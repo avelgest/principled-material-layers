@@ -10,7 +10,8 @@ bl_info = {
     "location": ("View3D > Texture Paint Sidebar > Material Layers "
                  "or Shader Editor > Sidebar > Material Layers"),
     "warning": "Early beta version",
-    "doc_url": ""  # TODO
+    "doc_url": ("https://github.com/avelgest/"
+                "principled-material-painting/blob/main/docs.md")
 }
 
 if "import_utils" in locals():

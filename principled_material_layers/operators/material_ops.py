@@ -458,8 +458,8 @@ class PML_OT_replace_layer_material(Operator):
     auto_enable_channels: BoolProperty(
         name="Auto-Enable Layer Stack Channels",
         description="Automatically enable any channels used by the new "
-                    "material that are not enabled on the layer stack",
-        default=False
+                    "material that are not already enabled on the layer stack",
+        default=True
     )
 
     ma_index: IntProperty(
