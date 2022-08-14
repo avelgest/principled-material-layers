@@ -418,7 +418,7 @@ class ImageManager(bpy.types.PropertyGroup):
         image.delete()
         self.layer_images.remove(idx)
 
-    def reload_tmp_active_layer(self) -> None:
+    def reload_tmp_active_image(self) -> None:
         """If a temporary active image is being used instead of the
         active layer's 'image' property then this loads the active
         layer's alpha into all the RGB channels of theactive image.
@@ -548,8 +548,17 @@ class ImageManager(bpy.types.PropertyGroup):
         for image in self.layer_images:
             bl_image = image.image
             bl_image.scale(width, height)
-        if self.active_image is not None:
-            self.active_image.scale(width, height)
+
+        active_image = self.active_image
+        if active_image is not None:
+            if tuple(active_image.size) != (width, height):
+                active_image.scale(width, height)
+
+            # Need to edit pixel data after scale or texture paint may
+            # display blank tiles when trying to paint.
+            # (cause unknown: can't reproduce outside add-on)
+            active_image.pixels[0] = active_image.pixels[0]
+            active_image.update()
 
         self.image_width = width
         self.image_height = height

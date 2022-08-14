@@ -479,7 +479,7 @@ class LayerStack(bpy.types.PropertyGroup):
                     self._undo_workaround()
             else:
                 if pre_undo_layer_id != active_layer_id:
-                    self.image_manager.reload_tmp_active_layer()
+                    self.image_manager.reload_tmp_active_image()
 
         # Check whether the layer stack has been reallocated
         if undo_invariant.pre_pointer != self.as_pointer():
