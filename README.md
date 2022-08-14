@@ -1,5 +1,5 @@
 # Principled Material Layers
-Principled Material Painting is a Blender add-on that aims to provide a
+Principled Material Layers is a Blender add-on that aims to provide a
 convenient and performant way to layer and paint any materials that use the
 Principled BSDF node as their surface shader.
 
@@ -19,9 +19,10 @@ https://user-images.githubusercontent.com/111190478/184520872-12deb2ec-1857-4e57
 *from Poly Haven.*
 
 ## Installation
-Download the latest .zip file from the releases section, then from the Add-ons
-section of Blender’s preferences click “Install...” and select the downloaded
-.zip file. Enable the add-on labelled “Material: Principled Material Layers”.
+Download the latest principled_material_layers ZIP file from the releases 
+section, then from the Add-ons section of Blender’s preferences click 
+“Install...” and select the downloaded .zip file. Enable the add-on labelled 
+“Material: Principled Material Layers”.
 
 ## Features
 - Use existing materials in the same blend file or directly from an asset
@@ -71,4 +72,4 @@ For more information see the [documentation](/docs.md).
 
 ## License
 Principled Material Layer is release under the GNU General Public License,
-version 2. See LICENSE.txt for details.
+version 2. See [LICENSE.txt](/LICENSE.txt) for details.
