@@ -16,6 +16,7 @@ from bpy.types import (Node,
                        NodeSocketInterface,
                        ShaderNode,
                        ShaderNodeTree)
+from mathutils import Vector
 
 from .temp_changes import TempNodes
 
@@ -108,6 +109,9 @@ def is_socket_simple_const(socket: NodeSocket) -> bool:
 
 def get_nodes_by_type(node_tree: bpy.types.NodeTree,
                       node_type: Union[str, type]) -> Iterator[Node]:
+    """Returns an iterator over all nodes of the given type in
+    node_tree.
+    """
     if isinstance(node_type, str):
         return (x for x in node_tree.nodes if x.bl_idname == node_type)
 
@@ -115,7 +119,10 @@ def get_nodes_by_type(node_tree: bpy.types.NodeTree,
 
 
 def get_node_by_type(node_tree: bpy.types.NodeTree,
-                     node_type: Union[str, type]) -> bpy.types.Node:
+                     node_type: Union[str, type]) -> Optional[bpy.types.Node]:
+    """Returns the first node with the given type or None if no nodes
+    in node_tree have this type.
+    """
     return next(get_nodes_by_type(node_tree, node_type), None)
 
 
@@ -199,36 +206,132 @@ def set_node_group_vector_defaults(node_group: ShaderNodeTree):
             elif "tangent" in socket_name:
                 tangent_sockets.append(socket)
 
-        group_out_loc = group_out.location
-        group_out_height = group_out.dimensions.y
-        if group_out_height == 0:
-            # Approximate the height of the node
-            group_out_height = len(group_out.inputs) * 22 + 50
-
         if normal_sockets:
-            # Use a Texture Coordinate node for default normals
-            coord_node = node_group.nodes.new("ShaderNodeTexCoord")
-            coord_node.name = coord_node.label = "Default Normal"
-            coord_node.hide = True
-            coord_node.location = (group_out_loc.x - coord_node.width - 80,
-                                   group_out_loc.y - group_out_height + 50)
-            for output in coord_node.outputs:
-                if output.name != "Normal":
-                    output.hide = True
+            default_normals = _ensure_default_normals_socket(node_group)
 
             for socket in normal_sockets:
-                node_group.links.new(socket, coord_node.outputs["Normal"])
+                node_group.links.new(socket, default_normals)
 
         if tangent_sockets:
-            # Use a Tangent node for tangents
-            tangent_node = node_group.nodes.new("ShaderNodeTangent")
-            tangent_node.name = tangent_node.label = "Default Tangent"
-            tangent_node.hide = True
-            tangent_node.location = (group_out_loc.x - tangent_node.width - 80,
-                                     group_out_loc.y - group_out_height + 20)
+            default_tangents = _ensure_default_tangents_socket(node_group)
 
             for socket in tangent_sockets:
-                node_group.links.new(socket, tangent_node.outputs[0])
+                node_group.links.new(socket, default_tangents)
+
+
+def group_output_link_default(socket: NodeSocketInterface) -> None:
+    """Link each Group Output node socket matching the
+    NodeSocketInterface socket to a node that provides them with a
+    correct default value.
+    """
+    if socket.type != 'VECTOR':
+        return
+
+    node_tree = socket.id_data
+    assert isinstance(node_tree, ShaderNodeTree)
+
+    for group_out in get_nodes_by_type(node_tree, "NodeGroupOutput"):
+        out_socket = group_out.inputs[socket.name]
+        vector_socket_link_default(out_socket)
+
+
+def vector_socket_link_default(socket: NodeSocket) -> None:
+    """Link an unconnected normal or tangent input socket to a node that
+    provides them with a correct default value. This is for use with
+    the inputs of Group Output nodes so that they have the same value
+    they would have if left unconnected in a material's node tree.
+    """
+    if socket.is_output:
+        raise ValueError("Expected an input socket.")
+
+    if socket.type != 'VECTOR' or socket.is_linked:
+        return
+
+    node_tree = socket.id_data
+    assert isinstance(node_tree, ShaderNodeTree)
+
+    socket_name = socket.name.casefold()
+
+    if "normal" in socket_name:
+        default_vec_socket = _ensure_default_normals_socket(node_tree)
+    elif "tangent" in socket_name:
+        default_vec_socket = _ensure_default_tangents_socket(node_tree)
+    else:
+        return
+
+    node_tree.links.new(socket, default_vec_socket)
+
+
+def _get_group_output_bottom_left(node_tree: ShaderNodeTree) -> Vector:
+    """Returns the position of the bottom left of the first Group Output
+    node in node_tree as a 2D Vector.
+    """
+    group_out = get_node_by_type(node_tree, bpy.types.NodeGroupOutput)
+    if group_out is None:
+        return Vector((0., 0.))
+
+    group_out_loc = group_out.location
+    group_out_height = group_out.dimensions.y
+    if group_out_height == 0:
+        # Approximate the height of the node
+        group_out_height = len(group_out.inputs) * 22 + 50
+
+    return Vector((group_out_loc.x, group_out_loc.y - group_out_height))
+
+
+def _ensure_default_normals_socket(node_tree: ShaderNodeTree) -> NodeSocket:
+    """Ensures a node that provides a default value for normals exists
+    in node_tree and returns the relevent output socket of that node.
+    """
+    # The name attribute of the node to use for default normals
+    default_normals_name = "default_normals"
+
+    # Check for an existing node first
+    existing = node_tree.nodes.get(default_normals_name)
+    if existing:
+        return existing.outputs["Normal"]
+
+    # Create a new Texture Coordinate node
+    coord_node = node_tree.nodes.new("ShaderNodeTexCoord")
+    coord_node.name = default_normals_name
+    coord_node.label = "Default Normals"
+    coord_node.hide = True
+
+    # Place the node near the bottom left of the Group Output node
+    align_to = _get_group_output_bottom_left(node_tree)
+    coord_node.location = (align_to.x - coord_node.width - 80, align_to.y + 50)
+
+    for output in coord_node.outputs:
+        if output.name != "Normal":
+            output.hide = True
+
+    return coord_node.outputs["Normal"]
+
+
+def _ensure_default_tangents_socket(node_tree: ShaderNodeTree) -> NodeSocket:
+    """Ensures a node that provides a default value for normals exists
+    in node_tree and returns the relevent output socket of that node.
+    """
+    # The name attribute of the node to use for default normals
+    default_tangents_name = "default_tangents"
+
+    # Check for an existing node first
+    existing = node_tree.nodes.get(default_tangents_name)
+    if existing:
+        return existing.outputs[0]
+
+    # Create a new Tangent node
+    tangent_node = node_tree.nodes.new("ShaderNodeTangent")
+    tangent_node.name = default_tangents_name
+    tangent_node.label = "Default Tangent"
+    tangent_node.hide = True
+
+    # Place the node near the bottom left of the Group Output node
+    align_to = _get_group_output_bottom_left(node_tree)
+    tangent_node.location = (align_to.x - tangent_node.width - 80,
+                             align_to.y + 20)
+
+    return tangent_node.outputs[0]
 
 
 class DefaultSocket(NamedTuple):

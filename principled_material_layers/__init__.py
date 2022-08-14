@@ -3,7 +3,7 @@
 bl_info = {
     "name": "Principled Material Layers",
     "description": "Addon for painting node-based material layers",
-    "author": "",  # TODO
+    "author": "Avelgest",
     "version": (0, 5),
     "blender": (3, 1, 0),
     "category": "Material",

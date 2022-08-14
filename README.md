@@ -2,9 +2,10 @@
 Principled Material Painting is a Blender add-on that aims to provide a
 convenient and performant way to layer and paint any materials that use the
 Principled BSDF node as their surface shader.
+
 The add-on works by adding a “Material Layers” node to the Shader Editor to
 which materials can be added and painted in Texture Paint mode. The Material
-Layers node blends the channels (e.g. Base Color, Roughness etc.)  of multiple
+Layers node blends the channels (e.g. Base Color, Roughness etc.) of multiple
 materials based on each layer’s painted alpha. Each enabled channel has a
 corresponding output socket on the node, which can be connected to the socket
 with the same name on a Principled BSDF node.
@@ -39,7 +40,7 @@ when in Texture Paint mode, then paint using grayscale to modify the layer’s
 alpha (white fully blends this layer’s material, black leaves the layer below
 fully visible).
 
-Layers can be added/removed using the “+” and “-” buttons next to layers list.
+Layers can be added/removed using the '+' and '-' buttons next to layers list.
 A layer’s material may be edited by pressing the node icon next to its name in
 the layers list when there is an unpinned Shader Editor area open.
 To load an existing material select a layer then press the “Replace Layer

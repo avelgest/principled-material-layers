@@ -26,7 +26,8 @@ from .preferences import get_addon_preferences
 from .utils.layer_stack_utils import (get_layer_stack_by_id,
                                       get_layer_stack_from_prop)
 from .utils.naming import unique_name_in
-from .utils.nodes import set_node_group_vector_defaults
+from .utils.nodes import (set_node_group_vector_defaults,
+                          group_output_link_default)
 
 LAYER_TYPES = (('MATERIAL_PAINT', "Material Paint",
                 "An image-based layer for painting"),
@@ -280,6 +281,10 @@ class MaterialLayer(PropertyGroup):
         default_value = self.layer_stack.get_channel_default_value(channel)
         if default_value is not None:
             output.default_value = default_value
+
+        # Links any normal or tangent sockets on the Group Output node
+        # so they have the expected value. Does nothing for other sockets.
+        group_output_link_default(output)
 
     @property
     def _node_tree_name(self) -> str:
