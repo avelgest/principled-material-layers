@@ -69,7 +69,10 @@ For more information see the [documentation](/docs.md).
 - Loading materials from an asset library is considered experimental.
 - Early beta version, has not been thoroughly tested (see the issues section of
  the repository for known bugs).
+ 
+ https://user-images.githubusercontent.com/111190478/184711235-25bf5c51-ef9a-4372-a519-1eb4960c685a.mp4
 
 ## License
 Principled Material Layer is release under the GNU General Public License,
 version 2. See [LICENSE.txt](/LICENSE.txt) for details.
+
