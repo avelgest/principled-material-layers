@@ -168,6 +168,16 @@ class PML_OT_new_blending_node_group(Operator):
 
         assert blending.is_group_blending_compat(node_group, strict=True)
 
+        # Add MixRGB node
+        mix_node = node_group.nodes.new(type="ShaderNodeMixRGB")
+        mix_node.location = (group_in.location + group_out.location) / 2
+
+        for out_soc, in_soc in zip(group_in.outputs, mix_node.inputs):
+            node_group.links.new(in_soc, out_soc)
+
+        node_group.links.new(group_out.inputs[0], mix_node.outputs[0])
+
+        # Set the active channlel's blend_mode_custom to the new node group
         if self.set_on_active_channel:
             try:
                 layer_stack = get_layer_stack(context)

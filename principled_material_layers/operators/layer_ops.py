@@ -430,6 +430,10 @@ class PML_OT_channel_set_custom_blend(Operator):
             return {'CANCELLED'}
 
         channel.blend_mode_custom = blend_group
+
+        # Act as if the blend mode has been changed
+        bpy.msgbus.publish_rna(key=channel.path_resolve("blend_mode", False))
+
         return {'FINISHED'}
 
 
