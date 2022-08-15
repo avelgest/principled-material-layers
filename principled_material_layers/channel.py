@@ -212,11 +212,38 @@ class Channel(BasicChannel):
         return blending.BLEND_MODES_NODE_INFO[self.blend_mode]
 
     @property
+    def default_blend_mode(self):
+        """The default value of blend_mode that this channel should have.
+        This is the same for all channels in the layer stack with the
+        same name. Readonly when this channel belongs to a layer rather
+        than a layer stack.
+        """
+        if not self.is_layer_channel:
+            return self.blend_mode
+
+        # For MaterialLayer channels find a channel with the same name
+        # in layer_stack.channels and return its default_blend_mode
+        layer_stack_ch = self.layer_stack.channels.get(self.name)
+        if layer_stack_ch is None:
+            return 'MIX'
+
+        assert not layer_stack_ch.is_layer_channel
+        return layer_stack_ch.default_blend_mode
+
+    @default_blend_mode.setter
+    def default_blend_mode(self, value: str):
+        if self.is_layer_channel:
+            raise RuntimeError("Can only set default_blend_mode on a layer "
+                               "stack channel, not a MaterialLayer channel.")
+        self.blend_mode = value
+
+    @property
     def is_baked(self) -> bool:
         return self.bake_image is not None
 
     @property
     def is_layer_channel(self) -> bool:
+        """Returns true if this channel belongs to a MaterialLayer"""
         return bool(self.layer_identifier)
 
     @property
