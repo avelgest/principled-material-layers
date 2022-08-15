@@ -216,6 +216,10 @@ class Channel(BasicChannel):
         return self.bake_image is not None
 
     @property
+    def is_layer_channel(self) -> bool:
+        return bool(self.layer_identifier)
+
+    @property
     def layer(self):
         if not self.layer_identifier:
             return None

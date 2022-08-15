@@ -44,15 +44,15 @@ class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
     )
     r: StringProperty(
         name="Red Channel",
-        default=unallocated_value
+        default=""
     )
     g: StringProperty(
         name="Green Channel",
-        default=unallocated_value
+        default=""
     )
     b: StringProperty(
         name="Blue Channel",
-        default=unallocated_value
+        default=""
     )
 
     def delete(self):

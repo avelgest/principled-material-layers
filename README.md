@@ -1,7 +1,7 @@
 # Principled Material Layers
-Principled Material Layers is a Blender add-on that aims to provide a
-convenient and performant way to layer and paint any materials that use the
-Principled BSDF node as their surface shader.
+Principled Material Layers is a Blender add-on (for Blender 3.1+) that aims to 
+provide a convenient and performant way to layer and paint any materials that 
+use the Principled BSDF node as their surface shader.
 
 The add-on works by adding a “Material Layers” node to the Shader Editor to
 which materials can be added and painted in Texture Paint mode. The Material

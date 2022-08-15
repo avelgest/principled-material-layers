@@ -106,6 +106,7 @@ def _duplicate_ma_node_tree(context,
         old_nodes = list(nodes)
         exit_stack.callback(lambda: delete_nodes_not_in(nodes, old_nodes))
 
+        # FIXME Crashes in Blender 3.0.1
         bpy.ops.node.duplicate()
         bpy.ops.node.group_make()
 
