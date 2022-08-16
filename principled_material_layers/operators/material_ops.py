@@ -161,6 +161,8 @@ class _SocketInputValue(NamedTuple):
             raise ValueError("Expected an input socket.")
 
         default_value = getattr(socket, "default_value", None)
+        if isinstance(default_value, bpy.types.bpy_prop_array):
+            default_value = tuple(default_value)
 
         if not socket.is_linked:
             return cls(socket.name, socket.bl_idname,
@@ -326,7 +328,7 @@ class _ReplaceMaterialHelper:
         for soc_value in socket_values:
             group_out_soc = group_out.inputs[soc_value.name]
             tree_out = node_tree.outputs[soc_value.name]
-
+            
             if soc_value.default_value is not None:
                 group_out_soc.default_value = soc_value.default_value
                 tree_out.default_value = soc_value.default_value

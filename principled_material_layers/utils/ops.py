@@ -33,7 +33,6 @@ def save_all_modified() -> None:
 
     op_ctx = bpy.context.copy()
     with contextlib.redirect_stdout(io.StringIO()):
-        print("test")
         for img in images:
             if not img.is_dirty:
                 continue
