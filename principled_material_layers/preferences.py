@@ -31,7 +31,7 @@ class PMLPreferences(AddonPreferences):
                       "layer_ui_scale": 2.0,
                       "layers_share_images": True,
                       "use_undo_workaround": bpy.app.version < (3, 2, 0),
-                      "use_op_based_ma_copy": bpy.app.version < (3, 1, 0)
+                      "use_op_based_ma_copy": bpy.app.version > (3, 1, 0)
                       }
 
     # Differences in debug mode:
