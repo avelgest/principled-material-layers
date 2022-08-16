@@ -659,7 +659,7 @@ class NodeManager(bpy.types.PropertyGroup):
             if not ch.is_baked or ch.name not in output_node.inputs:
                 continue
             if ch.bake_image_channel == -1:
-                bake_node = nodes[node_names.bake_image_rgb(ch.bake_image)]
+                bake_node = nodes[node_names.bake_image(ch.bake_image)]
                 bake_socket = bake_node.outputs[0]
             else:
                 bake_node = nodes[node_names.bake_image_rgb(ch.bake_image)]
