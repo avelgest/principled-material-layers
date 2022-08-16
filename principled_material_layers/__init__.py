@@ -5,7 +5,7 @@ bl_info = {
     "description": "Addon for painting node-based material layers",
     "author": "Avelgest",
     "version": (0, 5),
-    "blender": (3, 1, 0),
+    "blender": (3, 0, 1),
     "category": "Material",
     "location": ("View3D > Texture Paint Sidebar > Material Layers "
                  "or Shader Editor > Sidebar > Material Layers"),

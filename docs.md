@@ -217,3 +217,8 @@ or adding/removing layers, but does not include making a brush stroke in Texture
 Paint mode) whilst a layer preview is being updated may cause a crash.
 Currently the only solution if you experience this issue is to disable layer
 previews.
+
+### Crash after "Replace Layer Material"
+When pressing "OK" in the "Replace Layer Material" pop-up causes a crash, this
+may be due to the method used by the add-on when copying materials. Unchecking
+"Use Op-Based Material Copy" in the add-on preferences may solve this.

@@ -23,13 +23,16 @@ class PMLPreferences(AddonPreferences):
     # Preferences to use when PMLPreferences cannot be found
     _mock_prefs: Optional[SimpleNamespace] = None
 
-    default_values = {"debug": False,
+    default_values = {
+                      "debug": False,
                       "use_numpy": False,
                       "show_misc_ops": False,
                       "show_previews": True,
                       "layer_ui_scale": 2.0,
                       "layers_share_images": True,
-                      "use_undo_workaround": bpy.app.version < (3, 2, 0)}
+                      "use_undo_workaround": bpy.app.version < (3, 2, 0),
+                      "use_op_based_ma_copy": bpy.app.version < (3, 1, 0)
+                      }
 
     # Differences in debug mode:
     #   - node_manager always rebuilds immediately rather than using a
@@ -73,6 +76,14 @@ class PMLPreferences(AddonPreferences):
         name="Show Layer Material Previews",
         description="Show previews for material layers in the UI",
         default=default_values["show_previews"]
+    )
+
+    use_op_based_ma_copy: BoolProperty(
+        name="Use Op-Based Material Copy",
+        description="Use operators to copy material node trees. Copies "
+                    "materials better, but may cause crashes during 'Replace "
+                    "Layer Material' in some Blender versions",
+        default=default_values["use_op_based_ma_copy"]
     )
 
     use_undo_workaround: BoolProperty(
@@ -125,6 +136,7 @@ class PMLPreferences(AddonPreferences):
         col = layout.column(align=True)
         col.prop(self, "debug")
         col.prop(self, "use_undo_workaround")
+        col.prop(self, "use_op_based_ma_copy")
 
     @classmethod
     def get_prefs(cls) -> Union[AddonPreferences, SimpleNamespace]:

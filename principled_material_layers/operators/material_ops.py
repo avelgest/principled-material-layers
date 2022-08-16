@@ -1,8 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 from contextlib import ExitStack
-from collections.abc import Container
-from typing import Any, Dict, List, NamedTuple, Optional, Union
+from typing import Any, Container, Dict, List, NamedTuple, Optional, Union
 
 import bpy
 
@@ -20,8 +19,11 @@ from bpy.types import (Material,
                        ShaderNodeTree,
                        UIList)
 
+from ..preferences import get_addon_preferences
+
 from ..asset_helper import append_material_asset
 
+from ..utils.duplicate_node_tree import duplicate_node_tree
 from ..utils.layer_stack_utils import get_layer_stack
 from ..utils.nodes import (delete_nodes_not_in,
                            get_node_by_type,
@@ -61,6 +63,9 @@ def _material_compatible_with(ma: Material, layer_stack) -> bool:
 def _duplicate_ma_node_tree(context,
                             material: Material) -> ShaderNodeTree:
     """Duplicate a material's node tree as a new node group."""
+
+    if not get_addon_preferences().use_op_based_ma_copy:
+        return duplicate_node_tree(material.node_tree)
 
     # Duplicates a material's node tree using bpy.ops.duplicate to
     # copy the nodes and bpy.ops.group_make to convert the
