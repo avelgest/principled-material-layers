@@ -3,37 +3,40 @@
 import os
 import typing
 
-from typing import Optional
+from typing import Optional, Union
 
 import bpy
 
 from bpy.types import (AssetHandle,
                        AssetLibraryReference,
+                       FileSelectEntry,
                        Material)
 
 
-def append_material_asset(asset: AssetHandle,
+def append_material_asset(asset: Union[AssetHandle, FileSelectEntry],
                           library: AssetLibraryReference) -> Material:
     """Append a material asset to the blend file."""
     return import_material_asset(asset, library, False)
 
 
-def link_material_asset(asset: AssetHandle,
+def link_material_asset(asset: Union[AssetHandle, FileSelectEntry],
                         library: AssetLibraryReference) -> Material:
     """Link a material asset to the blend file."""
     return import_material_asset(asset, library, True)
 
 
-def import_material_asset(asset: AssetHandle,
+def import_material_asset(asset: Union[AssetHandle, FileSelectEntry],
                           library: AssetLibraryReference,
                           link: bool) -> Material:
-
-    if not hasattr(asset, "file_data"):
+    if isinstance(asset, FileSelectEntry):
+        file_data = asset
+        del asset
+    elif not hasattr(asset, "file_data"):
         raise NotImplementedError("No 'file_data' attribute on asset")
+    else:
+        file_data = asset.file_data
 
     import_op = bpy.ops.wm.link if link else bpy.ops.wm.append
-
-    file_data = asset.file_data
 
     # Path to the blend file containing the asset
     library_path = AssetHandle.get_full_library_path(file_data, library)

@@ -19,6 +19,8 @@ from bpy.types import (Material,
                        ShaderNodeTree,
                        UIList)
 
+from bpy_extras.asset_utils import SpaceAssetInfo
+
 from ..preferences import get_addon_preferences
 
 from ..asset_helper import append_material_asset
@@ -30,6 +32,22 @@ from ..utils.nodes import (delete_nodes_not_in,
                            reference_inputs,
                            sort_sockets_by)
 from ..utils.ops import pml_op_poll
+
+
+# Which channels should be added when replacing a layer's material
+CHANNEL_DETECT_MODES = (
+    ('ALL', "All Channels",
+     "The layer will have all the layer stack's channels"),
+    ('ALL_ENABLED', "All Enabled",
+     "The layer will have all channels that are currently enabled "
+     "on the layer stack"),
+    ('MODIFIED_OR_ENABLED', "Modified or Enabled",
+     "The layer will have all channels that are enabled on the "
+     "layer stack or are affected by the new material"),
+    ('MODIFIED_ONLY', "Modified Only",
+     "The layer will have only channels that are affected by the "
+     "new material")
+    )
 
 
 def _get_output_node(node_tree):
@@ -443,7 +461,70 @@ class PML_UL_load_material_list(UIList):
         return flags, []  # flags, order
 
 
-class PML_OT_replace_layer_material(Operator):
+class ReplaceLayerOpBase:
+    auto_enable_channels: BoolProperty(
+        name="Auto-Enable Layer Stack Channels",
+        description="Automatically enable any channels used by the new "
+                    "material that are not already enabled on the layer stack",
+        default=True
+    )
+
+    ch_detect_mode: EnumProperty(
+        name="Channels",
+        items=CHANNEL_DETECT_MODES,
+        default='MODIFIED_OR_ENABLED'
+    )
+
+    def __init__(self):
+        # Used during execute for deleting temporarily appended materials
+        self.exit_stack: Optional[ExitStack] = None
+
+    def check_material_valid(self, material: Material, layer_stack) -> bool:
+        if material.node_tree is None:
+            self.report({'WARNING'}, "Material has no node tree.")
+            return False
+
+        if material is layer_stack.material:
+            self.report({'WARNING'}, "Cannot use the layer stack's container "
+                                     "material as a layer.")
+            return False
+
+        if not _material_compatible_with(material, layer_stack):
+            self.report({'WARNING'}, f"Material '{material.name}' is not "
+                                     "compatible")
+            return False
+
+        return True
+
+    def enable_stack_channels(self, layer_stack, layer) -> None:
+        """Enable all channels in layer on both the layer_stack and
+        the layer itself.
+        """
+        for ch in layer.channels:
+            layer_stack_ch = layer_stack.channels.get(ch.name)
+
+            if layer_stack_ch is not None:
+                layer_stack.set_channel_enabled(ch.name, True)
+                ch.enabled = True
+
+    def replace_layer_material(self, context, layer, material):
+        layer_stack = get_layer_stack(context)
+
+        layer.free_bake()
+
+        replace_layer_material(context, layer, material,
+                               ch_select=self.ch_detect_mode)
+
+        if (self.ch_detect_mode in ('MODIFIED_ONLY', 'MODIFIED_OR_ENABLED')
+                and self.auto_enable_channels):
+            # Ensure all channels in layer are enabled on the layer
+            # and the layer stack
+            self.enable_stack_channels(layer_stack, layer)
+
+        layer_stack.node_manager.rebuild_node_tree()
+
+
+class PML_OT_replace_layer_material(ReplaceLayerOpBase, Operator):
     bl_idname = "material.pml_replace_layer_material"
     bl_label = "Replace Layer Material"
     bl_description = ("Replaces the material of a principled material "
@@ -459,13 +540,6 @@ class PML_OT_replace_layer_material(Operator):
     layer_name: StringProperty(
         name="Layer",
         description="The layer to replace the material of"
-    )
-
-    auto_enable_channels: BoolProperty(
-        name="Auto-Enable Layer Stack Channels",
-        description="Automatically enable any channels used by the new "
-                    "material that are not already enabled on the layer stack",
-        default=True
     )
 
     ma_index: IntProperty(
@@ -489,27 +563,6 @@ class PML_OT_replace_layer_material(Operator):
                ),
         default='LOCAL'
     )
-
-    ch_detect_mode: EnumProperty(
-        name="Channels",
-        items=(('ALL', "All Channels",
-                "The layer will have all the layer stack's channels"),
-               ('ALL_ENABLED', "All Enabled",
-                "The layer will have all channels that are currently enabled "
-                "on the layer stack"),
-               ('MODIFIED_OR_ENABLED', "Modified or Enabled",
-                "The layer will have all channels that are enabled on the "
-                "layer stack or are affected by the new material"),
-               ('MODIFIED_ONLY', "Modified Only",
-                "The layer will have only channels that are affected by the "
-                "new material")
-               ),
-        default='MODIFIED_OR_ENABLED'
-    )
-
-    def __init__(self):
-        # Used during execute for deleting temporarily appended materials
-        self._exit_stack: Optional[ExitStack] = None
 
     @classmethod
     def poll(cls, context):
@@ -567,26 +620,12 @@ class PML_OT_replace_layer_material(Operator):
             self.report({'WARNING'}, f"Layer '{self.layer_name}' not found.")
             return {'CANCELLED'}
 
-        with ExitStack() as self._exit_stack:
+        with ExitStack() as self.exit_stack:
             material = self._get_material(layer_stack)
             if material is None:
                 return {'CANCELLED'}
-            if material.node_tree is None:
-                self.report({'WARNING'}, "Material has no node tree")
-                return {'CANCELLED'}
 
-            layer.free_bake()
-
-            replace_layer_material(context, layer, material,
-                                   ch_select=self.ch_detect_mode)
-
-            if (self.ch_detect_mode in ('MODIFIED_ONLY', 'MODIFIED_OR_ENABLED')
-                    and self.auto_enable_channels):
-                # Ensure all channels in layer are enabled on the layer
-                # and the layer stack
-                self._enable_stack_channels(layer_stack, layer)
-
-            layer_stack.node_manager.rebuild_node_tree()
+            self.replace_layer_material(context, layer, material)
 
             return {'FINISHED'}
 
@@ -607,38 +646,10 @@ class PML_OT_replace_layer_material(Operator):
                                    "not supported for this version.")
             return None
 
-        if self._exit_stack is not None:
-            self._exit_stack.callback(lambda: bpy.data.materials.remove(ma))
+        if self.exit_stack is not None:
+            self.exit_stack.callback(lambda: bpy.data.materials.remove(ma))
 
         return ma
-
-    def _enable_stack_channels(self, layer_stack, layer) -> None:
-        """Enable all channels in layer on both the layer_stack and
-        the layer itself.
-        """
-        for ch in layer.channels:
-            layer_stack_ch = layer_stack.channels.get(ch.name)
-
-            if layer_stack_ch is not None:
-                layer_stack.set_channel_enabled(ch.name, True)
-                ch.enabled = True
-
-    def _check_material_valid(self, material: Material, layer_stack) -> bool:
-        if material.node_tree is None:
-            self.report({'WARNING'}, "Material has no node tree.")
-            return False
-
-        if material is layer_stack.material:
-            self.report({'WARNING'}, "Cannot use the layer stack's container "
-                                     "material as a layer.")
-            return False
-
-        if not _material_compatible_with(material, layer_stack):
-            self.report({'WARNING'}, f"Material '{material.name}' is not "
-                                     "compatible")
-            return False
-
-        return True
 
     def _get_material(self, layer_stack) -> Optional[Material]:
 
@@ -658,14 +669,92 @@ class PML_OT_replace_layer_material(Operator):
             self.report({'WARNING'}, "No material specified.")
             return None
 
-        if not self._check_material_valid(material, layer_stack):
+        if not self.check_material_valid(material, layer_stack):
             return None
 
         return material
 
 
+class PML_OT_replace_layer_material_ab(ReplaceLayerOpBase, Operator):
+    bl_idname = "material.pml_replace_layer_material_ab"
+    bl_label = "Replace Layer Material"
+    bl_description = ("Replaces the material of the active principled  "
+                      "material layer")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        if not SpaceAssetInfo.is_asset_browser(context.space_data):
+            return False
+
+        active_file = context.active_file
+        if active_file is None or active_file.id_type != 'MATERIAL':
+            return False
+
+        layer_stack = get_layer_stack(context)
+        if not layer_stack or layer_stack.active_layer is None:
+            return False
+        return True
+
+    def draw(self, context):
+        layout = self.layout
+
+        col = layout.column(align=True)
+        col.prop(self, "ch_detect_mode")
+        if self.ch_detect_mode in ('MODIFIED_ONLY', 'MODIFIED_OR_ENABLED'):
+            col.prop(self, "auto_enable_channels")
+
+        asset = context.active_file
+
+        layout.separator()
+        layout.label(text="Selected Material: "
+                          f"{asset.name}")
+        if asset.preview_icon_id:
+            layout.template_icon(asset.preview_icon_id, scale=5.0)
+
+    def execute(self, context):
+        layer_stack = get_layer_stack(context)
+        layer = layer_stack.active_layer
+
+        with ExitStack() as self.exit_stack:
+            material = self.import_material(context)
+            if material is None:
+                return {'CANCELLED'}
+
+            self.replace_layer_material(context, layer, material)
+
+            return {'FINISHED'}
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self)
+
+    def import_material(self, context) -> Optional[Material]:
+        if context.active_file is None:
+            return None
+        if self.exit_stack is None:
+            raise RuntimeError("self.exit_stack is None.")
+
+        try:
+            ma = append_material_asset(context.active_file,
+                                       bpy.context.asset_library_ref)
+        except NotImplementedError:
+            self.report({'ERROR'}, "Replacing the layer material with an "
+                                   "asset is not supported for this version.")
+            return None
+
+        self.exit_stack.callback(lambda: bpy.data.materials.remove(ma))
+
+        if not self.check_material_valid(ma, get_layer_stack(context)):
+            self.report({'WARNING'}, "This material is not compatible")
+            return None
+
+        return ma
+
+
 classes = (PML_UL_load_material_list,
-           PML_OT_replace_layer_material)
+           PML_OT_replace_layer_material,
+           PML_OT_replace_layer_material_ab)
 
 _register, _unregister = bpy.utils.register_classes_factory(classes)
 

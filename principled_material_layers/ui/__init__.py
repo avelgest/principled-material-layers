@@ -5,7 +5,8 @@ from ..import_utils import import_all, register_all, unregister_all
 
 submodule_names = ("common",
                    "image_paint",
-                   "node_editor",)
+                   "node_editor",
+                   "asset_browser")
 
 submodules = import_all(submodule_names, __name__)
 
