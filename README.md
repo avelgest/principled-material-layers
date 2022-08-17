@@ -58,6 +58,10 @@ Material” button, select a material then press OK. The layer will now contain 
 copy of the material (note that the layer will not be affected by any subsequent
 changes made to the original material).
 
+A material asset can be loaded either by using the method above (for small
+asset libraries) or by selecting an asset in an Asset Browser area and pressing
+"Replace Layer Material" in the right-hand sidebar of the Asset Browser.
+
 A layer’s channels may be added/removed or enabled/disabled in the “Active
 Layer” panel. When a channel is disabled/removed from a layer then that layer
 no longer contributes to the final value of the channel.

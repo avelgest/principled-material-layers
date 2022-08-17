@@ -74,11 +74,16 @@ stack's channels, only the enabled channels, only channels modified by the new
 material, or channels that are either modified by the new material or enabled
 on the layer stack.
 
-When selecting from local materials in the “Replace Layer Material” pop-up only
-compatible materials (those which use a single surface shader with sockets that
-match any of the layer stack’s channels) are displayed. However, since this is
-not yet supported for assets, a material selected in the asset view is not
-guaranteed to be compatible.
+When selecting from local materials in the “Replace Layer Material” the pop-up 
+only compatible materials (those which use a single surface shader with sockets 
+that match any of the layer stack’s channels) are displayed. However, since this
+is not yet supported for assets, a material selected in the asset view may be 
+incompatible in which case the layer will be left unchanged.
+
+Material assets may also be loaded from an Asset Browser area by selecting the
+asset, going to the right-hand sidebar of the Asset Browser, and pressing
+"Replace Layer Material". As above, there's a possibility that the selected 
+asset may be incompatible. 
 
 A layer’s shader node tree may be edited at any time by clicking the node icon
 next to the layer’s name in the layer list or by selecting “Edit Nodes” in the
