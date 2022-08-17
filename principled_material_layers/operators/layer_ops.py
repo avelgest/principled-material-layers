@@ -405,7 +405,7 @@ class PML_OT_channel_set_blend_mode(Operator):
 class PML_OT_channel_set_custom_blend(Operator):
     bl_idname = "material.pml_channel_set_custom_blend"
     bl_label = "Set Custom Blend Group"
-    bl_description = "Sets the custom blend group of a channel."
+    bl_description = "Sets the custom blend group of a channel"
     bl_options = {'INTERNAL', 'REGISTER'}
 
     custom_blend: StringProperty(

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 import bpy
 
 from bpy.props import (BoolProperty,
@@ -171,25 +173,29 @@ class Channel(BasicChannel):
         default=""
     )
 
-    def initialize(self, name: str, socket_type: str, layer=None):
+    def initialize(self, name: str, socket_type: str, layer=None) -> None:
         """Initializes the channel. This or another of the init methods
         should be called before this channel is used.
         """
         super().initialize(name, socket_type)
-        if layer is not None:
-            self.layer_identifier = layer.identifier
+        self._init_props(layer)
 
     def init_from_channel(self, channel: BasicChannel, layer=None) -> None:
         """Initializes the channel from a BasicChannel instance."""
         super().init_from_channel(channel)
-        if layer is not None:
-            self.layer_identifier = layer.identifier
+        self._init_props(layer)
 
     def init_from_socket(self, socket: NodeSocket, layer=None) -> None:
         """Initializes the channel from a NodeSocket."""
         super().init_from_socket(socket)
+        self._init_props(layer)
+
+    def _init_props(self, layer) -> None:
         if layer is not None:
             self.layer_identifier = layer.identifier
+
+        self.blend_mode = self.default_blend_mode
+        self.blend_mode_custom = self.default_blend_mode_custom
 
     def delete(self) -> None:
         super().delete()
@@ -235,6 +241,30 @@ class Channel(BasicChannel):
         if self.is_layer_channel:
             raise RuntimeError("Can only set default_blend_mode on a layer "
                                "stack channel, not a MaterialLayer channel.")
+        self.blend_mode = value
+
+    @property
+    def default_blend_mode_custom(self) -> Optional[ShaderNodeTree]:
+        """The default value of blend_mode_custom that this channel
+        should have. Like default_blend_mode it is readonly for material
+        layer channels.
+        """
+        if not self.is_layer_channel:
+            return self.blend_mode_custom
+        layer_stack_ch = self.layer_stack.channels.get(self.name)
+
+        if layer_stack_ch is None:
+            return None
+
+        return layer_stack_ch.blend_mode_custom
+
+    @default_blend_mode_custom.setter
+    def default_blend_mode_custom(self,
+                                  value: Optional[ShaderNodeTree]) -> None:
+        if self.is_layer_channel:
+            raise RuntimeError("Can only set default_blend_mode_custom on a "
+                               "layer stack channel, not a MaterialLayer "
+                               "channel.")
         self.blend_mode = value
 
     @property

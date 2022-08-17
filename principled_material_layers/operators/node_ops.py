@@ -21,7 +21,7 @@ class PML_OT_rebuild_pml_stack_node_tree(Operator):
     bl_label = "Rebuild Layer Stack Node Tree"
     bl_description = ("Rebuilds the internal node tree of the active "
                       "material's PML layer stack")
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'INTERNAL', 'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -147,7 +147,9 @@ class PML_OT_new_blending_node_group(Operator):
         default=False
     )
     set_on_active_channel: BoolProperty(
-        default=False
+        default=False,
+        description=("Set blend_mode_custom of the active layer's "
+                     "active channel to the new node group")
     )
 
     def execute(self, context):
@@ -177,16 +179,21 @@ class PML_OT_new_blending_node_group(Operator):
 
         node_group.links.new(group_out.inputs[0], mix_node.outputs[0])
 
-        # Set the active channlel's blend_mode_custom to the new node group
+        # Set the active channel's blend_mode_custom to the new node group
         if self.set_on_active_channel:
+            # If pml_channel has been by context_pointer_set then use
+            # that otherwise use the active channel of the active layer
+            channel = getattr(context, "pml_channel", None)
+
             try:
-                layer_stack = get_layer_stack(context)
-                active_channel = layer_stack.active_layer.active_channel
+                if channel is None:
+                    layer_stack = get_layer_stack(context)
+                    channel = layer_stack.active_layer.active_channel
             except AttributeError:
                 self.report({'WARNING'}, "No active channel found: could not "
                                          "set blend_mode_custom.")
             else:
-                active_channel.blend_mode_custom = node_group
+                channel.blend_mode_custom = node_group
 
         if self.open_in_editor:
             bpy.ops.node.pml_view_shader_node_group(
@@ -261,7 +268,7 @@ class PML_OT_add_pml_node(Operator):
 
         return (layer_stack
                 and space.type == 'NODE_EDITOR'
-                and space.edit_tree == layer_stack.material.node_tree)
+                and space.edit_tree is layer_stack.material.node_tree)
 
     def draw(self, context):
         return

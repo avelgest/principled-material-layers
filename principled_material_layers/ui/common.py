@@ -227,7 +227,10 @@ class PML_MT_custom_blend_mode_select(Menu):
 
         layer_stack = get_layer_stack(context)
 
-        channel = layer_stack.active_layer.active_channel
+        # pml_channel can be set using context_pointer_set
+        channel = getattr(context, "pml_channel", None)
+        if channel is None:
+            channel = layer_stack.active_layer.active_channel
 
         layout.context_pointer_set("pml_channel", channel)
 
@@ -313,7 +316,7 @@ class layer_stack_PT_base:
 
         col = row.column()
         col.scale_y = prefs.layer_ui_scale
-        col.context_pointer_set("test", layer_stack)
+
         col.template_list("PML_UL_material_layers_list", "", layer_stack,
                           "layers", layer_stack, "active_layer_index",
                           sort_lock=True, sort_reverse=True)
@@ -346,9 +349,23 @@ class layer_stack_channels_PT_base:
 
         self.draw_channels_list(layout, layer_stack)
 
+        active_channel = layer_stack.active_channel
+        if active_channel is None:
+            return
+
         row = layout.row()
         row.enabled = False
-        row.prop(layer_stack.active_channel, "socket_type", text="Type")
+        row.prop(active_channel, "socket_type", text="Type")
+
+        # The blend modes of the layer stack's channels are the defaults
+        # for its layers' channels
+        layout.separator()
+        layout.label(text="Default Blend Mode")
+        layout.prop(active_channel, "blend_mode", text="")
+        if active_channel.blend_mode == 'CUSTOM':
+            # Same UI as for material layers' channels
+            active_layer_PT_base.draw_custom_blending_props(layout,
+                                                            active_channel)
 
     def draw_channels_list(self, layout, layer_stack):
         active_channel = layer_stack.active_channel
@@ -445,7 +462,10 @@ class active_layer_PT_base:
         if output_node is not None and socket is not None:
             layout.template_node_view(node_tree, output_node, socket)
 
-    def draw_custom_blending_props(self, layout, channel):
+    @staticmethod
+    def draw_custom_blending_props(layout, channel):
+
+        layout.context_pointer_set("pml_channel", channel)
 
         col = layout.column(align=True)
         col.label(text="Custom Blending Mode")
