@@ -328,7 +328,7 @@ class _ReplaceMaterialHelper:
         for soc_value in socket_values:
             group_out_soc = group_out.inputs[soc_value.name]
             tree_out = node_tree.outputs[soc_value.name]
-            
+
             if soc_value.default_value is not None:
                 group_out_soc.default_value = soc_value.default_value
                 tree_out.default_value = soc_value.default_value
@@ -599,6 +599,13 @@ class PML_OT_replace_layer_material(ReplaceLayerOpBase, Operator):
                               type='GRID', rows=4, columns=2)
 
         elif self.ma_select_mode == 'ASSET':
+            wm = context.window_manager
+            if len(wm.pml_ma_assets) > 30:
+                col = layout.column(align=True)
+                col.label(text="Material assets can also be loaded via the ",
+                               icon='INFO')
+                col.label(text="sidebar of the Asset Browser.", icon='BLANK1')
+
             # FIXME Can only select with the arrow keys
             layout.label(text="The selection can be changed using the arrow "
                               "keys")
