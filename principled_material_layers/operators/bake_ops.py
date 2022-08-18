@@ -453,6 +453,8 @@ class PML_OT_bake_layer_stack(Operator):
 
         if self.hide_images:
             self._ensure_images_hidden(baked)
+        else:
+            self._report_baked_names(baked)
 
         layer_stack.node_manager.rebuild_node_tree()
 
@@ -469,6 +471,11 @@ class PML_OT_bake_layer_stack(Operator):
         for img in b_images:
             if not img.name.startswith("."):
                 img.name = f".{img.name}"
+
+    def _report_baked_names(self, bake_sockets):
+        image_names = [f'"{x.b_image.name}"' for x in bake_sockets]
+        self.report({'INFO'}, f"Created {len(image_names)} images: "
+                              f"{', '.join(image_names)}")
 
     def _get_bake_size(self, image_manager) -> Tuple[int, int]:
         ratio = self.size_percent / 100
