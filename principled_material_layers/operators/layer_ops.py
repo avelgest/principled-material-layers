@@ -472,10 +472,12 @@ class PML_OT_stack_add_channel(Operator):
     def execute(self, context):
         layer_stack = get_layer_stack(context)
         try:
-            layer_stack.add_channel(self.channel_name, self.channel_type)
+            ch = layer_stack.add_channel(self.channel_name, self.channel_type)
         except ValueError as e:
             self.report({'ERROR'}, str(e))
             return {'CANCELLED'}
+
+        layer_stack.active_channel = ch
 
         save_all_modified()
         ensure_global_undo()
@@ -504,7 +506,12 @@ class PML_OT_stack_remove_channel(Operator):
 
     @classmethod
     def poll(cls, context):
-        return pml_op_poll(context)
+        if not pml_op_poll(context):
+            return False
+
+        layer_stack = get_layer_stack(context)
+        # Layer stacks with no channels are not supported
+        return len(layer_stack.channels) > 1
 
     def execute(self, context):
         layer_stack = get_layer_stack(context)

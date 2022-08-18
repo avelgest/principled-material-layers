@@ -692,6 +692,9 @@ class LayerStack(bpy.types.PropertyGroup):
         Params:
             name: The name of the channel to remove.
         """
+        if len(self.channels) == 1:
+            raise RuntimeError("A LayerStack must have at least one channel.")
+
         channel = self.channels.get(name)
 
         if channel is None:
@@ -1008,6 +1011,14 @@ class LayerStack(bpy.types.PropertyGroup):
             self.active_channel_index = len(self.channels) - 1
 
         return self.channels[self.active_channel_index]
+
+    @active_channel.setter
+    def active_channel(self, channel: BasicChannel):
+        ch_idx = self.channels.find(channel.name)
+        if ch_idx < 0:
+            raise ValueError(f"LayerStack has no channel named {channel.name}")
+
+        self.active_channel_index = ch_idx
 
     @property
     def base_layer(self) -> Optional[MaterialLayer]:
