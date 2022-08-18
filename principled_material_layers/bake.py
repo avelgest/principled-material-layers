@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import (Collection,
                     Generator,
                     Iterable,
@@ -21,6 +21,8 @@ from .channel import Channel, get_socket_type
 from .utils.image import SplitChannelImageRGB
 from .utils.nodes import is_socket_simple_const
 from .utils.temp_changes import TempChanges, TempNodes
+
+from .utils.layer_stack_utils import get_layer_stack_by_id
 
 
 @dataclass
@@ -70,7 +72,8 @@ class _SocketBakeType(NamedTuple):
                 and (self.height is None or image.height == self.height))
 
 
-class BakedSocket(NamedTuple):
+@dataclass
+class BakedSocket:
     """The result baking a socket. Returned from various methods of
     SocketBaker.
     Attributes:
@@ -83,6 +86,32 @@ class BakedSocket(NamedTuple):
     socket: NodeSocket
     image: SplitChannelImageRGB
     image_ch: int = -1
+
+    image_id: str = field(init=False)  # Identifier used by ImageManager
+    _layer_stack_id: str = field(init=False, default="")
+
+    def __post_init__(self):
+        self.image_id = getattr(self.image, "identifier", "")
+
+        layer_stack = getattr(self.image, "layer_stack", None)
+        if layer_stack:
+            self._layer_stack_id = layer_stack.identifier
+
+    def get_image_safe(self) -> Optional[SplitChannelImageRGB]:
+        """A safe way of getting the image attribute. Since image may
+        be a SplitChannelImageProp accessing it via a python variable
+        can sometimes cause crashes.
+        """
+        if not self._layer_stack_id or not self.image_id:
+            return self.image
+
+        layer_stack = get_layer_stack_by_id(self._layer_stack_id)
+
+        if layer_stack is None:
+            raise RuntimeError("Cannot find LayerStack with id "
+                               f"{self._layer_stack_id}")
+
+        return layer_stack.image_manager.get_image_by_id(self.image_id)
 
     @property
     def b_image(self) -> bpy.types.Image:
@@ -574,7 +603,7 @@ class LayerStackBaker(SocketBaker):
     def rename_image(self,
                      image: SplitChannelImageRGB,
                      socket: NodeSocket) -> None:
-        """Rename an image created by this baker."""
+        """Rename an image newly created by this baker."""
         channel_socket = next((x for x in self.baking_sockets
                                if x.socket is socket), None)
         if channel_socket is None:
@@ -584,7 +613,7 @@ class LayerStackBaker(SocketBaker):
         layer_stack = channel.layer_stack
         ma = layer_stack.material
 
-        image.image.name = f"{ma.name} {channel.name} baked"
+        image.name = f"{ma.name} {channel.name} baked"
 
     def use_float_for(self, socket: NodeSocket) -> bool:
         """Whether or not to use a float for a particular socket.
@@ -654,7 +683,7 @@ class LayerBaker(LayerStackBaker):
         return baked_sockets
 
     def rename_image(self, image, socket) -> None:
-        """Rename an image created by this baker.
+        """Rename an image newly created by this baker.
         Override of LayerStackBaker method.
         """
         # No code. Don't rename and just keep the default name.

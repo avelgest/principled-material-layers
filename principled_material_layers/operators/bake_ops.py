@@ -467,13 +467,13 @@ class PML_OT_bake_layer_stack(Operator):
         return wm.invoke_props_dialog(self)
 
     def _ensure_images_hidden(self, baked_sockets: BakedSocket) -> None:
-        b_images = [x.b_image for x in baked_sockets]
-        for img in b_images:
+        images = [x.get_image_safe() for x in baked_sockets]
+        for img in images:
             if not img.name.startswith("."):
                 img.name = f".{img.name}"
 
     def _report_baked_names(self, bake_sockets):
-        image_names = [f'"{x.b_image.name}"' for x in bake_sockets]
+        image_names = [f'"{x.get_image_safe().name}"' for x in bake_sockets]
         self.report({'INFO'}, f"Created {len(image_names)} images: "
                               f"{', '.join(image_names)}")
 

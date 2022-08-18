@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools as it
 import warnings
 
 from typing import List, Optional, Tuple
@@ -20,6 +21,7 @@ from .utils.image import (clear_channel,
                           copy_image_channel,
                           copy_image_channel_to_rgb,
                           SplitChannelImageRGB)
+from .utils.layer_stack_utils import get_layer_stack_from_prop
 from .utils.naming import unique_name_in
 
 from .channel import Channel
@@ -41,6 +43,12 @@ class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
     )
     name: StringProperty(
         name="Name",
+        update=SplitChannelImageProp._name_update
+    )
+    identifier: StringProperty(
+        name="Identifier",
+        description="A unique identifier",
+        default=""
     )
     r: StringProperty(
         name="Red Channel",
@@ -54,6 +62,12 @@ class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
         name="Blue Channel",
         default=""
     )
+
+    def __eq__(self, other):
+        if isinstance(other, SplitChannelImageRGB):
+            return self.identifier == other.identifier
+
+        return super().__eq__(other)
 
     def delete(self):
         if self.image is not None:
@@ -93,6 +107,7 @@ class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
                                          float_buffer=im.use_float)
 
         self.name = self.image.name
+        self.identifier = im.create_identifier()
 
         # Alter the image data so that the image can be packed
         self.image.pixels[0] = 0.0
@@ -118,7 +133,25 @@ class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
                                          float_buffer=is_float)
 
         self.name = self.image.name
+        self.identifier = im.create_identifier()
         # TODO check name not in image_manager.bake_images
+
+    @property
+    def image_manager(self) -> ImageManager:
+        return get_layer_stack_from_prop(self).image_manager
+
+    @property
+    def layer_stack(self):
+        return get_layer_stack_from_prop(self)
+
+    @staticmethod
+    def _name_update(self_, context):
+        self = self_
+        if self.image.name == self.name:
+            return
+        self.image.name = self.name
+        if self.name != self.image.name:
+            self.name = self.image.name
 
 
 class ImageManager(bpy.types.PropertyGroup):
@@ -273,6 +306,13 @@ class ImageManager(bpy.types.PropertyGroup):
                               f"{image.name}, want {self._BLANK_IMAGE_NAME}")
         return image
 
+    def create_identifier(self):
+        # All SplitChannelImageProp used by this ImageManager
+        all_split_images = it.chain(self.layer_images, self.bake_images)
+
+        identifiers = {x.identifier for x in all_split_images}
+        return unique_name_in(identifiers)
+
     def _get_unused_layer_image_channel(self):
         """Finds a layer image with an unused channel; if none can be
         found then a new image is created.
@@ -417,6 +457,13 @@ class ImageManager(bpy.types.PropertyGroup):
 
         image.delete()
         self.layer_images.remove(idx)
+
+    def get_image_by_id(self,
+                        identifier: str) -> Optional[SplitChannelImageProp]:
+        """Returns a SplitChannelImageProp (used for layer images and
+        bake images) with the given identifier."""
+        return next((x for x in it.chain(self.layer_images, self.bake_images)
+                     if x.identifier == identifier), None)
 
     def reload_tmp_active_image(self) -> None:
         """If a temporary active image is being used instead of the
@@ -610,14 +657,7 @@ class ImageManager(bpy.types.PropertyGroup):
 
     @property
     def layer_stack(self):
-        try:
-            layer_stack_path = self["layer_stack_path"]
-        except KeyError as e:
-            raise RuntimeError("No id property 'layer_stack_path'."
-                               "Prehaps the image manager has not been "
-                               "initialized") from e
-
-        return self.id_data.path_resolve(layer_stack_path)
+        return get_layer_stack_from_prop(self)
 
 
 classes = (SplitChannelImageProp, ImageManager)

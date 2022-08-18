@@ -7,6 +7,7 @@ import struct
 from array import array
 from typing import Any, Optional, Tuple, Union
 
+import bpy
 from bpy.types import Image
 
 from ..preferences import get_addon_preferences
@@ -28,7 +29,10 @@ class SplitChannelImageRGB:
     _channel_names = {0: "r", 1: "g", 2: "b"}
 
     def __init__(self, image):
-        self.image = image
+        # Use image name to get image from bpy.data.images
+        # N.B. Prevents crashes but breaks if image is renamed
+        self._image_name = image.name
+
         self.r = self.unallocated_value
         self.g = self.unallocated_value
         self.b = self.unallocated_value
@@ -84,20 +88,41 @@ class SplitChannelImageRGB:
         return (self.r, self.g, self.b)
 
     @property
+    def image(self) -> Image:
+        try:
+            return bpy.data.images[self._image_name]
+        except KeyError as e:
+            raise KeyError(f"Cannot find image named {self._image_name}. The "
+                           "image may have be renamed without using the name "
+                           "property of this SplitChannelImageRGB instance"
+                           ) from e
+
+    @property
+    def image_name(self) -> str:
+        return self.name
+
+    @image_name.setter
+    def image_name(self, name: str):
+        self.name = name
+
+    @property
+    def name(self) -> str:
+        return self._image_name
+
+    @name.setter
+    def name(self, name: str):
+        image = self.image
+        image.name = name
+        # Name may be different from argument
+        self._image_name = image.name
+
+    @property
     def is_data(self) -> bool:
         return self.image.colorspace_settings.is_data
 
     @property
     def is_float(self) -> bool:
         return self.image.is_float
-
-    @property
-    def image_name(self) -> str:
-        return self.image.name
-
-    @image_name.setter
-    def image_name(self, name: str):
-        self.image.name = name
 
     @property
     def size(self) -> Tuple[int, int]:
