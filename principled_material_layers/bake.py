@@ -510,10 +510,15 @@ class SocketBaker:
         return socket.type == 'RGBA'
 
     def use_float_for(self, socket: NodeSocket) -> bool:
-        settings = self.settings
-        return (settings.always_use_float
-                or (isinstance(socket, bpy.types.NodeSocketFloat)
-                    and socket.name.lower() != "fac"))
+        if self.settings.always_use_float:
+            return True
+
+        socket_type_name = socket.bl_rna.identifier
+        # N.B. Need to use float for vectors to support negative values
+
+        # Only use ints for color sockets or 'fac' scalar sockets
+        return not ("Color" in socket_type_name
+                    or socket.name.lower() == "fac")
 
 
 class ChannelSocket(NamedTuple):
