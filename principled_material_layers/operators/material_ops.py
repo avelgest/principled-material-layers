@@ -27,7 +27,9 @@ from ..asset_helper import append_material_asset
 
 from ..utils.duplicate_node_tree import duplicate_node_tree
 from ..utils.layer_stack_utils import get_layer_stack
-from ..utils.materials import check_material_compat
+from ..utils.materials import (IsMaterialCompat,
+                               check_material_compat,
+                               check_material_asset_compat)
 from ..utils.nodes import (delete_nodes_not_in,
                            get_node_by_type,
                            get_output_node,
@@ -550,6 +552,8 @@ class PML_OT_replace_layer_material(ReplaceLayerOpBase, Operator):
         if layer is None:
             return
 
+        prefs = get_addon_preferences()
+
         col = layout.column(align=True)
         col.prop(self, "ch_detect_mode")
         if self.ch_detect_mode in ('MODIFIED_ONLY', 'MODIFIED_OR_ENABLED'):
@@ -570,6 +574,14 @@ class PML_OT_replace_layer_material(ReplaceLayerOpBase, Operator):
                               type='GRID', rows=4, columns=2)
 
         elif self.ma_select_mode == 'ASSET':
+            row = layout.row()
+            row.prop(prefs, "check_assets_compat", text="Check Compatible")
+            if prefs.check_assets_compat:
+                is_compat = self._check_asset_compat(context)
+                if is_compat is not None:
+                    row.label(text=is_compat.label_text_short,
+                              icon=is_compat.label_icon)
+
             wm = context.window_manager
             if len(wm.pml_ma_assets) > 30:
                 col = layout.column(align=True)
@@ -615,12 +627,21 @@ class PML_OT_replace_layer_material(ReplaceLayerOpBase, Operator):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
 
+    def _check_asset_compat(self, context) -> Optional[IsMaterialCompat]:
+        layer_stack = get_layer_stack(context)
+        asset = self.selected_asset
+        if asset is None:
+            return None
+        asset_lib = bpy.context.asset_library_ref
+
+        return check_material_asset_compat(asset, asset_lib,
+                                           layer_stack, delayed=True)
+
     def _temp_append_material_asset(self) -> Optional[Material]:
         """Temporarily append the selected asset to the file and tell
         the exit stack to delete it on exit. If the file has a local_id
         then the local_id is just returned and will not deleted."""
-        wm = bpy.context.window_manager
-        asset = wm.pml_ma_assets[self.ma_asset_index]
+        asset = self.selected_asset
 
         if getattr(asset, "local_id", None) is not None:
             return asset.local_id
@@ -659,6 +680,13 @@ class PML_OT_replace_layer_material(ReplaceLayerOpBase, Operator):
             return None
 
         return material
+
+    @property
+    def selected_asset(self) -> Optional[bpy.types.AssetHandle]:
+        wm = bpy.context.window_manager
+        if not wm.pml_ma_assets:
+            return None
+        return wm.pml_ma_assets[self.ma_asset_index]
 
 
 class PML_OT_replace_layer_material_ab(ReplaceLayerOpBase, Operator):

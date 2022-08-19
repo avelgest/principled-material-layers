@@ -74,9 +74,4 @@ def pml_op_poll(context: Context) -> bool:
                 and layer_stack.active_layer is not None
                 and space.edit_tree == layer_stack.active_layer.node_tree):
             return True
-
-        # Return True if a ShaderNodePMLStack is selected
-        if (context.active_node is not None
-                and context.active_node.bl_idname == "ShaderNodePMLStack"):
-            return True
     return False

@@ -4,7 +4,7 @@ use the Principled BSDF shader node. It works by adding a new node (the
 [Material Layers](#material-layers-node) node) to the shader editor that
 represents a stack of material  layers with an output socket for each of the
 stack’s enabled channels. The blending of the stack’s materials takes place
-entirely inside the nodes internal node tree, so that the node itself can be 
+entirely inside the nodes internal node tree, so that the node itself can be
 freely connected like any other node.
 
 Any number of materials can be added to the stack and their node trees may be
@@ -67,23 +67,23 @@ alt="The Replace Layer Material pop-up"
 
 Existing materials can be added to the layer stack using “Replace Layer
 Material”. This replaces the material of the active layer with a material from
-the current Blender file or from an asset (currently experimental). What 
-channels the layer will have after its material is replaced is determined by 
-the "Channels" option in the pop-up, the options are: all the layer 
+the current Blender file or from an asset (currently experimental). What
+channels the layer will have after its material is replaced is determined by
+the "Channels" option in the pop-up, the options are: all the layer
 stack's channels, only the enabled channels, only channels modified by the new
 material, or channels that are either modified by the new material or enabled
 on the layer stack.
 
-When selecting from local materials in the “Replace Layer Material” the pop-up 
-only compatible materials (those which use a single surface shader with sockets 
-that match any of the layer stack’s channels) are displayed. However, since this
-is not yet supported for assets, a material selected in the asset view may be 
-incompatible in which case the layer will be left unchanged.
+When selecting from local materials in the “Replace Layer Material” the pop-up
+only compatible materials (those which use a single surface shader with sockets
+that match any of the layer stack’s channels) are displayed. For the asset view
+all materials are displayed, though the compatibility of the selected asset can
+be displayed if "Check Compatible" is enabled.
 
 Material assets may also be loaded from an Asset Browser area by selecting the
 asset, going to the right-hand sidebar of the Asset Browser, and pressing
-"Replace Layer Material". As above, there's a possibility that the selected 
-asset may be incompatible. 
+"Replace Layer Material". As above, the compatibility of the selected asset can
+be displayed in the sidebar if "Check Compatible" is enabled.
 
 A layer’s shader node tree may be edited at any time by clicking the node icon
 next to the layer’s name in the layer list or by selecting “Edit Nodes” in the

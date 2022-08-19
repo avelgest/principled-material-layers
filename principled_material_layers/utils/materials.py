@@ -7,15 +7,19 @@ import itertools as it
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Callable, DefaultDict, Dict, Optional
+from typing import Callable, DefaultDict, Dict, Optional, Union
 
 import bpy
 
-from bpy.types import AssetLibraryReference, FileSelectEntry, Material
+from bpy.types import (AssetHandle,
+                       AssetLibraryReference,
+                       FileSelectEntry,
+                       Material)
 
 from .layer_stack_utils import get_layer_stack_by_id
 from ..asset_helper import (append_material_asset,
-                            delayed_append_material_asset)
+                            delayed_append_material_asset,
+                            file_entry_from_handle)
 from ..utils.nodes import get_output_node
 
 _LayerStackID = str
@@ -65,6 +69,48 @@ class IsMaterialCompat:
 
     def __bool__(self):
         return not self.reason
+
+    @property
+    def label_text(self) -> str:
+        if self:
+            if not self.unmatched_channels:
+                return "Compatible: All Channels Found"
+            if self.unmatched_channels < self.matched_sockets:
+                return (f"Mostly Compatible: {self.unmatched_channels} "
+                        "Channels Not Found")
+            return (f"Low Compatibility: {self.unmatched_channels} "
+                    "Channels Not Found")
+
+        if self.in_progress:
+            return "Checking Compatibility..."
+
+        return f"Incompatible: {self.reason}."
+
+    @property
+    def label_text_short(self) -> str:
+        if self:
+            if not self.unmatched_channels:
+                return "Fully Compatible"
+            if self.unmatched_channels < self.matched_sockets:
+                text = "Mostly Compatible"
+            else:
+                text = "Low Compatibility"
+            return f"{text} {self.matched_sockets}:{self.unmatched_channels}"
+
+        if self.in_progress:
+            return "Checking Compatibility..."
+
+        return f"Incompatible: {self.reason}."
+
+    @property
+    def label_icon(self) -> str:
+        if self:
+            if self.unmatched_channels < self.matched_sockets:
+                return 'CHECKMARK'
+            return 'INFO'
+        if self.in_progress:
+            return 'NONE'
+        return 'ERROR'
 
     @classmethod
     def make_in_progress(cls):
@@ -120,7 +166,7 @@ def check_material_compat(ma: Material,
 MaterialAppender = Callable[[], Material]
 
 
-def check_material_asset_compat(asset: FileSelectEntry,
+def check_material_asset_compat(asset: Union[AssetHandle, FileSelectEntry],
                                 library: AssetLibraryReference,
                                 layer_stack,
                                 delayed: bool = False,
@@ -150,6 +196,10 @@ def check_material_asset_compat(asset: FileSelectEntry,
 
     if not layer_stack.is_initialized:
         raise ValueError("layer_stack has not been initialized")
+
+    # Support both FileSelectEntry and AssetHandle for asset param
+    if isinstance(asset, AssetHandle):
+        asset = file_entry_from_handle(asset)
 
     # Don't cache local materials
     if asset.local_id is not None:

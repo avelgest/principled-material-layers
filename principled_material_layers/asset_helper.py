@@ -14,6 +14,13 @@ from bpy.types import (AssetHandle,
                        Material)
 
 
+def file_entry_from_handle(asset: AssetHandle) -> FileSelectEntry:
+    """Returns a FileSelectEntry from an asset. Defined as a function
+    in case AssetHandle.file_data is changed/removed.
+    """
+    return asset.file_data
+
+
 @dataclass
 class DelayedMaterialImport:
     """Class for delayed material imports. The asset will not be
@@ -77,7 +84,7 @@ def import_material_asset(asset: Union[AssetHandle, FileSelectEntry],
     elif not hasattr(asset, "file_data"):
         raise NotImplementedError("No 'file_data' attribute on asset")
     else:
-        file_data = asset.file_data
+        file_data = file_entry_from_handle(asset)
 
     # Path to the blend file containing the asset
     library_path = AssetHandle.get_full_library_path(file_data, library)
