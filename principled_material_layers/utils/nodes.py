@@ -14,6 +14,7 @@ import bpy
 from bpy.types import (Node,
                        NodeSocket,
                        NodeSocketInterface,
+                       NodeTree,
                        ShaderNode,
                        ShaderNodeTree)
 from mathutils import Vector
@@ -107,7 +108,7 @@ def is_socket_simple_const(socket: NodeSocket) -> bool:
     return _is_node_simple_const(linked_node)
 
 
-def get_output_node(node_tree):
+def get_output_node(node_tree: ShaderNodeTree):
     for x in ('ALL', 'EEVEE', 'CYCLES'):
         output = node_tree.get_output_node(x)
         if output is not None:
@@ -115,7 +116,7 @@ def get_output_node(node_tree):
     return None
 
 
-def get_nodes_by_type(node_tree: bpy.types.NodeTree,
+def get_nodes_by_type(node_tree: NodeTree,
                       node_type: Union[str, type]) -> Iterator[Node]:
     """Returns an iterator over all nodes of the given type in
     node_tree.
@@ -126,12 +127,28 @@ def get_nodes_by_type(node_tree: bpy.types.NodeTree,
     return (x for x in node_tree.nodes if isinstance(x, node_type))
 
 
-def get_node_by_type(node_tree: bpy.types.NodeTree,
-                     node_type: Union[str, type]) -> Optional[bpy.types.Node]:
+def get_node_by_type(node_tree: NodeTree,
+                     node_type: Union[str, type]) -> Optional[Node]:
     """Returns the first node with the given type or None if no nodes
     in node_tree have this type.
     """
     return next(get_nodes_by_type(node_tree, node_type), None)
+
+
+def get_closest_node_of_type(closest_to: Node,
+                             node_type: Union[str, type],
+                             group_tree: Optional[NodeTree] = None
+                             ) -> Optional[Node]:
+    node_tree = closest_to.id_data
+
+    if group_tree:
+        nodes = [x for x in get_nodes_by_type(node_tree, node_type)
+                 if x.node_tree is group_tree]
+    else:
+        nodes = get_nodes_by_type(node_tree, node_type)
+
+    closest_to_loc = closest_to.location
+    return min(nodes, key=lambda x: x.location - closest_to_loc, default=None)
 
 
 def delete_nodes_not_in(nodes: bpy.types.Nodes,

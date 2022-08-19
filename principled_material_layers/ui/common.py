@@ -28,7 +28,7 @@ class PML_UL_material_layers_list(UIList):
         row = layout.row(align=True)
 
         if prefs.show_previews:
-            row.template_icon(layer.preview_icon, scale=2.0)
+            row.template_icon(layer.preview_icon, scale=prefs.layer_ui_scale)
 
         row.prop(layer, "name", text="", emboss=False)
 
@@ -512,6 +512,7 @@ class settings_PT_base:
 
         layout.prop_search(layer_stack, "uv_map_name",
                            mesh, "uv_layers", text="UV Map")
+        layout.prop(layer_stack, "auto_connect_shader")
         layout.separator()
 
         layout.label(text="Layer Size: {} x {}".format(*im.layer_size))

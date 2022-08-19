@@ -117,7 +117,13 @@ class PML_OT_initialize_layer_stack(Operator):
                     "Layers' node",
         default=True
     )
-
+    auto_connect_shader: BoolProperty(
+        name="Auto-Connect New Sockets",
+        description="Automatically connect sockets of this layer stack's "
+                    "Material Layer node to the shader node whenever a "
+                    "channel is added/enabled",
+        default=True
+    )
     select: EnumProperty(
         name="Select",
         items=(('ALL', "Select All", ""),
@@ -187,6 +193,7 @@ class PML_OT_initialize_layer_stack(Operator):
         col = layout.column(align=True)
         col.prop(self, "base_layer_from_current")
         col.prop(self, "replace_connections")
+        col.prop(self, "auto_connect_shader")
 
         row = layout.row()
         row.label(text="Channels")
@@ -225,6 +232,8 @@ class PML_OT_initialize_layer_stack(Operator):
                                   node_group=node_group)
 
         assert ma_layer_stack.is_initialized
+
+        ma_layer_stack.auto_connect_shader = self.auto_connect_shader
 
         if self.base_layer_from_current and context.space_data is not None:
             # Replace the base layers node tree with a copy of the

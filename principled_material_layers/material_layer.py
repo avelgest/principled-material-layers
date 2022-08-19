@@ -317,7 +317,9 @@ class MaterialLayer(PropertyGroup):
 
         return added
 
-    def remove_channel(self, channel_name: Union[str, BasicChannel]) -> None:
+    def remove_channel(self,
+                       channel_name: Union[str, BasicChannel],
+                       keep_sockets: bool = True) -> None:
         if isinstance(channel_name, BasicChannel):
             channel_name = channel_name.name
         elif not isinstance(channel_name, str):
@@ -334,9 +336,10 @@ class MaterialLayer(PropertyGroup):
         channel.delete()
         self.channels.remove(ch_idx)
 
-        outputs = self.node_tree.outputs
-        if channel_name in outputs:
-            outputs.remove(outputs[channel_name])
+        if not keep_sockets:
+            outputs = self.node_tree.outputs
+            if channel_name in outputs:
+                outputs.remove(outputs[channel_name])
 
         active_index = self.active_channel_index
 
@@ -580,7 +583,7 @@ class MaterialLayer(PropertyGroup):
             # Remove any channels not found on the node tree
             for ch in reversed(list(self.channels)):
                 if ch.name not in node_output_names:
-                    self.remove_channel(ch)
+                    self.remove_channel(ch, keep_sockets=False)
 
         # Ensure the node tree has all the channels of this layer and
         # that they're the correct type

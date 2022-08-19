@@ -3,18 +3,20 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from typing import Optional
 from warnings import warn
 
 import bpy
 
 from bpy.props import StringProperty
 
-from bpy.types import ShaderNode, ShaderNodeCustomGroup
+from bpy.types import ShaderNode, ShaderNodeCustomGroup, ShaderNodeTree
 
 from .on_load_manager import pml_trusted_callback
 from .utils.layer_stack_utils import (get_layer_stack_from_ma,
                                       get_layer_stack_by_id)
 from .utils.naming import unique_name_in
+from .utils.nodes import get_closest_node_of_type, get_output_node
 
 
 def _get_node(layer_stack_id: str, node_id: str) -> ShaderNodePMLStack:
@@ -31,7 +33,25 @@ def _get_node(layer_stack_id: str, node_id: str) -> ShaderNodePMLStack:
         return None
 
     # TODO cache node name to optimize
+    found = _get_node_by_id(ma.node_tree, node_id)
+    if found is not None:
+        return found
+
+    # Search in any group nodes
     for node in layer_stack.material.node_tree.nodes:
+        if (not isinstance(node, bpy.types.ShaderNodeGroup)
+                or node.node_tree is None):
+            continue
+        found = _get_node_by_id(node.node_tree, node_id)
+        if found is not None:
+            return found
+
+    return None
+
+
+def _get_node_by_id(node_tree: ShaderNodeTree,
+                    node_id: str) -> Optional[ShaderNode]:
+    for node in node_tree.nodes:
         if getattr(node, "identifier", None) == node_id:
             return node
     return None
@@ -64,7 +84,7 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
         self["material"] = ma
 
         self.identifier = unique_name_in(
-            set(getattr(x, "identifier", None) for x in self.id_data.nodes),
+            set(getattr(x, "identifier", None) for x in self.id_tree.nodes),
             num_bytes=4)
 
         layer_stack = get_layer_stack_from_ma(ma)
@@ -154,7 +174,7 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
                 replace: If True replace existing links, otherwise only
                     create links to unlinked sockets.
         """
-        links = self.id_data.links
+        links = self.id_tree.links
 
         for output in self.outputs:
             if output.hide:
@@ -166,18 +186,51 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
                     links.new(to_input, output)
 
     def _refresh_output_hidden(self, name: str) -> None:
-        node_output = self.outputs.get(name)
-        stack_ch = self.layer_stack.channels.get(name)
+        layer_stack = self.layer_stack
+        node_tree = self.id_tree
 
-        if node_output is not None and stack_ch is not None:
+        out_socket = self.outputs.get(name)
+        stack_ch = layer_stack.channels.get(name)
+
+        if out_socket is not None and stack_ch is not None:
             # If the output should be hidden then delete all its links
-            if not stack_ch.enabled and node_output.is_linked:
-                for link in node_output.links:
-                    self.id_data.links.remove(link)
-
+            if not stack_ch.enabled and out_socket.is_linked:
+                for link in out_socket.links:
+                    node_tree.links.remove(link)
             # TODO use dict to store and recover removed links
 
-            node_output.hide = not stack_ch.enabled
+            out_socket.hide = not stack_ch.enabled
+
+            if (layer_stack.auto_connect_shader
+                    and not out_socket.hide
+                    and not out_socket.is_linked):
+                in_socket = self._find_socket_to_link_to(name)
+
+                if in_socket is not None and not in_socket.is_linked:
+                    node_tree.links.new(in_socket, out_socket)
+
+    def _find_socket_to_link_to(self, name: str) -> Optional[ShaderNode]:
+        """Finds an input socket on the closest node that the layer
+        stack can"""
+        layer_stack = self.layer_stack
+
+        sh_node = get_closest_node_of_type(self,
+                                           layer_stack.shader_node_type,
+                                           layer_stack.group_to_connect)
+
+        if sh_node is not None:
+            socket = sh_node.inputs.get(name)
+            if socket is not None:
+                return socket
+
+        # Look for a socket on a Material Output node
+        out_node = get_output_node(self.id_tree)
+        return None if out_node is None else out_node.inputs.get(name)
+
+    @property
+    def id_tree(self) -> ShaderNodeTree:
+        """The ShaderNodeTree containing this node."""
+        return self.id_data
 
     @property
     def layer_stack(self):

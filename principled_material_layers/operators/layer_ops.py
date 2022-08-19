@@ -10,8 +10,6 @@ from bpy.props import (BoolProperty,
                        IntVectorProperty,
                        StringProperty)
 
-from .. import pml_node
-
 from ..bake import apply_node_mask_bake
 from ..blending import blend_mode_description, blend_mode_display_name
 from ..channel import SOCKET_TYPES
@@ -20,6 +18,7 @@ from ..material_layer import LAYER_TYPES
 from ..utils.image import copy_image
 from ..utils.layer_stack_utils import get_layer_stack, get_layer_stack_by_id
 from ..utils.naming import suffix_num_unique_in
+from ..utils.nodes import get_nodes_by_type
 from ..utils.ops import ensure_global_undo, pml_op_poll, save_all_modified
 
 
@@ -593,8 +592,8 @@ class PML_OT_resubscribe_msgbus(Operator):
             return {'FINISHED'}
 
         # Resubscribe RNA for any ShaderNodePMLStack of the layer_stack
-        pml_nodes = [x for x in material.node_tree.nodes
-                     if isinstance(x, pml_node.ShaderNodePMLStack)]
+        pml_nodes = list(get_nodes_by_type(material.node_tree,
+                                           "ShaderNodePMLStack"))
         for node in pml_nodes:
             node.reregister_msgbus()
         self.report({'INFO'}, f"Resubscribed {material.name}'s layer stack "

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import typing
 
 from collections import defaultdict
 from typing import (Any, Callable, Collection, DefaultDict, Dict, List,
@@ -10,7 +11,8 @@ from typing import (Any, Callable, Collection, DefaultDict, Dict, List,
 
 import bpy
 
-from bpy.props import (CollectionProperty,
+from bpy.props import (BoolProperty,
+                       CollectionProperty,
                        IntProperty,
                        IntVectorProperty,
                        PointerProperty,
@@ -55,6 +57,10 @@ class _UndoInvariant:
         """
         return cls._instances[identifier]
 
+    @classmethod
+    def copy_instances(cls, other: typing.Type) -> None:
+        cls._instances = other._instances
+
     def __init__(self):
         # The active layer identifier before the last undo.
         # Only when the layer stack is active.
@@ -71,6 +77,14 @@ class _UndoInvariant:
 
         # True if undo/redo callbacks should return immediately
         self.skip_undo_callbacks: bool = False
+
+
+# If reloading the module then copy the _instances dict from the
+# previously defined _UndoInvariant
+_UndoInvariantOld = globals().get("_UndoInvariantOld")
+if _UndoInvariantOld is not None:
+    _UndoInvariant.copy_instances(_UndoInvariantOld)
+_UndoInvariantOld = _UndoInvariant
 
 
 class LayerStack(bpy.types.PropertyGroup):
@@ -143,11 +157,19 @@ class LayerStack(bpy.types.PropertyGroup):
     group_to_connect: PointerProperty(
         type=bpy.types.ShaderNodeTree,
         name="Connects to",
-        description=("What node group is this layer stack supposed to connect"
-                     "to. If None then this layer stack should connect to a "
-                     "Principled BSDF node. Otherwise should connect to a "
-                     "group node set to this node group.")
+        description="What node group is this layer stack supposed to connect"
+                    "to. If None then this layer stack should connect to a "
+                    "Principled BSDF node. Otherwise should connect to a "
+                    "group node set to this node group."
     )
+    auto_connect_shader: BoolProperty(
+        name="Auto-Connect New Sockets",
+        description="Automatically connect sockets of this layer stack's "
+                    "Material Layer node to the shader node whenever a "
+                    "channel is added/enabled",
+        default=True
+    )
+
     channels: CollectionProperty(
         type=Channel,
         name="Channels"
@@ -372,7 +394,6 @@ class LayerStack(bpy.types.PropertyGroup):
         self._register_msgbus()
 
         self.node_manager.reregister_msgbus()
-
         for callback, args in self._rna_resub_callbacks.values():
             callback(*args)
 
@@ -1030,6 +1051,13 @@ class LayerStack(bpy.types.PropertyGroup):
         return self.top_level_layers_ref[0].resolve()
 
     @property
+    def shader_node_type(self) -> type:
+        """The type of node that this layer stack should connect to."""
+        if self.group_to_connect:
+            return bpy.types.ShaderNodeGroup
+        return bpy.types.ShaderNodeBsdfPrincipled
+
+    @property
     def top_layer(self) -> Optional[MaterialLayer]:
         """The top-most top level layer, or None if this layer stack
         has no layers.
@@ -1111,11 +1139,22 @@ def _rebuild_node_tree(layer_stack_id: LayerStackID) -> None:
         layer_stack.node_manager.rebuild_node_tree()
 
 
+def _reregister_msgbus_all():
+    for ma in bpy.data.materials:
+        if ma.pml_layer_stack:
+            ma.pml_layer_stack.reregister_msgbus()
+
+
 def register():
     bpy.utils.register_class(LayerStack)
 
     bpy.types.Material.pml_layer_stack = PointerProperty(
         type=LayerStack)
+
+    # Reregister msgbus subs for when e.g. reload scripts is called
+    # Need to use timer in case BlendData access is restricted
+    # TODO Only do when reregistering module
+    bpy.app.timers.register(_reregister_msgbus_all)
 
 
 def unregister():
