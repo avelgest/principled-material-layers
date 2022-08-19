@@ -17,7 +17,7 @@ import bpy
 from bpy.types import (NodeSocket,
                        ShaderNodeTree)
 
-from .channel import Channel, get_socket_type
+from .channel import Channel
 from .utils.image import SplitChannelImageRGB
 from .utils.nodes import is_socket_simple_const
 from .utils.temp_changes import TempChanges, TempNodes
@@ -620,14 +620,31 @@ class LayerStackBaker(SocketBaker):
 
         image.name = f"{ma.name} {channel.name} baked"
 
+    def get_channel(self, socket: NodeSocket) -> Channel:
+        try:
+            return next(x.channel for x in self.baking_sockets
+                        if x.socket is socket)
+        except StopIteration as e:
+            raise ValueError("Could not find socket {socket.name} "
+                             "in self.baking_sockets") from e
+
+    def use_srgb_for(self, socket: NodeSocket) -> bool:
+        """Use SRGB for this socket. Should only be True for color.
+        Override of method in SocketBaker.
+        """
+        ch_type = self.get_channel(socket).socket_type
+        return ch_type == 'COLOR'
+
     def use_float_for(self, socket: NodeSocket) -> bool:
         """Whether or not to use a float for a particular socket.
         Override of method in SocketBaker.
         """
-        socket_pml_type = get_socket_type(socket)
-        if socket_pml_type == "FLOAT":
+        ch_type = self.get_channel(socket).socket_type
+        # Always use float for FLOAT and VECTOR
+        # Can only use scalar for COLOR or FLOAT_FACTOR
+        if ch_type in ('FLOAT', 'VECTOR'):
             return True
-        return super().use_float_for(socket)
+        return self.settings.always_use_float
 
     @property
     def bake_target_node_tree(self) -> ShaderNodeTree:
