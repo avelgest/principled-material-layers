@@ -8,6 +8,7 @@ submodule_names = ("naming",
                    "layer_stack_utils",
                    "nodes",
                    "duplicate_node_tree",
+                   "materials",
                    "temp_changes")
 
 _submodules = import_all(submodule_names, __name__)

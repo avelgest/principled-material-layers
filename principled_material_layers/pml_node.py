@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from warnings import warn
 
 import bpy
@@ -11,7 +12,6 @@ from bpy.props import StringProperty
 from bpy.types import ShaderNode, ShaderNodeCustomGroup
 
 from .on_load_manager import pml_trusted_callback
-from .preferences import running_as_proper_addon
 from .utils.layer_stack_utils import (get_layer_stack_from_ma,
                                       get_layer_stack_by_id)
 from .utils.naming import unique_name_in
@@ -45,8 +45,7 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
         name="Identifier"
     )
 
-    # TODO make utils function get_msgbus_owners
-    _msgbus_owners_cls = {}
+    _msgbus_owners_cls = defaultdict(object)
 
     @staticmethod
     def _reregister_msgbus(layer_stack_id: str, node_id: str) -> None:
@@ -191,25 +190,11 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
 
     @property
     def _msgbus_owner(self):
-        owner = self._msgbus_owners_cls.get(self.identifier)
-        if owner is None:
-            owner = self._msgbus_owners_cls[self.identifier] = object()
-        return owner
+        return self._msgbus_owners_cls[self.identifier]
 
 
 def register():
-    # For some reason reregistering ShaderNodePMLStack through
-    # 'Reload Scripts' can crash Blender with a memory access
-    # violation. Delaying registration seems to prevent this.
-    # FIXME Can still crash in Blender versions < 3.2
-    if running_as_proper_addon():
-        # Crash doesn't occur when addon is specified on the
-        # command line
-        def _register():
-            bpy.utils.register_class(ShaderNodePMLStack)
-        bpy.app.timers.register(_register)
-    else:
-        bpy.utils.register_class(ShaderNodePMLStack)
+    bpy.utils.register_class(ShaderNodePMLStack)
 
 
 def unregister():

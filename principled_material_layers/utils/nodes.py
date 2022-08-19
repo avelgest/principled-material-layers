@@ -107,6 +107,14 @@ def is_socket_simple_const(socket: NodeSocket) -> bool:
     return _is_node_simple_const(linked_node)
 
 
+def get_output_node(node_tree):
+    for x in ('ALL', 'EEVEE', 'CYCLES'):
+        output = node_tree.get_output_node(x)
+        if output is not None:
+            return output
+    return None
+
+
 def get_nodes_by_type(node_tree: bpy.types.NodeTree,
                       node_type: Union[str, type]) -> Iterator[Node]:
     """Returns an iterator over all nodes of the given type in

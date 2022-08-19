@@ -26,6 +26,7 @@ class PMLPreferences(AddonPreferences):
     default_values = {
                       "debug": False,
                       "use_numpy": False,
+                      "check_assets_compat": True,
                       "show_misc_ops": False,
                       "show_previews": True,
                       "layer_ui_scale": 2.0,
@@ -48,6 +49,14 @@ class PMLPreferences(AddonPreferences):
         description=("Use numpy for pixel operations on images. Faster but "
                      "may cause a slight delay when first imported"),
         default=default_values["use_numpy"]
+    )
+
+    check_assets_compat: BoolProperty(
+        name="Check Asset Compatibility",
+        description=("Check the compatibility of material assets when they "
+                     "are selected. This involves temporarily appending the "
+                     "asset"),
+        default=default_values["check_assets_compat"]
     )
 
     layer_ui_scale: FloatProperty(
@@ -129,6 +138,7 @@ class PMLPreferences(AddonPreferences):
         col = layout.column(align=True)
         col.prop(self, "use_numpy")
         col.prop(self, "show_previews")
+        col.prop(self, "check_assets_compat")
         col.prop(self, "layers_share_images")
         col.prop(self, "show_misc_ops")
 

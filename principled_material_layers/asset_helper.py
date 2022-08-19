@@ -3,6 +3,7 @@
 import os
 import typing
 
+from dataclasses import dataclass
 from typing import Optional, Union
 
 import bpy
@@ -11,6 +12,30 @@ from bpy.types import (AssetHandle,
                        AssetLibraryReference,
                        FileSelectEntry,
                        Material)
+
+
+@dataclass
+class DelayedMaterialImport:
+    """Class for delayed material imports. The asset will not be
+    linked/appended to the blend file until the import_material mthod
+    is called.
+    """
+    name: str
+    library_path: str
+    link: bool
+    _done: bool = False
+
+    def __call__(self) -> Material:
+        return self.import_material()
+
+    def import_material(self) -> Material:
+        """Immediately link/append the material asset to the blend file."""
+        if self._done:
+            raise RuntimeError("Import has already been performed.")
+        self._done = True
+        return _import_material_asset_path(self.name,
+                                           self.library_path,
+                                           self.link)
 
 
 def append_material_asset(asset: Union[AssetHandle, FileSelectEntry],
@@ -25,24 +50,51 @@ def link_material_asset(asset: Union[AssetHandle, FileSelectEntry],
     return import_material_asset(asset, library, True)
 
 
+def delayed_append_material_asset(asset: Union[AssetHandle, FileSelectEntry],
+                                  library: AssetLibraryReference
+                                  ) -> DelayedMaterialImport:
+    """Returns a DelayedMaterialImport, the import_material method can
+    be used to append the material to the blend file.
+    """
+    return import_material_asset(asset, library, link=False, delayed=True)
+
+
+def delayed_link_material_asset(asset: Union[AssetHandle, FileSelectEntry],
+                                library: AssetLibraryReference
+                                ) -> DelayedMaterialImport:
+    """Returns a DelayedMaterialImport, the import_material method can
+    be used to link the material to the blend file.
+    """
+    return import_material_asset(asset, library, link=True, delayed=True)
+
+
 def import_material_asset(asset: Union[AssetHandle, FileSelectEntry],
                           library: AssetLibraryReference,
-                          link: bool) -> Material:
+                          link: bool,
+                          delayed: bool = False) -> Material:
     if isinstance(asset, FileSelectEntry):
         file_data = asset
-        del asset
     elif not hasattr(asset, "file_data"):
         raise NotImplementedError("No 'file_data' attribute on asset")
     else:
         file_data = asset.file_data
 
-    import_op = bpy.ops.wm.link if link else bpy.ops.wm.append
-
     # Path to the blend file containing the asset
     library_path = AssetHandle.get_full_library_path(file_data, library)
 
+    if delayed:
+        return DelayedMaterialImport(file_data.name, library_path, link)
+
+    return _import_material_asset_path(file_data.name, library_path, link)
+
+
+def _import_material_asset_path(name: str,
+                                library_path: str,
+                                link: bool) -> Material:
+    import_op = bpy.ops.wm.link if link else bpy.ops.wm.append
+
     if link:
-        existing = _get_linked_material(file_data.name, library_path)
+        existing = _get_linked_material(name, library_path)
         if existing is not None:
             return existing
     else:
@@ -53,18 +105,18 @@ def import_material_asset(asset: Union[AssetHandle, FileSelectEntry],
     # Link or append the material into the current blend file
     result = import_op(filepath=library_path,
                        directory=os.path.join(library_path, "Material"),
-                       filename=file_data.name)
+                       filename=name)
 
     if 'FINISHED' not in result:
-        raise ValueError(f"Could not link asset '{file_data.name}' from "
-                         f"'{library_path}'")
+        raise RuntimeError(f"Could not link asset '{name}' from "
+                           f"'{library_path}'")
 
     # Find the newly added material
     if link:
-        material = _get_linked_material(file_data.name, library_path)
+        material = _get_linked_material(name, library_path)
         if material is None:
-            raise ValueError("Could not find linked material "
-                             f"'{file_data.name}' from '{library_path}'")
+            raise RuntimeError("Could not find linked material "
+                               f"'{name}' from '{library_path}'")
         return material
 
     # For append look for the new material by searching for a material
@@ -74,8 +126,8 @@ def import_material_asset(asset: Union[AssetHandle, FileSelectEntry],
     assert len(added) <= 1, "Expected only one new material"
 
     if not added:
-        raise ValueError("Could not find appended material "
-                         f"'{file_data.name}' from '{library_path}'")
+        raise RuntimeError("Could not find appended material "
+                           f"'{name}' from '{library_path}'")
 
     return bpy.data.materials[added.pop()]
 

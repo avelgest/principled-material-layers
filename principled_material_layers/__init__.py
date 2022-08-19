@@ -33,6 +33,7 @@ submodule_names = [
     "layer_stack",
     "pml_node",
     "bake",
+    "asset_helper",
     "operators",
     "ui"]
 

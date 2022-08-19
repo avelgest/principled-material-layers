@@ -27,8 +27,10 @@ from ..asset_helper import append_material_asset
 
 from ..utils.duplicate_node_tree import duplicate_node_tree
 from ..utils.layer_stack_utils import get_layer_stack
+from ..utils.materials import check_material_compat
 from ..utils.nodes import (delete_nodes_not_in,
                            get_node_by_type,
+                           get_output_node,
                            reference_inputs,
                            sort_sockets_by)
 from ..utils.ops import pml_op_poll
@@ -48,34 +50,6 @@ CHANNEL_DETECT_MODES = (
      "The layer will have only channels that are affected by the "
      "new material")
     )
-
-
-def _get_output_node(node_tree):
-    for x in ('ALL', 'EEVEE', 'CYCLES'):
-        output = node_tree.get_output_node(x)
-        if output is not None:
-            return output
-    return None
-
-
-def _material_compatible_with(ma: Material, layer_stack) -> bool:
-    if ma.node_tree is None or ma is layer_stack.material:
-        return False
-
-    output = _get_output_node(ma.node_tree)
-    if output is None or not output.inputs[0].is_linked:
-        return False
-
-    surface_shader = output.inputs[0].links[0].from_node
-    sockets = {x.name for x in surface_shader.inputs if x.type != 'SHADER'}
-    if not sockets:
-        return False
-
-    shared = sockets.intersection({x.name for x in layer_stack.channels})
-    if not shared:
-        return False
-
-    return True
 
 
 def _duplicate_ma_node_tree(context,
@@ -129,7 +103,7 @@ def _duplicate_ma_node_tree(context,
         old_nodes = list(nodes)
         exit_stack.callback(lambda: delete_nodes_not_in(nodes, old_nodes))
 
-        # FIXME Crashes in Blender 3.0.1
+        # N.B. Crashes in Blender 3.0.1
         bpy.ops.node.duplicate()
         bpy.ops.node.group_make()
 
@@ -226,7 +200,7 @@ class _ReplaceMaterialHelper:
 
         # Identify channels from the material output node and the
         # shader node connected to the 'Surface' socket
-        output_node = _get_output_node(node_tree)
+        output_node = get_output_node(node_tree)
         if output_node is not None:
             socket_values = self._socket_values(output_node, channel_names)
 
@@ -295,7 +269,7 @@ class _ReplaceMaterialHelper:
             group_out = node_tree.nodes.new("NodeGroupOutput")
 
         # The material output node
-        ma_output_node = _get_output_node(node_tree)
+        ma_output_node = get_output_node(node_tree)
         if ma_output_node is not None:
             # Set the group output's location to the same as the
             # material output
@@ -433,24 +407,31 @@ class PML_UL_load_material_list(UIList):
         else:
             flags = [shown_flag] * len(materials)
 
+        # FIXME Compatibility may have changed since material was cached
         compat_cache = self._ma_compat_cache
+
+        # Should materials with names starting with "." be shown
+        show_hidden_materials = self.filter_name.startswith(".")
 
         for idx, ma in enumerate(materials):
             if not flags[idx] & shown_flag:
                 continue
 
+            if ma.name.startswith(".") and not show_hidden_materials:
+                # Hide hidden materials unless searching for them
+                flags[idx] &= ~shown_flag
+                continue
+
             cached = compat_cache.get(ma.name_full, None)
 
             if cached is None:
-                compatible = _material_compatible_with(ma, layer_stack)
+                compatible = check_material_compat(ma, layer_stack)
                 if self._should_cache_compat(ma):
                     compat_cache[ma.name_full] = compatible
             else:
                 compatible = cached
 
-            if (not compatible
-                    or (ma.name.startswith(".")
-                        and not self.filter_name.startswith("."))):
+            if not compatible:
                 flags[idx] &= ~shown_flag
 
         # use_filter_invert automatically inverts the flags, but since
@@ -482,20 +463,10 @@ class ReplaceLayerOpBase:
         self.exit_stack: Optional[ExitStack] = None
 
     def check_material_valid(self, material: Material, layer_stack) -> bool:
-        if material.node_tree is None:
-            self.report({'WARNING'}, "Material has no node tree.")
+        is_compat = check_material_compat(material, layer_stack)
+        if not is_compat:
+            self.report({'WARNING'}, is_compat.reason)
             return False
-
-        if material is layer_stack.material:
-            self.report({'WARNING'}, "Cannot use the layer stack's container "
-                                     "material as a layer.")
-            return False
-
-        if not _material_compatible_with(material, layer_stack):
-            self.report({'WARNING'}, f"Material '{material.name}' is not "
-                                     "compatible")
-            return False
-
         return True
 
     def enable_stack_channels(self, layer_stack, layer) -> None:
@@ -645,8 +616,14 @@ class PML_OT_replace_layer_material(ReplaceLayerOpBase, Operator):
         return wm.invoke_props_dialog(self)
 
     def _temp_append_material_asset(self) -> Optional[Material]:
+        """Temporarily append the selected asset to the file and tell
+        the exit stack to delete it on exit. If the file has a local_id
+        then the local_id is just returned and will not deleted."""
         wm = bpy.context.window_manager
         asset = wm.pml_ma_assets[self.ma_asset_index]
+
+        if getattr(asset, "local_id", None) is not None:
+            return asset.local_id
 
         try:
             ma = append_material_asset(asset, bpy.context.asset_library_ref)
@@ -726,7 +703,7 @@ class PML_OT_replace_layer_material_ab(ReplaceLayerOpBase, Operator):
         layer = layer_stack.active_layer
 
         with ExitStack() as self.exit_stack:
-            material = self.import_material(context)
+            material = self._get_material(context)
             if material is None:
                 return {'CANCELLED'}
 
@@ -738,25 +715,35 @@ class PML_OT_replace_layer_material_ab(ReplaceLayerOpBase, Operator):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
 
-    def import_material(self, context) -> Optional[Material]:
+    def _get_material(self, context) -> Optional[Material]:
         if context.active_file is None:
             return None
+
+        local_id = context.active_file.local_id
+        if local_id is not None:
+            ma = local_id
+        else:
+            ma = self.import_material(context)
+
+        layer_stack = get_layer_stack(context)
+
+        if ma is None or not self.check_material_valid(ma, layer_stack):
+            return None
+        return ma
+
+    def import_material(self, context) -> Optional[Material]:
         if self.exit_stack is None:
             raise RuntimeError("self.exit_stack is None.")
 
         try:
             ma = append_material_asset(context.active_file,
-                                       bpy.context.asset_library_ref)
+                                       context.asset_library_ref)
         except NotImplementedError:
             self.report({'ERROR'}, "Replacing the layer material with an "
                                    "asset is not supported for this version.")
             return None
 
         self.exit_stack.callback(lambda: bpy.data.materials.remove(ma))
-
-        if not self.check_material_valid(ma, get_layer_stack(context)):
-            self.report({'WARNING'}, "This material is not compatible")
-            return None
 
         return ma
 
