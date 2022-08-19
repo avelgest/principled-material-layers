@@ -193,9 +193,24 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
         return self._msgbus_owners_cls[self.identifier]
 
 
+# Reregistering ShaderNodePMLStack can cause crashes if there is a panel
+# from the add-on visible. So refuse to unregister the class whilst
+# there are initialized pml_layer_stacks
+if "_registered_info" not in globals():
+    _registered_info = {"is_registered": False,
+                        "PML_Node_Class": None}
+
+
 def register():
-    bpy.utils.register_class(ShaderNodePMLStack)
+    if not _registered_info["is_registered"]:
+        bpy.utils.register_class(ShaderNodePMLStack)
+        _registered_info["is_registered"] = True
+        _registered_info["PML_Node_Class"] = ShaderNodePMLStack
 
 
 def unregister():
-    bpy.utils.unregister_class(ShaderNodePMLStack)
+    if not any(ma.pml_layer_stack for ma in bpy.data.materials):
+        PML_Node_Class = _registered_info["PML_Node_Class"]
+        if PML_Node_Class is not None:
+            bpy.utils.unregister_class(PML_Node_Class)
+        _registered_info["is_registered"] = False

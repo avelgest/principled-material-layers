@@ -734,9 +734,10 @@ class NodeManager(bpy.types.PropertyGroup):
 
         def on_active_image_change():
             layer_stack = get_layer_stack_by_id(layer_stack_id)
-            self = layer_stack.node_manager
+            if layer_stack is not None:
+                self = layer_stack.node_manager
 
-            self._on_active_image_change()
+                self._on_active_image_change()
 
         bpy.msgbus.subscribe_rna(
             key=image_manager.path_resolve("active_image_change", False),
