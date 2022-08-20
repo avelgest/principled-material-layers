@@ -20,9 +20,16 @@ from bpy.types import (NodeSocket,
 from .channel import Channel
 from .utils.image import SplitChannelImageRGB
 from .utils.nodes import is_socket_simple_const
+from .utils.ops import filter_stdstream
 from .utils.temp_changes import TempChanges, TempNodes
 
 from .utils.layer_stack_utils import get_layer_stack_by_id
+
+
+# Prevent the following messages from being shown when baking
+filter_msgs = ("Info: Baking map saved to internal image, save it "
+               "externally or pack it",
+               )
 
 
 @dataclass
@@ -248,8 +255,8 @@ class SocketBaker:
 
         self._set_bake_target_active(bake_img.image)
         self.node_tree.links.new(self.emit_node.inputs[0], socket)
-        
-        bpy.ops.object.bake(type='EMIT')
+
+        self._call_bake_op()
 
         self.allocate_image_to(bake_img, -1, socket)
 
@@ -286,12 +293,12 @@ class SocketBaker:
         self._set_bake_target_active(image.image)
 
         if image.is_empty:
-            bpy.ops.object.bake(type='EMIT')
+            self._call_bake_op()
         else:
             img_copy = image.image.copy()
             try:
                 self._existing_img_node.image = img_copy
-                bpy.ops.object.bake(type='EMIT')
+                self._call_bake_op()
             finally:
                 bpy.data.images.remove(img_copy)
 
@@ -390,6 +397,10 @@ class SocketBaker:
             baked = next(gen_it, None)
             if baked is not None:
                 yield baked
+
+    def _call_bake_op(self):
+        with filter_stdstream(*filter_msgs, stdout=True):
+            bpy.ops.object.bake(type='EMIT')
 
     def allocate_image_to(self, image: SplitChannelImageRGB,
                           image_ch: int,

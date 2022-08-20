@@ -2,6 +2,7 @@
 
 import contextlib
 import io
+import sys
 
 import bpy
 
@@ -32,7 +33,7 @@ def save_all_modified() -> None:
         images.add(im.active_image)
 
     op_ctx = bpy.context.copy()
-    with contextlib.redirect_stdout(io.StringIO()):
+    with filter_stdstream(prefix="Info:", stdout=True):
         for img in images:
             if not img.is_dirty:
                 continue
@@ -77,7 +78,47 @@ def pml_op_poll(context: Context) -> bool:
     return False
 
 
+@contextlib.contextmanager
+def filter_stdstream(*strings: str, prefix=None,
+                     stdout: bool = True, stderr: bool = False):
+    """Context manager that filters strings from stdout or stderr
+    printing any unfiltered strings when the context manager exits.
+    """
+    assert not isinstance(strings, str)
+    to_filter = set(strings)
+
+    filter_buffers = {"stdout": io.StringIO() if stdout else None,
+                      "stderr": io.StringIO() if stderr else None
+                      }
+
+    try:
+        with contextlib.ExitStack() as stack:
+            for st_type, buffer in filter_buffers.items():
+                if st_type == "stdout" and buffer is not None:
+                    stack.enter_context(contextlib.redirect_stdout(buffer))
+                if st_type == "stderr" and buffer is not None:
+                    stack.enter_context(contextlib.redirect_stderr(buffer))
+            yield stack
+    finally:
+        for st_type, buffer in filter_buffers.items():
+            if not buffer:
+                continue
+            lines = buffer.getvalue().split("\n")
+            if lines[-1] == "\n":
+                lines.pop()
+
+            stream = getattr(sys, st_type)
+            for line in lines:
+                if line in to_filter or (prefix and line.startswith(prefix)):
+                    continue
+                print(line, file=stream)
+
+
 class WMProgress:
+    """Context manager for showing progress using
+    window_manager.progress_begin etc.
+    progress_update is called when the value property is changed.
+    """
     def __init__(self, min_: int, max_: int):
         self.min_value = min_
         self.max_value = max_
@@ -92,12 +133,14 @@ class WMProgress:
         self.window_manager.progress_end()
 
     def update(self, value: int) -> None:
+        """Calls window_manager.progress_update with value."""
         value = min(value, self.max_value)
         self.window_manager.progress_update(value)
         self._value = value
 
     @property
     def value(self) -> int:
+        """The current progress value."""
         return self._value
 
     @value.setter
