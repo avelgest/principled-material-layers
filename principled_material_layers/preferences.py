@@ -31,6 +31,7 @@ class PMLPreferences(AddonPreferences):
                       "show_previews": True,
                       "layer_ui_scale": 2.0,
                       "layers_share_images": True,
+                      "use_large_icons": False,
                       "use_undo_workaround": bpy.app.version < (3, 2, 0),
                       "use_op_based_ma_copy": bpy.app.version > (3, 1, 0)
                       }
@@ -87,6 +88,13 @@ class PMLPreferences(AddonPreferences):
         default=default_values["show_previews"]
     )
 
+    use_large_icons: BoolProperty(
+        name="Large Previews",
+        description="Use large icons for material layer previews."
+                    "May cause occasional crashes.",
+        default=default_values["use_large_icons"],
+    )
+
     use_op_based_ma_copy: BoolProperty(
         name="Use Op-Based Material Copy",
         description="Use operators to copy material node trees. Copies "
@@ -136,9 +144,12 @@ class PMLPreferences(AddonPreferences):
         layout = self.layout
 
         col = layout.column(align=True)
-        col.prop(self, "use_numpy")
-        col.prop(self, "show_previews")
+        row = col.row(align=True)
+        row.prop(self, "show_previews")
+        row.prop(self, "use_large_icons")
+
         col.prop(self, "check_assets_compat")
+        col.prop(self, "use_numpy")
         col.prop(self, "layers_share_images")
         col.prop(self, "show_misc_ops")
 

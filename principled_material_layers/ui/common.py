@@ -28,7 +28,11 @@ class PML_UL_material_layers_list(UIList):
         row = layout.row(align=True)
 
         if prefs.show_previews:
-            row.template_icon(layer.preview_icon, scale=prefs.layer_ui_scale)
+            if prefs.use_large_icons:
+                row.template_icon(layer.preview_icon,
+                                  scale=prefs.layer_ui_scale)
+            else:
+                row.label(icon_value=layer.preview_icon)
 
         row.prop(layer, "name", text="", emboss=False)
 
@@ -54,6 +58,7 @@ class PML_UL_material_layers_list(UIList):
         layout.scale_y = 1/prefs.layer_ui_scale
         if isinstance(prefs, bpy.types.AddonPreferences):
             layout.prop(prefs, "show_previews", text="Show Previews")
+            layout.prop(prefs, "use_large_icons", text="Large Icons")
 
     def filter_items(self, context, data, propname):
         layer_stack = data
