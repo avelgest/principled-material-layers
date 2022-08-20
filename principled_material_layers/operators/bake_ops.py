@@ -27,7 +27,10 @@ from ..preferences import get_addon_preferences
 
 from ..utils.image import SplitChannelImageRGB
 from ..utils.layer_stack_utils import get_layer_stack
-from ..utils.ops import ensure_global_undo, pml_op_poll, save_all_modified
+from ..utils.ops import (WMProgress,
+                         ensure_global_undo,
+                         pml_op_poll,
+                         save_all_modified)
 
 
 class BakeNodeOpBase:
@@ -174,7 +177,7 @@ class BakeNodeOpBase:
                                    )
 
         baker = SocketBaker(node_tree, settings)
-        baked = baker.bake_sockets(sockets)
+        baked = list(baker.bake_sockets(sockets))
 
         self._replace_with_baked(baked, only_replace)
 
@@ -319,7 +322,9 @@ class PML_OT_bake_layer(Operator):
 
         baker = LayerBaker(layer)
 
-        baker.bake(skip_simple_const=True)
+        with WMProgress(0, baker.num_to_bake) as progress:
+            for _ in baker.bake(skip_simple_const=True):
+                progress.value += 1
 
         layer.is_baked = True
         layer_stack.node_manager.rebuild_node_tree()
@@ -448,8 +453,12 @@ class PML_OT_bake_layer_stack(Operator):
                                    samples=self.samples)
 
         baker = LayerStackBaker(layer_stack, settings)
+        baked = []
 
-        baked = baker.bake()
+        with WMProgress(0, baker.num_to_bake) as progress:
+            for x in baker.bake():
+                baked.append(x)
+                progress.value += 1
 
         if self.hide_images:
             self._ensure_images_hidden(baked)

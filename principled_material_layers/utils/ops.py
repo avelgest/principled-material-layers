@@ -75,3 +75,35 @@ def pml_op_poll(context: Context) -> bool:
                 and space.edit_tree == layer_stack.active_layer.node_tree):
             return True
     return False
+
+
+class WMProgress:
+    def __init__(self, min_: int, max_: int):
+        self.min_value = min_
+        self.max_value = max_
+        self._value = min_
+
+    def __enter__(self):
+        self.window_manager.progress_begin(self.min_value, self.max_value)
+        self.update(self.min_value)
+        return self
+
+    def __exit__(self, *args):
+        self.window_manager.progress_end()
+
+    def update(self, value: int) -> None:
+        value = min(value, self.max_value)
+        self.window_manager.progress_update(value)
+        self._value = value
+
+    @property
+    def value(self) -> int:
+        return self._value
+
+    @value.setter
+    def value(self, new_value: int):
+        self.update(new_value)
+
+    @property
+    def window_manager(self):
+        return bpy.context.window_manager

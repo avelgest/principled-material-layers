@@ -120,6 +120,16 @@ class BakedSocket:
         """
         return None if self.image is None else self.image.image
 
+    def get_b_image_safe(self) -> bpy.types.Image:
+        """A safe way of getting the bpy.types.Image that the socket
+        is baked to, since the normal b_image property may cause
+        crashes in some situations.
+        """
+        return self.get_image_safe().image
+
+
+BakedSocketGen = Generator[BakedSocket, None, None]
+
 
 class SocketBaker:
     """Class for baking output node sockets. Temporarily creates and
@@ -238,7 +248,7 @@ class SocketBaker:
 
         self._set_bake_target_active(bake_img.image)
         self.node_tree.links.new(self.emit_node.inputs[0], socket)
-
+        
         bpy.ops.object.bake(type='EMIT')
 
         self.allocate_image_to(bake_img, -1, socket)
@@ -342,15 +352,17 @@ class SocketBaker:
 
         return _bake_socket_shared_gen_()
 
-    def _bake_sockets_shared(self, sockets, images):
+    def _bake_sockets_shared(self,
+                             sockets: Iterable[NodeSocket],
+                             images: Collection[SplitChannelImageRGB],
+                             ) -> Generator[List[BakedSocket], None, None]:
         """Bake sockets to images with multiple sockets to each image.
-        If there aren't enough images more will be created.
+        If there aren't enough images more will be created. Returns a
+        generator iterator which yields lists of BakedSocket instances.
         """
 
         # Dict of _SocketBakeType to generator iterators
         bake_socket_gen_its = {}
-
-        baked_sockets: List[BakedSocket] = []
 
         for socket in sockets:
             if socket.type == 'SHADER':
@@ -363,23 +375,21 @@ class SocketBaker:
                 # Initialize a bake generator iterator
                 gen_it = self._bake_socket_shared_gen(images, bake_type)
                 bake_socket_gen_its[bake_type] = gen_it
-                next(gen_it)
+                next(gen_it, None)
 
             # Send the generator the socket
             baked = gen_it.send(socket)
             # The generator will return None if it is waiting for more
             # sockets before performing the bake.
             if baked is not None:
-                baked_sockets += baked
+                yield baked
 
         # Tell all bake genrators not to expect any more sockets and
         # bake any sockets they have not yet baked.
         for gen_it in bake_socket_gen_its.values():
             baked = next(gen_it, None)
             if baked is not None:
-                baked_sockets += baked
-
-        return baked_sockets
+                yield baked
 
     def allocate_image_to(self, image: SplitChannelImageRGB,
                           image_ch: int,
@@ -396,7 +406,7 @@ class SocketBaker:
     def bake_sockets(self,
                      sockets: Iterable[NodeSocket],
                      images: Collection[SplitChannelImageRGB] = tuple()
-                     ) -> List[BakedSocket]:
+                     ) -> BakedSocketGen:
         """Bakes the given sockets. If any of the images in 'images'
         are compatible and empty (or have spare channels depending on
         settings.share_images) then they may be used as bake targets.
@@ -408,7 +418,7 @@ class SocketBaker:
             images: A collection of SplitChannelImageRGB that can be
                 used as bake targets.
         Returns:
-            A list of BakedSocket instances.
+            A generator that yields BakedSocket instances.
         """
         scene = bpy.context.scene
         images = list(images)
@@ -468,16 +478,13 @@ class SocketBaker:
             # These sockets will each be baked to individual images
             unshared = [x for x in sockets if x not in shared]
 
-            baked_sockets = []
-            baked_sockets += self._bake_sockets_shared(shared, images)
+            for baked in self._bake_sockets_shared(shared, images):
+                yield baked
 
             for socket in unshared:
                 if socket.type == 'SHADER':
                     continue
-                baked = self._bake_socket_unshared(socket, images)
-                baked_sockets.append(baked)
-
-        return baked_sockets
+                yield self._bake_socket_unshared(socket, images)
 
     def create_image(self, socket: NodeSocket) -> SplitChannelImageRGB:
         settings = self.settings
@@ -558,7 +565,9 @@ class LayerStackBaker(SocketBaker):
                        if soc is socket)
         self.image_manager.allocate_bake_image(channel, image, image_ch)
 
-    def bake(self) -> List[BakedSocket]:
+    def bake(self) -> BakedSocketGen:
+        """Bakes the layer stack's channlels. Returns a generator that
+        yields BakedSocket instances."""
         sockets = [x.socket for x in self.baking_sockets]
 
         if self.layer_stack.material.node_tree is None:
@@ -658,6 +667,11 @@ class LayerStackBaker(SocketBaker):
         """The layer stack's image manager."""
         return self.layer_stack.image_manager
 
+    @property
+    def num_to_bake(self):
+        """The number of sockets that will be baked"""
+        return len(self.baking_sockets)
+
 
 class LayerBaker(LayerStackBaker):
     """Subclass of SocketBaker for baking the channels of a MaterialLayer"""
@@ -691,7 +705,15 @@ class LayerBaker(LayerStackBaker):
 
         return baking_sockets
 
-    def bake(self, skip_simple_const=True) -> List[BakedSocket]:
+    def bake(self, skip_simple_const=True) -> BakedSocketGen:
+        """Bakes the enabled channels of the material layer.
+        Params:
+            skip_simple_const: Skip any channel that has a constant
+                value e.g. its socket is unconnected, or just connected
+                to a Value node or RGB node.
+        Returns:
+            A generator that yield BakedSocket instances.
+        """
         sockets = [x.socket for x in self.baking_sockets]
 
         if skip_simple_const:
@@ -700,9 +722,7 @@ class LayerBaker(LayerStackBaker):
         if self.layer_stack.material.node_tree is None:
             raise ValueError("Layer stack's material has no node tree.")
 
-        baked_sockets = self.bake_sockets(sockets)
-
-        return baked_sockets
+        return self.bake_sockets(sockets)
 
     def rename_image(self, image, socket) -> None:
         """Rename an image newly created by this baker.
@@ -711,7 +731,12 @@ class LayerBaker(LayerStackBaker):
         # No code. Don't rename and just keep the default name.
 
 
-def apply_node_mask_bake(layer, samples) -> bpy.types.Image:
+def apply_node_mask_bake(layer,
+                         samples: int) -> bpy.types.Image:
+    """Bake a layer's node_mask multiplied with the layer's painted
+    alpha. Returns an Image that can used to replace the layer's
+    current alpha image.
+    """
     layer_stack = layer.layer_stack
 
     if layer.node_mask is None:
@@ -736,7 +761,7 @@ def apply_node_mask_bake(layer, samples) -> bpy.types.Image:
     old_opacity = layer.opacity
     try:
         layer.opacity = 1.0
-        baked = baker.bake_sockets((socket_to_bake,))[0]
+        baked = next(baker.bake_sockets((socket_to_bake,)))
     finally:
         layer.opacity = old_opacity
 
