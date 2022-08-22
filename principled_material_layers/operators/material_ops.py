@@ -539,6 +539,8 @@ class PML_OT_replace_layer_material(ReplaceLayerOpBase, Operator):
         default='LOCAL'
     )
 
+    displayed_asset_lib = None
+
     @classmethod
     def poll(cls, context):
         return pml_op_poll(context)
@@ -551,8 +553,6 @@ class PML_OT_replace_layer_material(ReplaceLayerOpBase, Operator):
 
         if layer is None:
             return
-
-        prefs = get_addon_preferences()
 
         col = layout.column(align=True)
         col.prop(self, "ch_detect_mode")
@@ -574,34 +574,7 @@ class PML_OT_replace_layer_material(ReplaceLayerOpBase, Operator):
                               type='GRID', rows=4, columns=2)
 
         elif self.ma_select_mode == 'ASSET':
-            row = layout.row()
-            row.prop(prefs, "check_assets_compat", text="Check Compatible")
-            if prefs.check_assets_compat:
-                is_compat = self._check_asset_compat(context)
-                if is_compat is not None:
-                    row.label(text=is_compat.label_text_short,
-                              icon=is_compat.label_icon)
-
-            wm = context.window_manager
-            if len(wm.pml_ma_assets) > 30:
-                col = layout.column(align=True)
-                col.label(text="Material assets can also be loaded via the ",
-                               icon='INFO')
-                col.label(text="sidebar of the Asset Browser.", icon='BLANK1')
-
-            # FIXME Can only select with the arrow keys
-            layout.label(text="The selection can be changed using the arrow "
-                              "keys")
-            layout.template_asset_view(
-                "pml_ma_asset_list",
-                context.workspace,
-                "asset_library_ref",
-                context.window_manager,
-                "pml_ma_assets",
-                self,
-                "ma_asset_index",
-                filter_id_types={"filter_material"},
-            )
+            self.draw_ma_asset_list(context, layout)
 
     def execute(self, context):
         layer_stack = get_layer_stack(context)
@@ -680,6 +653,61 @@ class PML_OT_replace_layer_material(ReplaceLayerOpBase, Operator):
             return None
 
         return material
+
+    def draw_asset_compat(self, context, layout):
+        prefs = get_addon_preferences()
+
+        row = layout.row()
+        if isinstance(prefs, bpy.types.AddonPreferences):
+            row.prop(prefs, "check_assets_compat", text="Check Compatible")
+
+        if prefs.check_assets_compat:
+            is_compat = self._check_asset_compat(context)
+            if is_compat is not None:
+                row.label(text=is_compat.label_text_short,
+                          icon=is_compat.label_icon)
+
+    def draw_ma_asset_list(self, context, layout):
+        wm = context.window_manager
+        ws = context.workspace
+        cls = type(self)
+
+        if (len(wm.pml_ma_assets) > 24
+                and cls.displayed_asset_lib == str(ws.asset_library_ref)):
+
+            # template_asset_view doesn't seem to work very well with
+            # large asset libraries fall back on a simpler UIList
+            col = layout.column(align=True)
+            col.label(text="Material assets can also be loaded via the ",
+                           icon='INFO')
+            col.label(text="sidebar of the Asset Browser.", icon='BLANK1')
+
+            self.draw_asset_compat(context, col)
+
+            col.prop(ws, "asset_library_ref")
+            col.template_list("PML_UL_material_asset_list", "",
+                              wm, "pml_ma_assets",
+                              self, "ma_asset_index",
+                              type='GRID', columns=3)
+        else:
+            self.draw_asset_compat(context, layout)
+
+            # FIXME Can only select with the arrow keys
+            layout.label(text="The selection can be changed using the arrow "
+                              "keys")
+            layout.template_asset_view(
+                "pml_ma_asset_list",
+                ws, "asset_library_ref",
+                wm, "pml_ma_assets",
+                self, "ma_asset_index",
+                filter_id_types={"filter_material"}
+            )
+            if self.ma_asset_index >= len(wm.pml_ma_assets):
+                self.ma_asset_index = 0
+        # Even when falling back on a UIList need to display asset_view
+        # once per-library to fill pml_ma_assets do this by comparing
+        # displayed_asset_lib with asset_library_ref
+        cls.displayed_asset_lib = str(ws.asset_library_ref)
 
     @property
     def selected_asset(self) -> Optional[bpy.types.AssetHandle]:
