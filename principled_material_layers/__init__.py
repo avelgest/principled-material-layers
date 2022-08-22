@@ -29,6 +29,7 @@ submodule_names = [
     "channel",
     "material_layer",
     "image_manager",
+    "pml_node_tree",
     "node_manager",
     "layer_stack",
     "pml_node",
