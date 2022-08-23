@@ -15,6 +15,7 @@ from bpy.props import (BoolProperty,
 from bpy.types import NodeSocket, ShaderNodeTree
 
 from . import blending
+from . import hardness
 from .utils.layer_stack_utils import get_layer_stack_from_prop
 
 SOCKET_TYPES = (('FLOAT', "Float", "Float in [-inf, inf]"),
@@ -123,7 +124,7 @@ class BasicChannel(bpy.types.PropertyGroup):
 
 
 def _publish_rna_callback_factory(property_name: str) -> callable:
-    def _callback(self, context):
+    def _callback(self, dummy_context):
         bpy.msgbus.publish_rna(key=self.path_resolve(property_name, False))
     return _callback
 
@@ -153,7 +154,20 @@ class Channel(BasicChannel):
         type=bpy.types.ShaderNodeTree,
         name="Custom Blend Mode",
         description="The node group used to blend this channel",
-        update=_publish_rna_callback_factory("blend_mode_custom")
+        update=_publish_rna_callback_factory("blend_mode")
+    )
+    hardness: EnumProperty(
+        items=hardness.HARDNESS_MODES,
+        name="Hardness",
+        description="How smoothly this channel transitions. E.g Binary "
+                    "instantly changes between two values",
+        default='DEFAULT'
+    )
+    hardness_custom: PointerProperty(
+        type=bpy.types.ShaderNodeTree,
+        name="Custom Hardness",
+        description="The node group used for this channel's custom hardness",
+        update=_publish_rna_callback_factory("hardness")
     )
     bake_image: PointerProperty(
         type=bpy.types.Image,
@@ -207,14 +221,32 @@ class Channel(BasicChannel):
             self.layer_stack.image_manager.deallocate_bake_image(self)
 
     def make_blend_node(self, node_tree: ShaderNodeTree):
-        return self.blend_mode_node_info.make(node_tree, self)
+        return self.blend_node_make_info.make(node_tree, self)
 
     def set_bake_image(self, image, channel: int = -1):
         self.bake_image = image
         self.bake_image_channel = channel
 
     @property
-    def blend_mode_node_info(self):
+    def hardness_node_make_info(self):
+        """The NodeMakeInfo needed to create a node for this channel's
+        hardness.
+        """
+        # If default hardness then use the hardness value of the layer
+        # stack's channel (or LINEAR if this is a layer_stack channel
+        # itself)
+        if self.hardness == 'DEFAULT':
+            if not self.is_layer_channel:
+                return hardness.HARDNESS_NODE_INFO['LINEAR']
+            layer_stack_ch = self.layer_stack.channels.get(self.name)
+
+            return (layer_stack_ch.hardness_node_make_info
+                    if layer_stack_ch is not None
+                    else hardness.HARDNESS_NODE_INFO['LINEAR'])
+        return hardness.HARDNESS_NODE_INFO[self.hardness]
+
+    @property
+    def blend_node_make_info(self):
         return blending.BLEND_MODES_NODE_INFO[self.blend_mode]
 
     @property

@@ -26,6 +26,7 @@ submodule_names = [
     "utils",
     "on_load_manager",
     "blending",
+    "hardness",
     "channel",
     "material_layer",
     "image_manager",

@@ -384,6 +384,12 @@ class layer_stack_channels_PT_base:
             # Same UI as for material layers' channels
             active_layer_PT_base.draw_custom_blending_props(layout,
                                                             active_channel)
+                                                            
+        layout.separator()
+        layout.label(text="Default Hardness")
+        layout.prop(active_channel, "hardness", text="")
+        if active_channel.hardness == 'CUSTOM':
+            pass
 
     def draw_channels_list(self, layout, layer_stack):
         active_channel = layer_stack.active_channel
@@ -464,10 +470,14 @@ class active_layer_PT_base:
                 op_props = row.operator("material.pml_layer_remove_channel",
                                         icon='REMOVE', text="")
                 op_props.channel_name = active_channel.name
-
-        if active_channel.blend_mode == 'CUSTOM':
-            self.draw_custom_blending_props(layout, active_channel)
-            layout.separator()
+                
+                # Custom blend mode
+                if active_channel.blend_mode == 'CUSTOM':
+                    self.draw_custom_blending_props(layout, active_channel)
+                    layout.separator()
+                
+                # Hardness
+                col.prop(active_channel, "hardness")
 
         node_tree = active_layer.node_tree
         if node_tree is None or active_channel is None:

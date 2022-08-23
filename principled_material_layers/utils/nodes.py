@@ -7,7 +7,7 @@ import math
 import typing
 
 from collections.abc import Container, Iterator, Sequence
-from typing import Any, List, NamedTuple, Optional, Tuple, Union
+from typing import Any, Callable, List, NamedTuple, Optional, Tuple, Union
 
 import bpy
 
@@ -505,3 +505,37 @@ def sort_sockets_by(sockets: bpy.types.bpy_prop_collection,
         current_idx = sockets.find(socket.name)
         if current_idx != target_idx:
             sockets.move(current_idx, target_idx)
+
+
+class NodeMakeInfo(NamedTuple):
+    """Contains the information needed to instantiate a node with
+    specific settings.
+
+    Attributes:
+        bl_idname: The bl_idname of the node class
+        options: dict of property names to values which will be set
+                 on the node or None
+        function: A callable that takes two arguments: the node instance
+                  and the channel for which the node was made
+    """
+    bl_idname: str
+    options: Optional[typing.Dict[str, Any]] = {}
+    function: Optional[Callable[[ShaderNode, "Channel"], None]] = None
+
+    def make(self, node_tree: ShaderNodeTree,
+             channel: Optional["Channel"]) -> ShaderNode:
+        node = node_tree.nodes.new(self.bl_idname)
+        self.update_node(node, channel)
+        return node
+
+    def simple_make(self, node_tree: ShaderNodeTree) -> ShaderNode:
+        return self.make(node_tree, None)
+
+    def update_node(self, node: ShaderNode, channel) -> None:
+
+        if self.options:
+            for attr, value in self.options.items():
+                setattr(node, attr, value)
+
+        if self.function is not None:
+            self.function(node, channel)

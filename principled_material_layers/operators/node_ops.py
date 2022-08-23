@@ -153,47 +153,24 @@ class PML_OT_new_blending_node_group(Operator):
     )
 
     def execute(self, context):
-        node_group = bpy.data.node_groups.new(name="Custom Blend Group",
-                                              type="ShaderNodeTree")
-        node_group.inputs.new(name="Blend Fac", type="NodeSocketFloatFactor")
-        node_group.inputs.new(name="Input 1", type="NodeSocketColor")
-        node_group.inputs.new(name="Input 2", type="NodeSocketColor")
-
-        out = node_group.outputs.new(name="Output", type="NodeSocketColor")
-        out.hide_value = True
-
-        group_in = node_group.nodes.new(type="NodeGroupInput")
-        group_out = node_group.nodes.new(type="NodeGroupOutput")
-
-        group_in.location.x -= 200
-        group_out.location.x += 200
-
-        assert blending.is_group_blending_compat(node_group, strict=True)
-
-        # Add MixRGB node
-        mix_node = node_group.nodes.new(type="ShaderNodeMixRGB")
-        mix_node.location = (group_in.location + group_out.location) / 2
-
-        for out_soc, in_soc in zip(group_in.outputs, mix_node.inputs):
-            node_group.links.new(in_soc, out_soc)
-
-        node_group.links.new(group_out.inputs[0], mix_node.outputs[0])
+        # Create a default group
+        node_group = blending.create_custom_blend_default("Custom Blend Group")
 
         # Set the active channel's blend_mode_custom to the new node group
         if self.set_on_active_channel:
             # If pml_channel has been by context_pointer_set then use
             # that otherwise use the active channel of the active layer
             channel = getattr(context, "pml_channel", None)
-
-            try:
-                if channel is None:
-                    layer_stack = get_layer_stack(context)
+            if channel is None:
+                layer_stack = get_layer_stack(context)
+                if layer_stack and layer_stack.active_layer:
                     channel = layer_stack.active_layer.active_channel
-            except AttributeError:
-                self.report({'WARNING'}, "No active channel found: could not "
-                                         "set blend_mode_custom.")
-            else:
+
+            if channel is not None:
                 channel.blend_mode_custom = node_group
+            else:
+                self.report({'WARNING'}, "No active channel found: could not "
+                            "set blend_mode_custom.")
 
         if self.open_in_editor:
             bpy.ops.node.pml_view_shader_node_group(

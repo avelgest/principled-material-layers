@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import itertools as it
 
-from typing import Callable, NamedTuple, Optional
-
 import bpy
 
 from bpy.types import NodeTree, ShaderNode, ShaderNodeTree
 
 from .channel import Channel
+from .utils.nodes import NodeMakeInfo, get_node_by_type
 from .utils.naming import cap_enum
 
 
@@ -101,41 +100,31 @@ def is_group_blending_compat(node_group: NodeTree,
     return True
 
 
-class _BlendModeNodeInfo(NamedTuple):
-    """Contains the information needed to instantiate a node that performs
-    a blending operation.
-
-    Attributes:
-        bl_idname: The bl_idname of the node class
-        options: dict of property names to values which will be set
-                 on the node
-        function: A callable that takes two arguments: the node instance
-                  and the channel for which the node was made
-    """
-    bl_idname: str
-    options: dict = {}
-    function: Optional[Callable[[ShaderNode, Channel], None]] = None
-
-    def make(self, node_tree: ShaderNodeTree, channel: Channel) -> ShaderNode:
-        node = node_tree.nodes.new(self.bl_idname)
-        self.update_node(node, channel)
-        return node
-
-    def update_node(self, node: ShaderNode, channel: Channel) -> None:
-
-        if self.options:
-            for attr, value in self.options.items():
-                setattr(node, attr, value)
-
-        if self.function is not None:
-            self.function(node, channel)
-
-
-def _mix_node_info(blend_mode: str) -> _BlendModeNodeInfo:
-    """Returns a _BlendModeNodeInfo tuple for a blend_mode that
+def _mix_node_info(blend_mode: str) -> NodeMakeInfo:
+    """Returns a NodeMakeInfo tuple for a blend_mode that
     uses a MixRGB node with a blend_type of blend_mode.
     """
-    return _BlendModeNodeInfo("ShaderNodeMixRGB", {"blend_type": blend_mode})
+    return NodeMakeInfo("ShaderNodeMixRGB", {"blend_type": blend_mode})
+
+
+def _create_node_group(name: str):
+    """Create a node group for a blend mode."""
+    node_group = bpy.data.node_groups.new(name=name, type="ShaderNodeTree")
+
+    node_group.inputs.new(name="Blend Fac", type="NodeSocketFloatFactor")
+    node_group.inputs.new(name="Input 1", type="NodeSocketColor")
+    node_group.inputs.new(name="Input 2", type="NodeSocketColor")
+
+    out = node_group.outputs.new(name="Output", type="NodeSocketColor")
+    out.hide_value = True
+
+    group_in = node_group.nodes.new(type="NodeGroupInput")
+    group_out = node_group.nodes.new(type="NodeGroupOutput")
+
+    group_in.location.x -= 200
+    group_out.location.x += 200
+
+    return node_group
 
 
 _FALLBACK_GROUP_NAME = ".pml_blend_fallback"
@@ -146,37 +135,58 @@ def _get_fallback_node_group() -> ShaderNodeTree:
     node group is missing or invalid.
     """
     node_tree = bpy.data.node_groups.get(_FALLBACK_GROUP_NAME)
+    if node_tree is not None:
+        return node_tree
 
-    if node_tree is None:
-        # Create a node group that is just a wrapper around a MixRGB
-        # node with the 'MIX' blend_type
-        node_tree = bpy.data.node_groups.new(_FALLBACK_GROUP_NAME,
-                                             "ShaderNodeTree")
-        assert node_tree.name == _FALLBACK_GROUP_NAME
+    # Create a node group that is just a wrapper around a MixRGB
+    # node with the 'MIX' blend_type
+    node_tree = _create_node_group(_FALLBACK_GROUP_NAME)
+    assert node_tree.name == _FALLBACK_GROUP_NAME
 
-        node_tree.inputs.new("NodeSocketFloat", "Fac")
-        node_tree.inputs.new("NodeSocketColor", "Color1")
-        node_tree.inputs.new("NodeSocketColor", "Color2")
+    group_in = get_node_by_type(node_tree, "NodeGroupInput")
+    group_out = get_node_by_type(node_tree, "NodeGroupOutput")
 
-        node_tree.outputs.new("NodeSocketColor", "Color")
+    mix_node = node_tree.nodes.new("ShaderNodeMixRGB")
+    mix_node.location.x = group_in.location.x + 300
+    mix_node.blend_type = 'MIX'
+    for out, in_ in zip(group_in.outputs, mix_node.inputs):
+        node_tree.links.new(in_, out)
 
-        group_in = node_tree.nodes.new("NodeGroupInput")
-
-        mix_node = node_tree.nodes.new("ShaderNodeMixRGB")
-        mix_node.location.x += 300
-        mix_node.blend_type = 'MIX'
-        for out, in_ in zip(group_in.outputs, mix_node.inputs):
-            node_tree.links.new(in_, out)
-
-        group_out = node_tree.nodes.new("NodeGroupOutput")
-        group_out.location.x += 600
-        node_tree.links.new(group_out.inputs[0], mix_node.outputs[0])
+    group_out.location.x = mix_node.location.x + 300
+    node_tree.links.new(group_out.inputs[0], mix_node.outputs[0])
 
     return node_tree
 
 
+def create_custom_blend_default(name: str) -> ShaderNodeTree:
+    """Creates a node group for use as a custom blending operation. The
+    group will have a default setup (i.e. a MixRGB node connected to
+    the group inputs/ouput).
+    """
+    node_group = _create_node_group(name)
+
+    group_in = get_node_by_type(node_group, "NodeGroupInput")
+    group_out = get_node_by_type(node_group, "NodeGroupOutput")
+
+    group_in.location.x = -200
+    group_out.location.x = 200
+
+    assert is_group_blending_compat(node_group, strict=True)
+
+    # Add MixRGB node
+    mix_node = node_group.nodes.new(type="ShaderNodeMixRGB")
+    mix_node.location = (group_in.location + group_out.location) / 2
+
+    for out_soc, in_soc in zip(group_in.outputs, mix_node.inputs):
+        node_group.links.new(in_soc, out_soc)
+
+    node_group.links.new(group_out.inputs[0], mix_node.outputs[0])
+
+    return node_group
+
+
 def _custom_blend_mode_fnc(node: ShaderNode, channel: Channel) -> None:
-    """Function used by the 'CUSTOM' blend mode's _BlendModeNodeInfo.
+    """Function used by the 'CUSTOM' blend mode's NodeMakeInfo.
     Sets the node tree for a group node to the channel's
     blend_mode_custom property. Uses a fallback group if the property's
     value is incompatible.
@@ -187,20 +197,20 @@ def _custom_blend_mode_fnc(node: ShaderNode, channel: Channel) -> None:
         node.node_tree = _get_fallback_node_group()
 
 
-# Dict of blend modes to _BlendModeNodeInfo
+# Dict of blend modes to NodeMakeInfo
 BLEND_MODES_NODE_INFO = {
-    'CUSTOM': _BlendModeNodeInfo('ShaderNodeGroup',
-                                 function=_custom_blend_mode_fnc)
+    'CUSTOM': NodeMakeInfo('ShaderNodeGroup',
+                           function=_custom_blend_mode_fnc)
     }
 
-# Create _BlendModeNodeInfo for mix node blend modes.
+# Create NodeMakeInfo for mix node blend modes.
 for mode_enum in _MIX_NODE_BLEND_TYPES:
     if mode_enum is not None:
         BLEND_MODES_NODE_INFO[mode_enum] = _mix_node_info(mode_enum)
 
 _BLEND_MODES_NO_NONE = [x for x in BLEND_MODES if x is not None]
 
-# Check that all (not None) blend modes have a _BlendModeNodeInfo
+# Check that all (not None) blend modes have a NodeMakeInfo
 assert len(_BLEND_MODES_NO_NONE) == len(BLEND_MODES_NODE_INFO)
 for mode_enum in _BLEND_MODES_NO_NONE:
     assert mode_enum[0] in BLEND_MODES_NODE_INFO, (f"{mode_enum[0]} not found")

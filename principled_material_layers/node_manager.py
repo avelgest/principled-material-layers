@@ -29,7 +29,7 @@ class NodeManager(bpy.types.PropertyGroup):
     # Stores the msgbus owners for each instance of this class
     # (mapped by layer_stack.identifier).
     _cls_msgbus_owners = defaultdict(lambda: defaultdict(dict))
-    
+
     node_names = NodeNames()
 
     def initialize(self, layer_stack) -> None:
@@ -108,7 +108,7 @@ class NodeManager(bpy.types.PropertyGroup):
         nodes = layer_stack.node_tree.nodes
         links = layer_stack.node_tree.links
 
-        making_info = channel.blend_mode_node_info
+        making_info = channel.blend_node_make_info
 
         node_name = NodeNames.blend_node(layer, channel)
         node = nodes.get(node_name)
@@ -244,6 +244,7 @@ class NodeManager(bpy.types.PropertyGroup):
         owners = self._msgbus_owners
 
         layer_stack_id = layer_stack.identifier
+        msgbus_options = {'PERSISTENT'}
 
         def update_node_tree_sockets():
             layer_stack = get_layer_stack_by_id(layer_stack_id)
@@ -257,7 +258,7 @@ class NodeManager(bpy.types.PropertyGroup):
             owner=owners,
             args=tuple(),
             notify=update_node_tree_sockets,
-            options={'PERSISTENT'}
+            options=msgbus_options
         )
 
         def on_active_image_change():
@@ -272,7 +273,7 @@ class NodeManager(bpy.types.PropertyGroup):
             owner=owners,
             args=tuple(),
             notify=on_active_image_change,
-            options={'PERSISTENT'}
+            options=msgbus_options
         )
 
         def update_uv_map():
@@ -286,8 +287,18 @@ class NodeManager(bpy.types.PropertyGroup):
             key=layer_stack.path_resolve("uv_map_name", False),
             owner=owners,
             args=tuple(),
-            notify=update_uv_map
+            notify=update_uv_map,
+            options=msgbus_options
         )
+
+        for ch in layer_stack.channels:
+            bpy.msgbus.subscribe_rna(
+                key=ch.path_resolve("hardness", False),
+                owner=owners,
+                args=(layer_stack_id,),
+                notify=_rebuild_node_tree,
+                options=msgbus_options
+            )
 
         for layer in layer_stack.layers:
             if layer.is_initialized:
@@ -299,6 +310,8 @@ class NodeManager(bpy.types.PropertyGroup):
 
         # The msgbus owner for the subscriptions to this layer
         owner = self._msgbus_owners[layer.identifier]
+
+        msgbus_options = {'PERSISTENT'}
 
         # Define a function since msgbus doesn't accept methods
         def layer_channels_changed(layer_id):
@@ -319,7 +332,7 @@ class NodeManager(bpy.types.PropertyGroup):
             owner=owner,
             args=(layer_id,),
             notify=layer_channels_changed,
-            options={'PERSISTENT'}
+            options=msgbus_options
         )
 
         def update_blend_node(layer_id, ch_name):
@@ -343,13 +356,21 @@ class NodeManager(bpy.types.PropertyGroup):
 
             ch_owner = owner[ch.name] = object()
 
+            bpy.msgbus.subscribe_rna(
+                key=ch.path_resolve("hardness", False),
+                owner=ch_owner,
+                args=(layer_stack_id,),
+                notify=_rebuild_node_tree,
+                options=msgbus_options
+                )
+
             for key in ("enabled", "blend_mode"):
                 bpy.msgbus.subscribe_rna(
                     key=ch.path_resolve(key, False),
                     owner=ch_owner,
                     args=(layer.identifier, ch.name),
                     notify=update_blend_node,
-                    options={'PERSISTENT'}
+                    options=msgbus_options
                 )
 
     def _unregister_msgbus(self):
@@ -504,6 +525,15 @@ class NodeManager(bpy.types.PropertyGroup):
     def _one_const_output_socket(self):
         """The output socket of the one_const node."""
         return self.nodes[NodeNames.one_const()].outputs[0]
+
+
+def _rebuild_node_tree(layer_stack_id: str) -> None:
+    """Rebuilds the node tree of the layer stack with the given id.
+    For use as a msgbus callback.
+    """
+    layer_stack = get_layer_stack_by_id(layer_stack_id)
+    if layer_stack:
+        layer_stack.node_manager.rebuild_node_tree()
 
 
 def register():

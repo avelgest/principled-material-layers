@@ -4,7 +4,7 @@ import itertools as it
 import warnings
 
 import bpy
-from bpy.types import NodeReroute
+from bpy.types import NodeReroute, NodeSocket
 from mathutils import Vector
 
 
@@ -46,9 +46,9 @@ class NodeNames:
 
     @staticmethod
     def blend_node(layer, channel):
-        """MixRGB or group node. Blends a layers channel with the channel
-        from the previous layer. Will be a group node if using a custom
-        blending function otherwise a MixRGB node.
+        """MixRGB or group node. Blends a layers channel with the
+        channel from the previous layer. Will be a group node if using
+        a custom blending function otherwise a MixRGB node.
         """
         return f"{layer.identifier}.blend.{channel.name}"
 
@@ -56,6 +56,15 @@ class NodeNames:
     def one_const():
         """Value node. Always has the value 1.0"""
         return "pml_one_const"
+
+    @staticmethod
+    def hardness_node(layer, channel):
+        """A node that controls how smoothly a layer's channel
+        transitions between values. May be None or any node with at
+        least one input and output. Sockets other than the first
+        input/output will be ignored.
+        """
+        return f"{layer.identifier}.hardness.{channel.name}"
 
     @staticmethod
     def layer_alpha_x_opacity(layer):
@@ -328,6 +337,13 @@ class NodeTreeBuilder:
 
         links.new(active_layer_rgb.inputs[0], active_layer_node.outputs[0])
 
+    def _get_layer_final_alpha_socket(self, layer) -> NodeSocket:
+        """Returns the socket that gives the alpha value of layer
+        after any masks and the opacity have been applied.
+        """
+        return self.node_manager.get_layer_final_alpha_socket(layer,
+                                                              self.nodes)
+
     def _get_layer_output_socket(self, layer, channel):
 
         if layer == self.layer_stack.base_layer:
@@ -497,9 +513,8 @@ class NodeTreeBuilder:
         connects to the channel's baked value. The parent of the new
         nodes will be set to 'parent'.
         """
-        node_tree = self.node_tree
-        nodes = node_tree.nodes
-        links = node_tree.links
+        nodes = self.nodes
+        links = self.links
 
         ma_group = nodes[NodeNames.layer_material(layer)]
 
@@ -562,11 +577,37 @@ class NodeTreeBuilder:
             links.new(ch_blend.inputs[1], prev_layer_ch_out)
             links.new(ch_blend.inputs[2], ma_group_output)
 
+            self._insert_layer_hardness_nodes(layer, layer_ch, parent)
+
+    def _insert_layer_hardness_nodes(self, layer, ch, parent) -> None:
+        node_make = ch.hardness_node_make_info
+
+        if node_make is None:
+            return
+
+        final_alpha_soc = self._get_layer_final_alpha_socket(layer)
+        blend_node = self.nodes[NodeNames.blend_node(layer, ch)]
+
+        hardness_node = node_make.make(self.node_tree, ch)
+        hardness_node.name = NodeNames.hardness_node(layer, ch)
+        hardness_node.label = f"Hardness: {ch.name}"
+        hardness_node.hide = True
+        hardness_node.width = 100
+        hardness_node.parent = parent
+        hardness_node.location = blend_node.location + Vector((-120, 30))
+
+        # Show only the first input/output
+        for x in it.chain(hardness_node.inputs[1:], hardness_node.outputs[1:]):
+            x.hide = True
+
+        # Insert the node into the link between the blend node and
+        # the layer's final alpha (i.e. layer_alpha_x_opacity)
+        self.links.new(hardness_node.inputs[0], final_alpha_soc)
+        self.links.new(blend_node.inputs[0], hardness_node.outputs[0])
+
     def _insert_layer_mask_node(self, layer) -> None:
-        layer_stack = self.layer_stack
-        node_tree = layer_stack.node_tree
-        nodes = node_tree.nodes
-        links = node_tree.links
+        nodes = self.nodes
+        links = self.links
 
         names = NodeNames
 
