@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools as it
+import typing
 import warnings
 
 from typing import List, Optional, Union
@@ -27,6 +28,7 @@ from .utils.layer_stack_utils import (get_layer_stack_by_id,
                                       get_layer_stack_from_prop)
 from .utils.naming import unique_name_in
 from .utils.nodes import (set_node_group_vector_defaults,
+                          get_nodes_by_type,
                           group_output_link_default)
 
 LAYER_TYPES = (('MATERIAL_PAINT', "Material Paint",
@@ -254,6 +256,16 @@ class MaterialLayer(PropertyGroup):
                     return name
         return self.name
 
+    def _set_output_nodes_value(self, channel: BasicChannel,
+                                value: typing.Any) -> None:
+        """Set the value of all group output node sockets for channel
+        to value.
+        """
+        for node in get_nodes_by_type(self.node_tree, "NodeGroupOutput"):
+            socket = node.inputs.get(channel.name)
+            if socket is not None:
+                socket.default_value = value
+
     def _ensure_node_tree_output(self, channel: Channel) -> None:
         """Ensure that the layer's node tree has an output for channel
         and that it is of the correct type.
@@ -281,6 +293,7 @@ class MaterialLayer(PropertyGroup):
         default_value = self.layer_stack.get_channel_default_value(channel)
         if default_value is not None:
             output.default_value = default_value
+            self._set_output_nodes_value(channel, default_value)
 
         # Links any normal or tangent sockets on the Group Output node
         # so they have the expected value. Does nothing for other sockets.
