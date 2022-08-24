@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import itertools as it
 
+from typing import Optional
+
 import bpy
 
 from bpy.types import NodeTree, ShaderNode, ShaderNodeTree
@@ -67,7 +69,7 @@ def blend_mode_description(blend_mode: str) -> str:
     return BLEND_MODES[idx][2]
 
 
-def is_group_blending_compat(node_group: NodeTree,
+def is_group_blending_compat(node_group: Optional[NodeTree],
                              strict: bool = False) -> bool:
     """Returns whether or not a node group can be used as a custom
     blending operation. This function checks the input and ouput
@@ -81,7 +83,7 @@ def is_group_blending_compat(node_group: NodeTree,
     Returns:
         True if the group is compatible, False otherwise.
     """
-    if not isinstance(node_group, ShaderNodeTree):
+    if node_group is None or node_group.type != 'SHADER':
         return False
     if not strict:
         # Require at least 3 inputs and 1 output

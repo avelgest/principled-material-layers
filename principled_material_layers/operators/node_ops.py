@@ -10,6 +10,7 @@ from bpy.props import (BoolProperty,
                        StringProperty)
 
 from .. import blending
+from .. import hardness
 from ..utils.layer_stack_utils import get_layer_stack
 from ..utils.nodes import ensure_outputs_match_channels
 from ..utils.ops import pml_op_poll
@@ -135,28 +136,25 @@ class PML_OT_view_shader_node_group(Operator):
             bpy.ops.node.group_edit(context)
 
 
-class PML_OT_new_blending_node_group(Operator):
-    bl_idname = "node.pml_new_blending_node_group"
-    bl_label = "New Blending Group"
-    bl_description = ("Create a new shader node group for use as a custom"
-                      "blending operation")
-    bl_options = {'INTERNAL', 'REGISTER'}
-
+class NewCustomHardnessBlendBase:
+    """Base class for operators that create a new node group for a
+    custom hardness or blending function.
+    """
     open_in_editor: BoolProperty(
         name="Open in Shader Editor",
         default=False
     )
     set_on_active_channel: BoolProperty(
         default=False,
-        description=("Set blend_mode_custom of the active layer's "
+        description=("Set the property of the active layer's "
                      "active channel to the new node group")
     )
 
-    def execute(self, context):
-        # Create a default group
-        node_group = blending.create_custom_blend_default("Custom Blend Group")
-
-        # Set the active channel's blend_mode_custom to the new node group
+    def after_group_made(self, context, node_group, prop) -> None:
+        """Method that should be called after the new group is made.
+        Handles opening the group and setting it on the active channel.
+        """
+        # Set the active channel's prop to the new node group
         if self.set_on_active_channel:
             # If pml_channel has been by context_pointer_set then use
             # that otherwise use the active channel of the active layer
@@ -167,14 +165,46 @@ class PML_OT_new_blending_node_group(Operator):
                     channel = layer_stack.active_layer.active_channel
 
             if channel is not None:
-                channel.blend_mode_custom = node_group
+                setattr(channel, prop, node_group)
             else:
+                assert hasattr(self, "report")
                 self.report({'WARNING'}, "No active channel found: could not "
-                            "set blend_mode_custom.")
+                            f"set {prop}.")
 
         if self.open_in_editor:
             bpy.ops.node.pml_view_shader_node_group(
                 node_group=node_group.name)
+
+
+class PML_OT_new_blending_node_group(NewCustomHardnessBlendBase, Operator):
+    bl_idname = "node.pml_new_blending_node_group"
+    bl_label = "New Blending Group"
+    bl_description = ("Create a new shader node group for use as a custom"
+                      "blending operation")
+    bl_options = {'INTERNAL', 'REGISTER'}
+
+    def execute(self, context):
+        # Create a default group
+        node_group = blending.create_custom_blend_default("Custom Blend Group")
+
+        self.after_group_made(context, node_group, "blend_mode_custom")
+
+        return {'FINISHED'}
+
+
+class PML_OT_new_hardness_node_group(NewCustomHardnessBlendBase, Operator):
+    bl_idname = "node.pml_new_hardness_node_group"
+    bl_label = "New Hardness Group"
+    bl_description = ("Create a new shader node group for use as a custom"
+                      "hardness function")
+    bl_options = {'INTERNAL', 'REGISTER'}
+
+    def execute(self, context):
+        # Create a default group
+        name = "Custom Hardness Group"
+        node_group = hardness.create_custom_hardness_default(name)
+
+        self.after_group_made(context, node_group, "hardness_custom")
 
         return {'FINISHED'}
 
@@ -338,6 +368,7 @@ def add_pml_node_menu_func(self, context):
 classes = (PML_OT_view_shader_node_group,
            PML_OT_rebuild_pml_stack_node_tree,
            PML_OT_new_blending_node_group,
+           PML_OT_new_hardness_node_group,
            PML_OT_rename_node_group,
            PML_OT_add_pml_node,
            PML_OT_verify_layer_outputs,

@@ -2,6 +2,8 @@
 
 import typing
 
+from typing import Optional
+
 import bpy
 
 from bpy.types import Node, ShaderNode, ShaderNodeTree
@@ -34,6 +36,23 @@ HARDNESS_MODES = tuple(None if x is None
                        else (x, cap_enum(x), _HARDNESS_DESCR.get(x, ""))
                        for x in _HARDNESS_TYPES
                        )
+
+
+# Dict of enum strings to their indices in HARDNESS_MODES
+_HARDNESS_INDICES = {x[0]: idx for idx, x in enumerate(HARDNESS_MODES)
+                     if x is not None}
+
+
+def hardness_display_name(hardness: str) -> str:
+    """Returns the display name of a hardness enum value."""
+    idx = _HARDNESS_INDICES[hardness]
+    return HARDNESS_MODES[idx][1]
+
+
+def hardness_description(hardness: str) -> str:
+    """Returns the description of a hardness enum value."""
+    idx = _HARDNESS_INDICES[hardness]
+    return HARDNESS_MODES[idx][2]
 
 
 def _create_node_group(name: str) -> ShaderNodeTree:
@@ -109,16 +128,19 @@ def _map_range_xn_group(interp_type: str, n: int):
     return node_tree
 
 
-def is_group_hardness_compat(node_group: bpy.types.NodeTree,
+def is_group_hardness_compat(node_group: Optional[bpy.types.NodeTree],
                              strict: bool = False) -> bool:
     """Whether node_group can be used as a custom hardness function
     based on its inputs and outputs.
     If strict is True then the inputs and outputs must both be a single
     scalar socket.
     """
+    if node_group is None:
+        return False
+
     inputs = node_group.inputs
     outputs = node_group.outputs
-    if not node_group.type == 'SHADER' or not inputs or not outputs:
+    if node_group.type != 'SHADER' or not inputs or not outputs:
         return False
     if not strict:
         # When not strict accept at least one input and output socket
@@ -145,7 +167,7 @@ def create_custom_hardness_default(name: str) -> ShaderNodeTree:
     group_out.location.x = 300
 
     float_curve = node_group.nodes.new("ShaderNodeFloatCurve")
-    node_group.links.new(float_curve.inputs[1], group_in.inputs[0])
+    node_group.links.new(float_curve.inputs[1], group_in.outputs[0])
     node_group.links.new(group_out.inputs[0], float_curve.outputs[0])
 
     return node_group
@@ -186,7 +208,7 @@ def _custom_hardness_fnc(node: ShaderNode, channel) -> None:
     hardness_custom property. Uses a fallback group if the property's
     value is incompatible.
     """
-    node.node_tree = channel.blend_mode_custom
+    node.node_tree = channel.hardness_custom
 
     if not is_group_hardness_compat(node.node_tree, strict=False):
         node.node_tree = _get_fallback_node_group()

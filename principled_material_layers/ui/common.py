@@ -7,6 +7,7 @@ import bpy
 from bpy.types import Menu, NodeGroupOutput, UIList, UI_UL_list
 
 from .. import blending
+from .. import hardness
 from ..asset_helper import file_entry_from_handle
 from ..preferences import get_addon_preferences
 from ..utils.layer_stack_utils import get_layer_stack
@@ -218,7 +219,52 @@ class PML_MT_channel_blend_mode(Menu):
             op_props.channel_name = channel.name
 
 
-class PML_MT_custom_blend_mode_select(Menu):
+class CustomHardnessBlendSelectBase:
+    """Base class for a menu that selects a custom hardness or blending
+    node group.
+    """
+
+    @classmethod
+    def poll(cls, context):
+        layer_stack = get_layer_stack(context)
+        if not layer_stack:
+            return False
+
+        active_layer = layer_stack.active_layer
+        return (active_layer is not None
+                and active_layer.active_channel is not None)
+
+    def draw_menu(self, context, layout,
+                  new_op=None, set_op=None, compat=None):
+        layout.operator_context = 'EXEC_DEFAULT'
+
+        # pml_channel can be set using context_pointer_set
+        channel = getattr(context, "pml_channel", None)
+        if channel is None:
+            channel = get_layer_stack(context).active_layer.active_channel
+
+        layout.context_pointer_set("pml_channel", channel)
+
+        row = layout.row(align=True)
+        col = row.column()
+
+        if new_op is not None:
+            op_props = col.operator(new_op, text="New")
+            op_props.open_in_editor = True
+            op_props.set_on_active_channel = True
+
+        for node_group in bpy.data.node_groups:
+            if (node_group.name.startswith(".")
+                    or not isinstance(node_group, bpy.types.ShaderNodeTree)):
+                continue
+
+            if compat and compat(node_group, strict=True):
+                op_props = col.operator(set_op, text=node_group.name)
+                op_props.node_group = node_group.name
+        return col
+
+
+class PML_MT_custom_blend_mode_select(CustomHardnessBlendSelectBase, Menu):
     """Menu for selecting the node group used by a channel with a custom
     blend_mode. The channel is the active_channel of the layer_stack's
     active_layer. This menu only displays node groups that can be used
@@ -229,48 +275,29 @@ class PML_MT_custom_blend_mode_select(Menu):
     bl_description = ("Select the node group to be used as a custom blending "
                       "operation. Only compatible node groups are displayed")
 
-    @classmethod
-    def poll(cls, context):
-        layer_stack = get_layer_stack(context)
-        if layer_stack is None:
-            return False
+    def draw(self, context):
+        self.draw_menu(context, self.layout,
+                       new_op="node.pml_new_blending_node_group",
+                       set_op="material.pml_channel_set_custom_blend",
+                       compat=blending.is_group_blending_compat)
 
-        active_layer = layer_stack.active_layer
-        return (active_layer is not None
-                and active_layer.active_channel is not None)
+
+class PML_MT_custom_hardness_select(CustomHardnessBlendSelectBase, Menu):
+    """Menu for selecting the node group used by a channel with a custom
+    blend_mode. The channel is the active_channel of the layer_stack's
+    active_layer. This menu only displays node groups that can be used
+    as blending operations.
+    """
+    bl_label = "Custom Hardness"
+    bl_idname = "PML_MT_custom_hardness_select"
+    bl_description = ("Select the node group to be used as a custom hardness "
+                      "function. Only compatible node groups are displayed")
 
     def draw(self, context):
-        layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
-
-        layer_stack = get_layer_stack(context)
-
-        # pml_channel can be set using context_pointer_set
-        channel = getattr(context, "pml_channel", None)
-        if channel is None:
-            channel = layer_stack.active_layer.active_channel
-
-        layout.context_pointer_set("pml_channel", channel)
-
-        row = layout.row(align=True)
-
-        col = row.column()
-
-        op_props = col.operator("node.pml_new_blending_node_group",
-                                text="New")
-        op_props.open_in_editor = True
-        op_props.set_on_active_channel = True
-
-        for node_group in bpy.data.node_groups:
-            if (node_group.name.startswith(".")
-                    or not isinstance(node_group, bpy.types.ShaderNodeTree)):
-                continue
-
-            if blending.is_group_blending_compat(node_group, strict=True):
-                op_props = col.operator(
-                            "material.pml_channel_set_custom_blend",
-                            text=node_group.name)
-                op_props.custom_blend = node_group.name
+        self.draw_menu(context, self.layout,
+                       new_op="node.pml_new_hardness_node_group",
+                       set_op="material.pml_channel_set_custom_hardness",
+                       compat=hardness.is_group_hardness_compat)
 
 # Panels
 
@@ -384,12 +411,14 @@ class layer_stack_channels_PT_base:
             # Same UI as for material layers' channels
             active_layer_PT_base.draw_custom_blending_props(layout,
                                                             active_channel)
-                                                            
+
+        # Effective value of hardness for layers with 'DEFAULT' hardness
         layout.separator()
         layout.label(text="Default Hardness")
         layout.prop(active_channel, "hardness", text="")
         if active_channel.hardness == 'CUSTOM':
-            pass
+            active_layer_PT_base.draw_custom_hardness_props(layout,
+                                                            active_channel)
 
     def draw_channels_list(self, layout, layer_stack):
         active_channel = layer_stack.active_channel
@@ -470,14 +499,16 @@ class active_layer_PT_base:
                 op_props = row.operator("material.pml_layer_remove_channel",
                                         icon='REMOVE', text="")
                 op_props.channel_name = active_channel.name
-                
+
                 # Custom blend mode
                 if active_channel.blend_mode == 'CUSTOM':
                     self.draw_custom_blending_props(layout, active_channel)
                     layout.separator()
-                
+
                 # Hardness
-                col.prop(active_channel, "hardness")
+                layout.prop(active_channel, "hardness")
+                if active_channel.hardness == 'CUSTOM':
+                    self.draw_custom_hardness_props(layout, active_channel)
 
         node_tree = active_layer.node_tree
         if node_tree is None or active_channel is None:
@@ -491,28 +522,26 @@ class active_layer_PT_base:
             layout.template_node_view(node_tree, output_node, socket)
 
     @staticmethod
-    def draw_custom_blending_props(layout, channel):
-
+    def draw_custom_ch_node_group(layout, channel, prop, menu, compat):
         layout.context_pointer_set("pml_channel", channel)
 
         col = layout.column(align=True)
-        col.label(text="Custom Blending Mode")
+        col.label(text=type(channel).bl_rna.properties[prop].name)
 
-        blend_group = channel.blend_mode_custom
+        node_group = channel.path_resolve(prop)
 
-        if not blending.is_group_blending_compat(blend_group):
+        if node_group is None or not compat(node_group):
             col.label(text="Warning: the selected group is "
                            "incompatible.",
                       icon="ERROR")
 
-        group_name = "" if blend_group is None else blend_group.name
-        menu_text = ("No node group selected" if blend_group is None
-                     else group_name)
+        group_name = "" if node_group is None else node_group.name
 
-        col.menu("PML_MT_custom_blend_mode_select", text=menu_text)
+        menu_text = group_name or "No node group selected"
+        col.menu(menu, text=menu_text)
 
         row = col.row(align=True)
-        row.enabled = blend_group is not None
+        row.enabled = node_group is not None
 
         op_props = row.operator("node.pml_view_shader_node_group",
                                 text="Edit")
@@ -520,6 +549,20 @@ class active_layer_PT_base:
         op_props = row.operator("node.pml_rename_node_group",
                                 text="Rename")
         op_props.node_group_str = group_name
+
+    @classmethod
+    def draw_custom_blending_props(cls, layout, channel):
+        cls.draw_custom_ch_node_group(layout, channel,
+                                      "blend_mode_custom",
+                                      menu="PML_MT_custom_blend_mode_select",
+                                      compat=blending.is_group_blending_compat)
+
+    @classmethod
+    def draw_custom_hardness_props(cls, layout, channel):
+        cls.draw_custom_ch_node_group(layout, channel,
+                                      "hardness_custom",
+                                      menu="PML_MT_custom_hardness_select",
+                                      compat=hardness.is_group_hardness_compat)
 
 
 class settings_PT_base:
@@ -606,6 +649,7 @@ classes = (
     PML_MT_add_channel_layer,
     PML_MT_channel_blend_mode,
     PML_MT_custom_blend_mode_select,
+    PML_MT_custom_hardness_select,
     )
 
 register, unregister = bpy.utils.register_classes_factory(classes)
