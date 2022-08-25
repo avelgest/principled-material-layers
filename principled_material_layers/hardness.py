@@ -208,7 +208,10 @@ def _custom_hardness_fnc(node: ShaderNode, channel) -> None:
     hardness_custom property. Uses a fallback group if the property's
     value is incompatible.
     """
-    node.node_tree = channel.hardness_custom
+    if channel.hardness == 'DEFAULT':
+        node.node_tree = channel.default_hardness_custom
+    else:
+        node.node_tree = channel.hardness_custom
 
     if not is_group_hardness_compat(node.node_tree, strict=False):
         node.node_tree = _get_fallback_node_group()

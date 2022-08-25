@@ -299,6 +299,13 @@ class NodeManager(bpy.types.PropertyGroup):
                 notify=_rebuild_node_tree,
                 options=msgbus_options
             )
+            bpy.msgbus.subscribe_rna(
+                key=ch.path_resolve("blend_mode", False),
+                owner=owners,
+                args=(layer_stack_id,),
+                notify=_rebuild_node_tree,
+                options=msgbus_options
+            )
 
         for layer in layer_stack.layers:
             if layer.is_initialized:

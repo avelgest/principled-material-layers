@@ -199,7 +199,7 @@ class PML_MT_channel_blend_mode(Menu):
         layout = layout.row(align=True)
         col = layout.column()
         row_counter = it.count()
-        for enum_tuple in blending.BLEND_MODES:
+        for enum_tuple in self._get_avail_blend_modes(channel):
             row_num = next(row_counter)
 
             if enum_tuple is None:
@@ -217,6 +217,14 @@ class PML_MT_channel_blend_mode(Menu):
 
             op_props.layer_name = active_layer.name
             op_props.channel_name = channel.name
+
+    def _get_avail_blend_modes(self, channel):
+        """Returns a sequence of blend mode enum tuples for the blend
+        modes that are available to channel."""
+        if not channel.is_layer_channel:
+            return [x for x in blending.BLEND_MODES
+                    if x is None or x[0] != 'DEFAULT']
+        return blending.BLEND_MODES
 
 
 class CustomHardnessBlendSelectBase:

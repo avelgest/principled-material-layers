@@ -40,7 +40,7 @@ _MIX_NODE_BLEND_TYPES = ('MIX',
                          'COLOR',
                          'VALUE'
                          )
-_OTHER_BLEND_TYPES = ('CUSTOM',)
+_OTHER_BLEND_TYPES = ('DEFAULT', 'CUSTOM',)
 
 
 # BLEND_MODES enum
@@ -193,7 +193,10 @@ def _custom_blend_mode_fnc(node: ShaderNode, channel: Channel) -> None:
     blend_mode_custom property. Uses a fallback group if the property's
     value is incompatible.
     """
-    node.node_tree = channel.blend_mode_custom
+    if channel.blend_mode == 'DEFAULT':
+        node.node_tree = channel.default_blend_mode_custom
+    else:
+        node.node_tree = channel.blend_mode_custom
 
     if not is_group_blending_compat(node.node_tree, strict=False):
         node.node_tree = _get_fallback_node_group()
@@ -210,7 +213,8 @@ for mode_enum in _MIX_NODE_BLEND_TYPES:
     if mode_enum is not None:
         BLEND_MODES_NODE_INFO[mode_enum] = _mix_node_info(mode_enum)
 
-_BLEND_MODES_NO_NONE = [x for x in BLEND_MODES if x is not None]
+_BLEND_MODES_NO_NONE = [x for x in BLEND_MODES if (x is not None
+                                                   and x[0] != 'DEFAULT')]
 
 # Check that all (not None) blend modes have a NodeMakeInfo
 assert len(_BLEND_MODES_NO_NONE) == len(BLEND_MODES_NODE_INFO)

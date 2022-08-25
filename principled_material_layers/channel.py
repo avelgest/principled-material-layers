@@ -147,7 +147,7 @@ class Channel(BasicChannel):
     blend_mode: EnumProperty(
         name="Blend Mode",
         items=blending.BLEND_MODES,
-        default='MIX'
+        default='DEFAULT'
     )
     # Node group for 'CUSTOM' blend mode
     blend_mode_custom: PointerProperty(
@@ -208,8 +208,9 @@ class Channel(BasicChannel):
         if layer is not None:
             self.layer_identifier = layer.identifier
 
-        self.blend_mode = self.default_blend_mode
-        self.blend_mode_custom = self.default_blend_mode_custom
+        if not self.is_layer_channel:
+            self.blend_mode = 'MIX'
+            self.hardness = 'LINEAR'
 
     def delete(self) -> None:
         super().delete()
@@ -246,8 +247,25 @@ class Channel(BasicChannel):
         return hardness.HARDNESS_NODE_INFO[self.hardness]
 
     @property
+    def default_hardness_custom(self) -> Optional[ShaderNodeTree]:
+        """The default value of hardness_custom for this channel.
+        This is the hardness_custom property of the matching channel
+        in layer_stack.channels.
+        """
+        if not self.is_layer_channel:
+            return self.hardness_custom
+
+        layer_stack_ch = self.layer_stack_channel
+        if layer_stack_ch is None:
+            return None
+        return layer_stack_ch.hardness_custom
+
+    @property
     def blend_node_make_info(self):
-        return blending.BLEND_MODES_NODE_INFO[self.blend_mode]
+        blend_node_info = blending.BLEND_MODES_NODE_INFO
+        if self.blend_mode == 'DEFAULT':
+            return blend_node_info[self.default_blend_mode]
+        return blend_node_info[self.blend_mode]
 
     @property
     def default_blend_mode(self):
@@ -257,47 +275,31 @@ class Channel(BasicChannel):
         than a layer stack.
         """
         if not self.is_layer_channel:
-            return self.blend_mode
+            return ('MIX' if self.blend_mode == 'DEFAULT'
+                    else self.blend_mode)
 
-        # For MaterialLayer channels find a channel with the same name
-        # in layer_stack.channels and return its default_blend_mode
-        layer_stack_ch = self.layer_stack.channels.get(self.name)
+        # For MaterialLayer channels return the blend_mode of the
+        # matching channel on the layer stack
+        layer_stack_ch = self.layer_stack_channel
         if layer_stack_ch is None:
             return 'MIX'
 
         assert not layer_stack_ch.is_layer_channel
         return layer_stack_ch.default_blend_mode
 
-    @default_blend_mode.setter
-    def default_blend_mode(self, value: str):
-        if self.is_layer_channel:
-            raise RuntimeError("Can only set default_blend_mode on a layer "
-                               "stack channel, not a MaterialLayer channel.")
-        self.blend_mode = value
-
     @property
     def default_blend_mode_custom(self) -> Optional[ShaderNodeTree]:
-        """The default value of blend_mode_custom that this channel
-        should have. Like default_blend_mode it is readonly for material
-        layer channels.
+        """The default value of blend_mode_custom for this channel.
+        This is the blend_mode_custom property of the matching channel
+        in layer_stack.channels.
         """
         if not self.is_layer_channel:
             return self.blend_mode_custom
-        layer_stack_ch = self.layer_stack.channels.get(self.name)
 
+        layer_stack_ch = self.layer_stack_channel
         if layer_stack_ch is None:
             return None
-
         return layer_stack_ch.blend_mode_custom
-
-    @default_blend_mode_custom.setter
-    def default_blend_mode_custom(self,
-                                  value: Optional[ShaderNodeTree]) -> None:
-        if self.is_layer_channel:
-            raise RuntimeError("Can only set default_blend_mode_custom on a "
-                               "layer stack channel, not a MaterialLayer "
-                               "channel.")
-        self.blend_mode = value
 
     @property
     def is_baked(self) -> bool:
@@ -317,6 +319,14 @@ class Channel(BasicChannel):
     @property
     def layer_stack(self):
         return get_layer_stack_from_prop(self)
+
+    @property
+    def layer_stack_channel(self) -> Optional[Channel]:
+        """The channel on the layer stack with the same name as this
+        channel.
+        """
+        layer_stack = self.layer_stack
+        return layer_stack and layer_stack.channels.get(self.name)
 
 
 classes = (Channel, BasicChannel,)
