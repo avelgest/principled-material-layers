@@ -2,6 +2,8 @@
 
 import itertools as it
 
+from typing import Optional
+
 import bpy
 
 from bpy.types import Operator
@@ -59,9 +61,17 @@ class PML_OT_view_shader_node_group(Operator):
     def description(cls, context, properties):
         return properties.custom_description or cls.bl_description
 
+    @classmethod
+    def poll(cls, context):
+        if cls.find_available_editor(context) is None:
+            cls.poll_message_set("Could not find an available "
+                                 "shader node editor")
+            return False
+        return True
+
     def execute(self, context):
         if not self.node_group:
-            self.report({'WARNING'}, "No node tree given")
+            self.report({'ERROR'}, "No node tree given")
             return {'CANCELLED'}
 
         node_group_to_view = bpy.data.node_groups.get(self.node_group)
@@ -105,6 +115,20 @@ class PML_OT_view_shader_node_group(Operator):
             return {'CANCELLED'}
 
         return {'FINISHED'}
+
+    @classmethod
+    def find_available_editor(cls, context) -> Optional[bpy.types.Area]:
+        node_editor_areas = (a for a in context.screen.areas
+                             if a.type == 'NODE_EDITOR')
+
+        for area in node_editor_areas:
+            space = area.spaces[0]  # The active space
+
+            if (space.type == 'NODE_EDITOR' and
+                    space.tree_type == 'ShaderNodeTree' and
+                    not space.pin):
+                return area
+        return None
 
     def _close_node_group(self, context, area):
         context = context.copy()
@@ -172,8 +196,9 @@ class NewCustomHardnessBlendBase:
                             f"set {prop}.")
 
         if self.open_in_editor:
-            bpy.ops.node.pml_view_shader_node_group(
-                node_group=node_group.name)
+            open_op = bpy.ops.node.pml_view_shader_node_group
+            if open_op.poll():
+                open_op(node_group=node_group.name)
 
 
 class PML_OT_new_blending_node_group(NewCustomHardnessBlendBase, Operator):

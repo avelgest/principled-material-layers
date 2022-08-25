@@ -107,7 +107,7 @@ class IsMaterialCompat:
         if self:
             if self.unmatched_channels < self.matched_sockets:
                 return 'CHECKMARK'
-            return 'INFO'
+            return 'ERROR'
         if self.in_progress:
             return 'NONE'
         return 'ERROR'

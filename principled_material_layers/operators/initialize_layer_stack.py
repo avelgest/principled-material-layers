@@ -244,6 +244,8 @@ class PML_OT_initialize_layer_stack(Operator):
 
         self._create_pml_node(ma_layer_stack)
 
+        context.scene.tool_settings.image_paint.mode = 'IMAGE'
+
         return {'FINISHED'}
 
     def enable_channels_from_layer(self, layer_stack, layer) -> None:
