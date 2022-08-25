@@ -4,6 +4,7 @@ import itertools as it
 
 import bpy
 
+from bpy.props import BoolProperty
 from bpy.types import Menu, NodeGroupOutput, UIList, UI_UL_list
 
 from .. import blending
@@ -81,6 +82,13 @@ class PML_UL_material_layers_list(UIList):
 
 class PML_UL_layer_stack_channels_list(UIList):
     """UIList for displaying the layer stack's channels."""
+
+    sort_enabled: BoolProperty(
+        name="Sort by Enabled",
+        description="Show enabled channels at the top of the list",
+        default=True
+    )
+
     def draw_item(self, context, layout, data, item, icon, active_data,
                   active_property, index=0, flt_flag=0):
 
@@ -88,6 +96,30 @@ class PML_UL_layer_stack_channels_list(UIList):
         row = layout.row(align=True)
         row.prop(channel, "enabled", text="")
         row.label(text=channel.name)
+
+    def draw_filter(self, context, layout):
+        layout.prop(self, "sort_enabled")
+
+    def filter_items(self, context, data, propname):
+        if not self.sort_enabled:
+            return [], []
+
+        channels = getattr(data, propname)
+
+        num_enabled = len([x for x in channels if x.enabled])
+
+        # Supplies the indices for enabled channels
+        top_idxs = it.count()
+        # Supplies the indices for disabled channels
+        # (starts where top_idxs should end)
+        bottom_idxs = it.count(num_enabled)
+
+        # Take a value from top_idxs if the channel is enabled
+        # or bottom_idxs if the channel is disabled
+        order = [next(top_idxs if ch.enabled else bottom_idxs)
+                 for ch in channels]
+
+        return [], order
 
 
 class PML_UL_layer_channels_list(UIList):
