@@ -389,7 +389,7 @@ class NodeTreeBuilder:
         if layer.layer_type == 'MATERIAL_FILL':
             return self.nodes[NodeNames.one_const()].outputs[0]
 
-        if layer.uses_shared_image:
+        if layer.has_shared_image:
             node = self.nodes[NodeNames.paint_image_rgb(layer.image)]
             return node.outputs[layer.image_channel]
 
@@ -621,7 +621,7 @@ class NodeTreeBuilder:
 
         # The node that multiplies the opacity value
         x_opacity_node = nodes[names.layer_alpha_x_opacity(layer)
-                               if layer.uses_shared_image
+                               if layer.has_shared_image
                                else names.layer_alpha_x_opacity(layer)]
 
         group_node = nodes.new("ShaderNodeGroup")

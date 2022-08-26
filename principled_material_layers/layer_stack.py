@@ -402,7 +402,7 @@ class LayerStack(bpy.types.PropertyGroup):
 
         if self.active_layer_index == value:
             if self._is_active_in_image_paint:
-                self._set_paint_canvas()
+                self.image_manager.set_paint_canvas()
             return
 
         if value < 0 or value >= len(self.layers):
@@ -546,21 +546,7 @@ class LayerStack(bpy.types.PropertyGroup):
             self.image_manager.set_active_layer(layer)
             self.node_manager.set_active_layer(layer)
 
-        self._set_paint_canvas()
-
-    def _set_paint_canvas(self):
-        paint_settings = bpy.context.scene.tool_settings.image_paint
-
-        paint_settings.mode = 'IMAGE'
-
-        layer = self.active_layer
-
-        if layer.image is None:
-            paint_settings.canvas = None
-        elif layer.uses_shared_image:
-            paint_settings.canvas = self.image_manager.active_image
-        else:
-            paint_settings.canvas = layer.image
+        self.image_manager.set_paint_canvas()
 
     def _search_for_layer_index_by_id(self, identifier: str) -> int:
         for idx, layer in enumerate(self.layers):

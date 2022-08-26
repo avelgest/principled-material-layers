@@ -382,7 +382,7 @@ class ImageManager(bpy.types.PropertyGroup):
                                "layer_images")
 
         # TODO check that the layer_image is actually allocated to layer
-        if not layer.uses_shared_image:
+        if not layer.has_shared_image:
             layer_image.deallocate_all()
         else:
             layer_image.deallocate_single(layer.image_channel)
@@ -479,13 +479,16 @@ class ImageManager(bpy.types.PropertyGroup):
             return
 
         if (active is not None
-                and active.image is not None
-                and active.uses_shared_image):
+                and active.uses_image
+                and active.has_shared_image):
 
             copy_image_channel_to_rgb(active.image,
                                       active.image_channel,
                                       self.active_image,
                                       copy_alpha=True)
+
+    def reload_active_layer(self) -> None:
+        self._set_active_layer(self.active_layer)
 
     def _create_tmp_active_image(self,
                                  layer: MaterialLayer) -> bpy.types.Image:
@@ -526,14 +529,23 @@ class ImageManager(bpy.types.PropertyGroup):
         if image is not None:
             bpy.data.images.remove(image)
 
+    @property
+    def _is_using_tmp_active_image(self) -> bool:
+        tmp_image_name = self.active_image_name(self.active_layer)
+        return (self.active_image is not None
+                and self.active_image.name == tmp_image_name)
+
     def _replace_active_image(self,
                               layer: MaterialLayer,
                               old_layer: MaterialLayer) -> None:
 
-        if not layer.has_image:
+        # Only deletes active images made by _create_tmp_active_image
+        self._delete_tmp_active_image(old_layer)
+
+        if not layer.uses_image:
             new_active_img = None
 
-        elif not layer.uses_shared_image:
+        elif not layer.has_shared_image:
             # Use the actual image that the layer stores its data in
             new_active_img = layer.image
 
@@ -546,9 +558,6 @@ class ImageManager(bpy.types.PropertyGroup):
         if new_active_img is self.active_image:
             # No changes if the image is already active
             return
-
-        # Only deletes active images made by _create_tmp_active_image
-        self._delete_tmp_active_image(old_layer)
 
         self.active_image = new_active_img
 
@@ -564,8 +573,9 @@ class ImageManager(bpy.types.PropertyGroup):
         old_layer = self.active_layer
 
         if (old_layer is not None
-                and old_layer.image is not None
-                and old_layer.uses_shared_image):
+                and old_layer.has_image
+                and old_layer.has_shared_image
+                and self._is_using_tmp_active_image):
 
             copy_image_channel(self.active_image,
                                0,
@@ -590,6 +600,16 @@ class ImageManager(bpy.types.PropertyGroup):
 
         self["active_layer_id"] = layer.identifier
 
+    def set_paint_canvas(self, context=None) -> None:
+        if context is None:
+            context = bpy.context
+
+        paint_settings = context.scene.tool_settings.image_paint
+
+        paint_settings.mode = 'IMAGE'
+
+        paint_settings.canvas = self.active_image
+
     def resize_all_layers(self, width: int, height: int) -> None:
         """Resize all layer images created by this image manager."""
         for image in self.layer_images:
@@ -602,8 +622,7 @@ class ImageManager(bpy.types.PropertyGroup):
                 active_image.scale(width, height)
 
             # Need to edit pixel data after scale or texture paint may
-            # display blank tiles when trying to paint.
-            # (cause unknown: can't reproduce outside add-on)
+            # display blank tiles when trying to paint (cause unknown).
             active_image.pixels[0] = active_image.pixels[0]
             active_image.update()
 

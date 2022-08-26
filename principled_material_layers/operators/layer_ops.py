@@ -248,7 +248,6 @@ class PML_OT_apply_node_mask(Operator):
         return wm.invoke_props_dialog(self)
 
 
-# TODO Register and add to panel
 class PML_OT_convert_layer(Operator):
     bl_idname = "material.pml_convert_layer"
     bl_label = "Change Layer Type"
@@ -261,20 +260,74 @@ class PML_OT_convert_layer(Operator):
         description="The new type of the layer"
     )
 
+    keep_image: BoolProperty(
+        name="Keep Image",
+        description="Keep the layer's image data even if converting to a type "
+                    "that does not use an image",
+        default=True
+    )
+
     @classmethod
     def poll(cls, context):
-        return pml_op_poll(context)
+        if not pml_op_poll(context):
+            return False
+        active_layer = get_layer_stack(context).active_layer
+        if active_layer is None:
+            cls.poll_message_set("No active layer")
+            return False
+        if active_layer.is_base_layer:
+            cls.poll_message_set("Cannot change base layer type")
+            return False
+        return True
+
+    def draw(self, context):
+        layout = self.layout
+        row = layout.row()
+        row.prop(self, "new_type")
+        if len(LAYER_TYPES) == 2:
+            row.enabled = False
+        if self.new_type != 'MATERIAL_PAINT':
+            layout.prop(self, "keep_image")
 
     def execute(self, context):
         layer_stack = get_layer_stack(context)
 
         active_layer = layer_stack.active_layer
 
-        if active_layer is None:
-            self.report({'WARNING'}, "No active layer.")
+        if active_layer.layer_type == self.new_type:
+            self.report({'INFO'}, "Active layer is already a "
+                                  f"{self.new_type_name}")
             return {'CANCELLED'}
-        active_layer.convert_to(self.new_type)
+
+        save_all_modified()
+
+        active_layer.convert_to(self.new_type, self.keep_image)
+
+        layer_stack.image_manager.reload_active_layer()
+        layer_stack.image_manager.set_paint_canvas()
+        layer_stack.node_manager.rebuild_node_tree()
+
+        ensure_global_undo()
+
         return {'FINISHED'}
+
+    def invoke(self, context, event):
+        active_layer = get_layer_stack(context).active_layer
+
+        # Set to a value different from the layer's current type
+        self.new_type = next(x[0] for x in LAYER_TYPES
+                             if x[0] != active_layer.layer_type)
+
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self)
+
+    @property
+    def new_type_name(self) -> str:
+        if self.new_type == 'MATERIAL_FILL':
+            return "Fill Layer"
+        if self.new_type == 'MATERIAL_PAINT':
+            return "Paint Layer"
+        return ""
 
 
 class PML_OT_layer_add_channel(Operator):
@@ -650,13 +703,13 @@ class PML_OT_reload_active_layer(Operator):
             return False
 
         active_layer = get_layer_stack(context).active_layer
-        return active_layer is not None and active_layer.uses_shared_image
+        return active_layer is not None and active_layer.has_shared_image
 
     def execute(self, context):
         layer_stack = get_layer_stack(context)
         active_layer = layer_stack.active_layer
 
-        if not active_layer.uses_shared_image:
+        if not active_layer.has_shared_image:
             self.report({'WARNING'}, "Active layer does not use a shared "
                                      "image")
             return {'CANCELLED'}
@@ -673,6 +726,7 @@ classes = (PML_OT_set_active_layer_index,
            PML_OT_move_layer_down,
            PML_OT_new_node_mask,
            PML_OT_apply_node_mask,
+           PML_OT_convert_layer,
            PML_OT_layer_add_channel,
            PML_OT_layer_remove_channel,
            PML_OT_channel_set_blend_mode,

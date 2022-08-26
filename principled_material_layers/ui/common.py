@@ -386,6 +386,14 @@ class layer_stack_PT_base:
 
         # Load material
         op_props = col.operator("material.pml_replace_layer_material")
+
+        # Change layer type
+        row = col.row()
+        text = ("Convert to Fill Layer"
+                if active_layer.layer_type == 'MATERIAL_PAINT'
+                else "Convert to Paint Layer")
+        row.operator("material.pml_convert_layer", text=text)
+
         layout.separator()
 
         # Layer stack baking operators

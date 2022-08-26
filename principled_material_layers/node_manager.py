@@ -231,12 +231,8 @@ class NodeManager(bpy.types.PropertyGroup):
     def _on_active_image_change(self):
         layer_stack = self.layer_stack
         im = layer_stack.image_manager
-        active_layer = layer_stack.active_layer
 
-        if not active_layer.uses_shared_image:
-            self.active_layer_image = active_layer.image
-        else:
-            self.active_layer_image = im.active_image
+        self.active_layer_image = im.active_image
 
     def _register_msgbus(self):
         layer_stack = self.layer_stack

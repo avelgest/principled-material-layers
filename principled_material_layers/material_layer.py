@@ -451,7 +451,7 @@ class MaterialLayer(PropertyGroup):
         assert self.image is None
         assert self.image_channel == -1
 
-    def convert_to(self, layer_type: str) -> None:
+    def convert_to(self, layer_type: str, keep_data=True) -> None:
         if layer_type not in _VALID_LAYER_TYPES:
             raise ValueError(f"Expected a value in {_VALID_LAYER_TYPES}")
 
@@ -459,9 +459,13 @@ class MaterialLayer(PropertyGroup):
             return
 
         layer_stack = self.layer_stack
+        im = layer_stack.image_manager
 
         if layer_type == 'MATERIAL_PAINT' and self.image is None:
-            layer_stack.image_manager.allocate_image_to_layer(self)
+            im.allocate_image_to_layer(self)
+
+        elif layer_type == 'MATERIAL_FILL' and not keep_data:
+            im.deallocate_layer_image(self)
 
         self.layer_type = layer_type
 
@@ -726,6 +730,14 @@ class MaterialLayer(PropertyGroup):
         return self.image is not None
 
     @property
+    def uses_image(self) -> bool:
+        """True if this layer has an image that it uses.
+        This is different to has_image since a layer may have an image
+        that it doesn't use if it's type has been changed.
+        """
+        return self.layer_type == 'MATERIAL_PAINT'
+
+    @property
     def is_base_layer(self) -> bool:
         """Same as layer == layer.layer_stack.base_layer"""
         return self == self.layer_stack.base_layer
@@ -781,7 +793,7 @@ class MaterialLayer(PropertyGroup):
         return parent.parent.resolve().stack_depth + 2
 
     @property
-    def uses_shared_image(self):
+    def has_shared_image(self):
         return self.image is not None and self.image_channel >= 0
 
 
