@@ -207,8 +207,12 @@ class PML_OT_apply_node_mask(Operator):
         if not pml_op_poll(context):
             return False
         active_layer = get_layer_stack(context).active_layer
-        return (active_layer
-                and active_layer.node_mask is not None
+        if not active_layer:
+            return False
+        if active_layer.layer_type == 'MATERIAL_FILL':
+            cls.poll_message_set("Cannot apply node masks to a fill layer")
+            return False
+        return (active_layer.node_mask is not None
                 and active_layer.image is not None)
 
     def draw(self, context):

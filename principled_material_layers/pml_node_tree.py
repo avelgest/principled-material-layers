@@ -353,7 +353,7 @@ class NodeTreeBuilder:
                 warnings.warn(f"Socket for {channel.name} not found in base "
                               "layer node group.")
                 # Value socket which is always 0
-                return self.nodes[NodeNames.zero_const()].outputs[0]
+                return self._zero_const_socket
             return node.outputs[channel.name]
 
         node_name = NodeNames.blend_node(layer, channel)
@@ -378,7 +378,7 @@ class NodeTreeBuilder:
                       f"the node group of layer '{layer.name}' "
                       f"{'(baked)' if channel.is_baked else ''}")
 
-        return self.nodes[NodeNames.zero_const()].outputs[0]
+        return self._zero_const_socket
 
     def _get_bake_image_socket(self, layer, layer_ch):
         node_name = NodeNames.baked_value(layer, layer_ch)
@@ -387,7 +387,7 @@ class NodeTreeBuilder:
     def _get_paint_image_socket(self, layer):
 
         if layer.layer_type == 'MATERIAL_FILL':
-            return self.nodes[NodeNames.one_const()].outputs[0]
+            return self._one_const_socket
 
         if layer.has_shared_image:
             node = self.nodes[NodeNames.paint_image_rgb(layer.image)]
@@ -452,6 +452,11 @@ class NodeTreeBuilder:
 
             links.new(alpha_x_opacity.inputs[0], opacity.outputs[0])
             links.new(alpha_x_opacity.inputs[1], layer_image_socket)
+
+        if layer.layer_type == 'MATERIAL_FILL':
+            # Ignore active_* nodes when using fill layers since
+            # they can't be painted on.
+            links.new(alpha_x_opacity.inputs[1], self._one_const_socket)
 
         if layer.node_mask is not None:
             self._insert_layer_mask_node(layer)
@@ -644,6 +649,14 @@ class NodeTreeBuilder:
         links.new(opacity_x_node_mask.inputs[1], opacity_node.outputs[0])
 
         links.new(x_opacity_node.inputs[0], opacity_x_node_mask.outputs[0])
+
+    @property
+    def _one_const_socket(self):
+        return self.nodes[NodeNames.one_const()].outputs[0]
+
+    @property
+    def _zero_const_socket(self):
+        return self.nodes[NodeNames.zero_const()].outputs[0]
 
 
 def rebuild_node_tree(layer_stack):
