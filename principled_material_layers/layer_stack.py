@@ -241,20 +241,22 @@ class LayerStack(bpy.types.PropertyGroup):
                    node_group: Optional[bpy.types.ShaderNodeTree] = None,
                    image_width: int = 1024,
                    image_height: int = 1024,
-                   use_float: bool = False) -> None:
+                   use_float: bool = False,
+                   tiled: bool = False) -> None:
         """Initializes this layer stack. This should be called before
         the layer stack is used in any way. When called a second time
         this method has no effect.
         Params:
             channels: A collection of BasicChannel instances.
-            image_width: The width of images used for paint layers.
-            image_height: The height of images used for paint layers.
-            use_float: Whether to use 32-bit float images for paint
-                layers.
             uv_map: The name of the UV map used by this layer stack.
             node_groups: If this this layer stack should connect to
                 a group node then this is the node group that the node
                 should have.
+            image_width: The width of images used for paint layers.
+            image_height: The height of images used for paint layers.
+            use_float: Whether to use 32-bit float images for paint
+                layers.
+            tiled: If True use tiled images (UDIMs) for paint layers.
         """
 
         if self.is_initialized:
@@ -289,7 +291,7 @@ class LayerStack(bpy.types.PropertyGroup):
                 new_ch.init_from_channel(ch)
 
         self.image_manager.initialize(self, image_width, image_height,
-                                      use_float=use_float)
+                                      use_float=use_float, tiled=tiled)
 
         base_layer = self.layers.add()
         base_layer.initialize("Base Material",

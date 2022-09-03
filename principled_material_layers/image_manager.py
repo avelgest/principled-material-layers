@@ -27,6 +27,7 @@ from .utils.naming import unique_name_in
 from .channel import Channel
 from .material_layer import MaterialLayer
 from .preferences import get_addon_preferences
+from .udim_layout import UDIMLayout
 
 
 class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
@@ -102,16 +103,22 @@ class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
 
         im = image_manager
 
-        self.image = bpy.data.images.new(name, im.image_width, im.image_height,
-                                         alpha=False, is_data=True,
-                                         float_buffer=im.use_float)
+        # TODO Move to ImageManager
+        if im.uses_tiled_images:
+            self.image = im.udim_layout.create_tiled_image(name)
+        else:
+            self.image = bpy.data.images.new(name,
+                                             im.image_width, im.image_height,
+                                             alpha=False, is_data=True,
+                                             float_buffer=im.use_float)
 
         self.name = self.image.name
         self.identifier = im.create_identifier()
 
         # Alter the image data so that the image can be packed
-        self.image.pixels[0] = 0.0
-        self.image.pack()
+        if not im.uses_tiled_images:
+            self.image.pixels[0] = 0.0
+            self.image.pack()
 
     def initialize_as_bake_image(self,
                                  image_manager: ImageManager,
@@ -230,18 +237,29 @@ class ImageManager(bpy.types.PropertyGroup):
         default=True
     )
 
+    udim_layout: PointerProperty(
+        type=UDIMLayout,
+        name="UDIM Layout"
+    )
+
     # Name of the image to use when a blank image is needed
     _BLANK_IMAGE_NAME = ".pml_blank_image"
 
     def initialize(self, layer_stack, image_width=1024, image_height=1024,
-                   use_float=False) -> None:
+                   use_float=False, tiled=False) -> None:
         self.image_width = image_width
         self.image_height = image_height
         self.use_float = use_float
 
+        self["uses_tiled_images"] = tiled
+        if tiled:
+            self.udim_layout.initialize()
+
         prefs = get_addon_preferences()
 
-        self.layers_share_images = prefs.layers_share_images
+        # N.B. Sharing is not supported for tiled images
+        self.layers_share_images = (prefs.layers_share_images
+                                    and not self.uses_tiled_images)
 
         self["layer_stack_path"] = layer_stack.path_from_id()
 
@@ -265,6 +283,8 @@ class ImageManager(bpy.types.PropertyGroup):
         for img in self.bake_images:
             img.delete()
         self.bake_images.clear()
+
+        self.udim_layout.delete()
 
     def active_image_name(self, layer: MaterialLayer) -> str:
         """If a temporary active image is needed to paint on layer
@@ -629,6 +649,10 @@ class ImageManager(bpy.types.PropertyGroup):
         self.image_width = width
         self.image_height = height
 
+    def update_udim_images(self) -> None:
+        for img in self.layer_images_blend:
+            self.udim_layout.update_tiles(img)
+
     @property
     def active_layer(self):
         active_id = self["active_layer_id"]
@@ -677,6 +701,10 @@ class ImageManager(bpy.types.PropertyGroup):
     @property
     def layer_stack(self):
         return get_layer_stack_from_prop(self)
+
+    @property
+    def uses_tiled_images(self) -> bool:
+        return self.get("uses_tiled_images", False)
 
 
 classes = (SplitChannelImageProp, ImageManager)

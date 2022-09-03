@@ -7,6 +7,7 @@ from .common import (layer_stack_PT_base,
                      layer_stack_channels_PT_base,
                      active_layer_PT_base,
                      settings_PT_base,
+                     UDIM_PT_base,
                      debug_PT_base
                      )
 
@@ -69,6 +70,12 @@ class PML_PT_active_layer_ne(active_layer_PT_base, Panel):
     bl_parent_id = "PML_PT_layer_stack_ne"
 
 
+class PML_PT_udim_layout_ne(UDIM_PT_base, Panel):
+    bl_space_type = 'NODE_EDITOR'
+    bl_region_type = 'UI'
+    bl_parent_id = "PML_PT_layer_stack_ne"
+
+
 class PML_PT_layer_stack_settings_ne(settings_PT_base, Panel):
     bl_label = "Settings"
     bl_space_type = 'NODE_EDITOR'
@@ -100,6 +107,7 @@ class PML_PT_debug_ne(debug_PT_base, Panel):
 classes = (PML_PT_layer_stack_ne,
            PML_PT_active_layer_ne,
            PML_PT_layer_stack_channels_ne,
+           PML_PT_udim_layout_ne,
            PML_PT_layer_stack_settings_ne,
            PML_PT_debug_ne
            )

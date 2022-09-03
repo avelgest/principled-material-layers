@@ -206,11 +206,15 @@ class PML_OT_apply_node_mask(Operator):
     def poll(cls, context):
         if not pml_op_poll(context):
             return False
-        active_layer = get_layer_stack(context).active_layer
+        layer_stack = get_layer_stack(context)
+        active_layer = layer_stack.active_layer
         if not active_layer:
             return False
         if active_layer.layer_type == 'MATERIAL_FILL':
             cls.poll_message_set("Cannot apply node masks to a fill layer")
+            return False
+        if layer_stack.image_manager.uses_tiled_images:
+            cls.poll_message_set("Apply node mask not yet supported for UDIMs")
             return False
         return (active_layer.node_mask is not None
                 and active_layer.image is not None)

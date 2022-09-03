@@ -293,7 +293,13 @@ class PML_OT_bake_layer(Operator):
 
     @classmethod
     def poll(cls, context):
-        return pml_op_poll(context)
+        if not pml_op_poll(context):
+            return False
+        layer_stack = get_layer_stack(context)
+        if layer_stack.image_manager.uses_tiled_images:
+            cls.poll_message_set("Baking is not yet supported for UDIMs")
+            return False
+        return True
 
     def execute(self, context):
         layer_stack = get_layer_stack(context)
@@ -411,8 +417,13 @@ class PML_OT_bake_layer_stack(Operator):
 
     @classmethod
     def poll(cls, context):
-        return (pml_op_poll(context)
-                and not get_layer_stack(context).is_baked)
+        if not pml_op_poll(context):
+            return False
+        layer_stack = get_layer_stack(context)
+        if layer_stack.image_manager.uses_tiled_images:
+            cls.poll_message_set("Baking is not yet supported for UDIMs")
+            return False
+        return not layer_stack.is_baked
 
     def draw(self, context):
         layout = self.layout

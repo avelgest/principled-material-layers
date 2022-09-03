@@ -7,6 +7,7 @@ from .common import (layer_stack_PT_base,
                      layer_stack_channels_PT_base,
                      active_layer_PT_base,
                      settings_PT_base,
+                     UDIM_PT_base,
                      debug_PT_base
                      )
 
@@ -48,6 +49,13 @@ class PML_PT_layer_stack_settings_ip(settings_PT_base, Panel):
     bl_options = {'DEFAULT_CLOSED'}
 
 
+class PML_PT_udim_layout_ip(UDIM_PT_base, Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_context = 'imagepaint'
+    bl_parent_id = "PML_PT_layer_stack_ip"
+
+
 class PML_PT_debug_ip(debug_PT_base, Panel):
     bl_label = "Debug"
     bl_space_type = 'VIEW_3D'
@@ -60,6 +68,7 @@ class PML_PT_debug_ip(debug_PT_base, Panel):
 classes = (PML_PT_layer_stack_ip,
            PML_PT_active_layer_ip,
            PML_PT_layer_stack_channels_ip,
+           PML_PT_udim_layout_ip,
            PML_PT_layer_stack_settings_ip,
            PML_PT_debug_ip
            )

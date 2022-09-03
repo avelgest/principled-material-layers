@@ -25,6 +25,7 @@ submodule_names = [
     "preferences",
     "utils",
     "on_load_manager",
+    "udim_layout",
     "blending",
     "hardness",
     "channel",

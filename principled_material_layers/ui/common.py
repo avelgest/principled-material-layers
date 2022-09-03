@@ -634,8 +634,9 @@ class settings_PT_base:
         layout.prop(layer_stack, "auto_connect_shader")
         layout.separator()
 
-        layout.label(text="Layer Size: {} x {}".format(*im.layer_size))
-        layout.operator("material.pml_stack_resize_layers")
+        if not im.uses_tiled_images:
+            layout.label(text="Layer Size: {} x {}".format(*im.layer_size))
+            layout.operator("material.pml_stack_resize_layers")
 
         layout.separator()
         col = layout.column(align=True)
@@ -655,6 +656,35 @@ class settings_PT_base:
     def _get_mesh(self, context):
         obj = context.active_object
         return None if obj is None else obj.data
+
+
+class UDIM_PT_base:
+    bl_label = "UDIM Tiles"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        layer_stack = get_layer_stack(context)
+        return (layer_stack is not None
+                and layer_stack.is_initialized
+                and layer_stack.image_manager.uses_tiled_images)
+
+    def draw(self, context):
+        layout = self.layout
+        layer_stack = get_layer_stack(context)
+        udim_layout = layer_stack.image_manager.udim_layout
+
+        layout.prop(udim_layout, "image_dir", text="Folder")
+        layout.separator()
+
+        row = layout.row()
+        row.template_list("UI_UL_list", "pml_udim_tiles_list",
+                          udim_layout, "tiles",
+                          udim_layout, "active_index", rows=4)
+        col = row.column(align=True)
+        col.operator("material.pml_add_udim_layout_tile", text="", icon='ADD')
+        col.operator("material.pml_remove_udim_layout_tile", text="",
+                     icon='REMOVE')
 
 
 class debug_PT_base:

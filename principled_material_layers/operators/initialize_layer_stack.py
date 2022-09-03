@@ -131,6 +131,11 @@ class PML_OT_initialize_layer_stack(Operator):
         default='NONE',
         update=_select_enum_prop_update
     )
+    tiled: BoolProperty(
+        name="Tiled",
+        description="Use tiled images",
+        default=False
+    )
 
     @classmethod
     def poll(cls, context):
@@ -195,6 +200,8 @@ class PML_OT_initialize_layer_stack(Operator):
         col.prop(self, "replace_connections")
         col.prop(self, "auto_connect_shader")
 
+        col.prop(self, "tiled")
+
         row = layout.row()
         row.label(text="Channels")
         row.prop(self, "select", text="")
@@ -229,7 +236,8 @@ class PML_OT_initialize_layer_stack(Operator):
                                   image_height=self.image_height,
                                   use_float=self.use_float_images,
                                   uv_map=uv_map,
-                                  node_group=node_group)
+                                  node_group=node_group,
+                                  tiled=self.tiled)
 
         assert ma_layer_stack.is_initialized
 
@@ -245,6 +253,9 @@ class PML_OT_initialize_layer_stack(Operator):
         self._create_pml_node(ma_layer_stack)
 
         context.scene.tool_settings.image_paint.mode = 'IMAGE'
+
+        if self.tiled:
+            bpy.ops.material.pml_select_udim_dir('INVOKE_DEFAULT')
 
         return {'FINISHED'}
 
@@ -421,11 +432,7 @@ class PML_OT_delete_layer_stack(Operator):
         return {'FINISHED'}
 
 
-def register():
-    bpy.utils.register_class(PML_OT_initialize_layer_stack)
-    bpy.utils.register_class(PML_OT_delete_layer_stack)
+classes = (PML_OT_initialize_layer_stack,
+           PML_OT_delete_layer_stack)
 
-
-def unregister():
-    bpy.utils.unregister_class(PML_OT_initialize_layer_stack)
-    bpy.utils.unregister_class(PML_OT_delete_layer_stack)
+register, unregister = bpy.utils.register_classes_factory(classes)
