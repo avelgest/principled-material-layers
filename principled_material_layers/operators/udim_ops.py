@@ -18,19 +18,31 @@ class PML_OT_select_udim_dir(Operator, ImportHelper):
     bl_options = {'INTERNAL'}
 
     filter_folder: BoolProperty(default=True, options={'HIDDEN'})
+    relative_path: BoolProperty(
+        name="Relative Path",
+        description="Select a path relative to the current blend file",
+        default=True
+    )
 
     @classmethod
     def poll(cls, context):
         return get_layer_stack(context) is not None
 
     def draw(self, context):
-        self.layout.label(text="Select the folder to store UDIM tiles in.")
+        layout = self.layout
+        layout.label(text="Select the folder to store UDIM tiles in.")
+        layout.separator()
+        layout.prop(self, "relative_path")
 
     def execute(self, context):
         layer_stack = get_layer_stack(context)
         udim_layout = layer_stack.image_manager.udim_layout
 
-        udim_layout.image_dir = self.filepath
+        if self.relative_path and bpy.data.is_saved:
+            udim_layout.image_dir = bpy.path.relpath(self.filepath)
+        else:
+            udim_layout.image_dir = self.filepath
+
         return {'FINISHED'}
 
 

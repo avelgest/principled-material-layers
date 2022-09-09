@@ -27,7 +27,7 @@ from .utils.naming import unique_name_in
 from .channel import Channel
 from .material_layer import MaterialLayer
 from .preferences import get_addon_preferences
-from .udim_layout import UDIMLayout
+from .udim_layout import UDIMLayout, delete_udim_files
 
 
 class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
@@ -71,10 +71,17 @@ class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
         return super().__eq__(other)
 
     def delete(self):
-        if self.image is not None:
-            if not self.image.filepath:
-                bpy.data.images.remove(self.image)
-            self.image = None
+        if self.image is None:
+            return
+        if self.image.source == 'TILED':
+            im = self.image_manager
+            if im.udim_layout.is_temp_image(self.image):
+                delete_udim_files(self.image)
+
+        if self.image.name.startswith("."):
+            bpy.data.images.remove(self.image)
+
+        self.image = None
 
     def allocate_all_to_layer(self, layer: MaterialLayer) -> None:
         self.allocate_all_to(layer.identifier)
@@ -105,7 +112,8 @@ class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
 
         # TODO Move to ImageManager
         if im.uses_tiled_images:
-            self.image = im.udim_layout.create_tiled_image(name)
+            self.image = im.udim_layout.create_tiled_image(
+                            name, is_data=True, is_float=im.use_float)
         else:
             self.image = bpy.data.images.new(name,
                                              im.image_width, im.image_height,
@@ -134,10 +142,15 @@ class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
         name = ".pml_bake_image"
         width, height = im.bake_size
 
-        self.image = bpy.data.images.new(name, width, height,
-                                         alpha=False,
-                                         is_data=is_data,
-                                         float_buffer=is_float)
+        if im.uses_tiled_images:
+            self.image = im.udim_layout.create_tiled_image(
+                            name, is_data=is_data, is_float=is_float,
+                            temp=True)
+        else:
+            self.image = bpy.data.images.new(name, width, height,
+                                             alpha=False,
+                                             is_data=is_data,
+                                             float_buffer=is_float)
 
         self.name = self.image.name
         self.identifier = im.create_identifier()

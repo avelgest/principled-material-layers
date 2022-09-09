@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 from collections.abc import Collection, Container
-from typing import Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import bpy
 
@@ -25,12 +25,23 @@ from ..bake import (BakedSocket,
 
 from ..preferences import get_addon_preferences
 
-from ..utils.image import SplitChannelImageRGB
+from ..utils.image import SplitChannelImageRGB, can_pack_udims
 from ..utils.layer_stack_utils import get_layer_stack
 from ..utils.ops import (WMProgress,
                          ensure_global_undo,
                          pml_op_poll,
                          save_all_modified)
+
+
+def _for_each_bake_image(baked_sockets: Collection[BakedSocket],
+                         func: Callable[[bpy.types.Image], None]
+                         ) -> None:
+    """Call func exactly once for each bpy.types.Image that any member
+    bake_sockets uses.
+    """
+    images = {x.get_bpy_image_safe() for x in baked_sockets}
+    for img in images:
+        func(img)
 
 
 class BakeNodeOpBase:
@@ -295,9 +306,10 @@ class PML_OT_bake_layer(Operator):
     def poll(cls, context):
         if not pml_op_poll(context):
             return False
-        layer_stack = get_layer_stack(context)
-        if layer_stack.image_manager.uses_tiled_images:
-            cls.poll_message_set("Baking is not yet supported for UDIMs")
+        im = get_layer_stack(context).image_manager
+
+        if im.uses_tiled_images and bpy.app.version < (3, 2, 0):
+            cls.poll_message_set("Tiled image baking requires Blender 3.2+")
             return False
         return True
 
@@ -327,10 +339,16 @@ class PML_OT_bake_layer(Operator):
         save_all_modified()
 
         baker = LayerBaker(layer)
+        baked: List[BakedSocket] = []
 
         with WMProgress(0, baker.num_to_bake) as progress:
-            for _ in baker.bake(skip_simple_const=True):
+            for x in baker.bake(skip_simple_const=True):
+                baked.append(x)
                 progress.value += 1
+
+        # Tiled images must be saved before being used in Cycles
+        if layer_stack.image_manager.uses_tiled_images:
+            _for_each_bake_image(baked, lambda x: x.save())
 
         layer.is_baked = True
         layer_stack.node_manager.rebuild_node_tree()
@@ -415,15 +433,23 @@ class PML_OT_bake_layer_stack(Operator):
         default=False
     )
 
+    udim_dir: StringProperty(
+        name="UDIM Folder",
+        description="Folder to store baked images in",
+        default="//",
+        subtype='DIR_PATH'
+    )
+
     @classmethod
     def poll(cls, context):
         if not pml_op_poll(context):
             return False
-        layer_stack = get_layer_stack(context)
-        if layer_stack.image_manager.uses_tiled_images:
-            cls.poll_message_set("Baking is not yet supported for UDIMs")
+        im = get_layer_stack(context).image_manager
+
+        if im.uses_tiled_images and bpy.app.version < (3, 2, 0):
+            cls.poll_message_set("Tiled image baking requires Blender 3.2+")
             return False
-        return not layer_stack.is_baked
+        return True
 
     def draw(self, context):
         layout = self.layout
@@ -440,6 +466,11 @@ class PML_OT_bake_layer_stack(Operator):
 
         layout.separator()
         layout.prop(self, "hide_images")
+
+        if (not self.hide_images
+                and im.uses_tiled_images
+                and not can_pack_udims()):
+            layout.prop(self, "udim_dir")
 
     def execute(self, context):
         layer_stack = get_layer_stack(context)
@@ -464,7 +495,7 @@ class PML_OT_bake_layer_stack(Operator):
                                    samples=self.samples)
 
         baker = LayerStackBaker(layer_stack, settings)
-        baked = []
+        baked: List[BakedSocket] = []
 
         with WMProgress(0, baker.num_to_bake) as progress:
             for x in baker.bake():
@@ -476,6 +507,10 @@ class PML_OT_bake_layer_stack(Operator):
         else:
             self._report_baked_names(baked)
 
+        # Tiled images must be saved before being used in Cycles
+        if layer_stack.image_manager.uses_tiled_images:
+            _for_each_bake_image(baked, lambda x: x.save())
+
         layer_stack.node_manager.rebuild_node_tree()
 
         ensure_global_undo()
@@ -486,14 +521,14 @@ class PML_OT_bake_layer_stack(Operator):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
 
-    def _ensure_images_hidden(self, baked_sockets: BakedSocket) -> None:
+    def _ensure_images_hidden(self, baked_sockets: List[BakedSocket]) -> None:
         images = [x.get_image_safe() for x in baked_sockets]
         for img in images:
             if not img.name.startswith("."):
                 img.name = f".{img.name}"
 
-    def _report_baked_names(self, bake_sockets):
-        image_names = [f'"{x.get_image_safe().name}"' for x in bake_sockets]
+    def _report_baked_names(self, baked_sockets: List[BakedSocket]) -> None:
+        image_names = [f'"{x.get_image_safe().name}"' for x in baked_sockets]
         self.report({'INFO'}, f"Created {len(image_names)} images: "
                               f"{', '.join(image_names)}")
 

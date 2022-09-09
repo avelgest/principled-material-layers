@@ -21,6 +21,16 @@ def _use_numpy() -> bool:
     return get_addon_preferences().use_numpy
 
 
+_CAN_PACK_UDIMS = bpy.app.version >= (3, 3)
+
+
+def can_pack_udims() -> bool:
+    """Returns True if this version of Blender supports packing tiled
+    images in the blend file.
+    """
+    return _CAN_PACK_UDIMS
+
+
 class SplitChannelImageRGB:
 
     unallocated_value = None

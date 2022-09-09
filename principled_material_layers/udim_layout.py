@@ -2,6 +2,9 @@
 
 import itertools as it
 import os
+import random
+import re
+import warnings
 
 from typing import Optional
 
@@ -13,7 +16,9 @@ from bpy.props import (BoolProperty,
                        StringProperty)
 from bpy.types import Image, PropertyGroup
 
+from .utils.image import can_pack_udims
 from .utils.layer_stack_utils import get_layer_stack_from_prop
+from .utils.ops import save_image
 
 
 def save_tiled_image(image: Image) -> None:
@@ -23,6 +28,38 @@ def save_tiled_image(image: Image) -> None:
     bpy.ops.image.save(context)
 
 
+def delete_udim_files(image: Image) -> None:
+    if not image.source == 'TILED':
+        raise ValueError("Expected a tiled image.")
+
+    folder, filename = os.path.split(image.filepath_raw)
+    if not folder:
+        folder = "."
+
+    if "<UDIM>" not in filename:
+        return
+
+    dir_files = next(os.walk(folder))[2]
+
+    split_fn = [re.escape(x) for x in filename.split("<UDIM>")]
+    filename_re = fr"{split_fn[0]}\d{{4}}{split_fn[-1]}"
+
+    to_delete = [os.path.join(folder, x) for x in dir_files
+                 if re.search(filename_re, x, flags=re.A | re.I)]
+
+    for filepath in to_delete:
+        try:
+            os.remove(filepath)
+        except OSError as e:
+            warnings.warn(f"Could not delete UDIM file: {e}")
+
+
+def _pack_image(image: Image) -> None:
+    if not image.is_dirty:
+        image.pixels[0] = image.pixels[0]
+    image.pack()
+
+
 class UDIMTileProps(PropertyGroup):
     number: IntProperty(
         name="Number",
@@ -30,20 +67,27 @@ class UDIMTileProps(PropertyGroup):
     )
     label: StringProperty(
         name="Label",
+        description="Optional label used to display this tile",
         get=lambda self: self.get("name", ""),
         set=lambda self, value: self.__setitem__("name", value)
     )
     width: IntProperty(
         name="Width",
+        description="The width of this tile in pixels",
+        subtype='PIXEL'
     )
     height: IntProperty(
         name="Height",
+        description="The height of this tile in pixels",
+        subtype='PIXEL'
     )
     is_float: BoolProperty(
-        name="Use Float"
+        name="Use Float",
+        description="Should this tile be a floating-point image"
     )
     has_alpha: BoolProperty(
         name="Has Alpha",
+        description="Does this tile use an alpha channel",
         default=False
     )
 
@@ -58,8 +102,12 @@ class UDIMTileProps(PropertyGroup):
 
 
 class UDIMLayout(PropertyGroup):
+    """Stores a tiled image layout that can be used to create UDIM
+    images with the same tile layout.
+    """
     image_dir: StringProperty(
         name="UDIM Folder",
+        description="The folder in which to store UDIM tiles",
         subtype="DIR_PATH",
         default="//"
     )
@@ -68,11 +116,19 @@ class UDIMLayout(PropertyGroup):
         name="Tiles"
     )
     active_index: IntProperty(
-        name="Active Tile Index"
+        name="Active Tile Index",
+        description="The index of the currently active tile"
     )
 
     def initialize(self, image_dir: Optional[str] = None,
                    add_tile=True) -> None:
+        """Initialize this UDIMLayout.
+        Params:
+            image_dir: If given should be a directory path sting where
+                UDIM tiles should be saved.
+            add_tile: Add the 1001 tile to this layout using the
+                ImageManager's settings.
+        """
         if image_dir is not None:
             self.image_dir = image_dir
 
@@ -85,7 +141,18 @@ class UDIMLayout(PropertyGroup):
         self.tiles.clear()
         self.active_index = 0
 
-    def create_tiled_image(self, name, is_data=True) -> Image:
+    def create_tiled_image(self, name: str,
+                           is_data: bool = True,
+                           is_float: bool = False,
+                           temp: bool = False) -> Image:
+        """Creates a tiled Image with this UDIMLayout's layout.
+        Params:
+            name: The name of the new image.
+            is_data: Use a non-color colorspace
+            is_float: Use a floating-point image
+            temp: Set the new image's filepath to be in Blender's
+                temporary directory.
+        """
         first_tile = self.first_tile
         if first_tile is None:
             raise RuntimeError("UDIMLayout has no tiles.")
@@ -94,10 +161,23 @@ class UDIMLayout(PropertyGroup):
                                    name=name,
                                    width=first_tile.width,
                                    height=first_tile.height,
-                                   float_buffer=first_tile.is_float,
+                                   float_buffer=is_float,
                                    alpha=first_tile.has_alpha,
                                    is_data=is_data,
                                    tiled=True)
+
+        self.update_tiles(image)
+
+        # Pack the image if using Blender 3.3+
+        if not temp and can_pack_udims():
+            _pack_image(image)
+
+        else:
+            self._set_filename(image, temp=temp)
+
+        return image
+
+    def _set_filename(self, image: Image, temp: bool = False) -> None:
         if image.is_float:
             image.file_format = 'OPEN_EXR'
             file_ext = '.exr'
@@ -105,14 +185,65 @@ class UDIMLayout(PropertyGroup):
             image.file_format = 'PNG'
             file_ext = '.png'
 
-        filename = f"{image.name}.<UDIM>{file_ext}"
-        image.filepath_raw = os.path.join(self.image_dir, filename)
+        if not temp:
+            filename = f"{image.name}.<UDIM>{file_ext}"
+            image.filepath_raw = os.path.join(self.image_dir, filename)
+        else:
+            layer_stack_id = self._layer_stack.identifier
+            rand_id = f"{random.randint(0, 2**32):06x}"
 
-        self.update_tiles(image)
-        return image
+            filename = f"temp.{layer_stack_id}.{rand_id}.<UDIM>{file_ext}"
+            image.filepath_raw = os.path.join(bpy.app.tempdir, filename)
+            assert self.is_temp_image(image)
+
+    def is_temp_image(self, image: Image) -> bool:
+        """Checks if a tiled image is temporary, i.e. it's name starts
+        with temp or it's files are in bpy.app.tempdir.
+        """
+        if image.source != 'TILED':
+            raise ValueError("Expected a tiled image")
+
+        filename = os.path.split(image.filepath_raw)[1]
+        if filename.startswith("temp"):
+            return True
+
+        abs_path = bpy.path.abspath(image.filepath_raw)
+        if bpy.path.is_subdir(abs_path, bpy.app.tempdir):
+            return True
+        return False
+
+    def make_image_permanent(self, image: Image, dir_path: str,
+                             save: bool = False) -> None:
+        """Ensure image is either packed or located outside of
+        Blender's temp directory.
+        """
+        if image.source != 'TILED':
+            raise ValueError("Expected a tiled image")
+
+        if not self.is_temp_image(image):
+            return
+
+        if dir_path:
+            file_ext = ".exr" if image.is_float else ".png"
+
+            filename = bpy.path.display_name_to_filepath(image.name)
+            filename = f"{filename}.<UDIM>{file_ext}"
+
+            image.filepath_raw = os.path.join(dir_path, filename)
+
+        if can_pack_udims():
+            _pack_image(image)
+
+        elif save:
+            save_image(image)
+
+        assert not self.is_temp_image(image)
 
     def add_tile(self, number, width, height,
                  is_float=False, alpha=False, label="") -> UDIMTileProps:
+        """Adds a new UDIM tile. Raises a ValueError if a tile with the
+        same number already exists.
+        """
         if self._get_tile(number) is not None:
             raise ValueError(f"Tile {number} already exists.")
 
@@ -122,6 +253,9 @@ class UDIMLayout(PropertyGroup):
         return new_tile
 
     def remove_tile(self, number) -> None:
+        """Removes the tile with number 'number' from this layout.
+        Raises a KeyError if no such tile exists.
+        """
         for idx, tile in enumerate(self.tiles):
             if tile.number == number:
                 break
@@ -166,7 +300,7 @@ class UDIMLayout(PropertyGroup):
 
     def update_tiles(self, image) -> None:
         """Adds or removes tiles from image so that it matches the
-        layout of the UDIMLayout.
+        layout of this UDIMLayout.
         """
         img_tiles = {x.number for x in image.tiles}
         layout_tiles = {x.number for x in self.tiles}
@@ -181,6 +315,7 @@ class UDIMLayout(PropertyGroup):
 
     @property
     def active_tile(self) -> Optional[UDIMTileProps]:
+        """The tile that is currently selected in the UI."""
         if self.active_index < 0 or self.active_index >= len(self.tiles):
             return None
         return self.tiles[self.active_index]
@@ -196,6 +331,9 @@ class UDIMLayout(PropertyGroup):
 
     @property
     def first_tile(self) -> Optional[UDIMTileProps]:
+        """The first tile in this layout (the tile with the lowest
+        number).
+        """
         if not self.tiles:
             return None
         return min(self.tiles, key=lambda x: x.number)
@@ -206,14 +344,20 @@ class UDIMLayout(PropertyGroup):
         return None if layer_stack is None else layer_stack.image_manager
 
     @property
-    def next_free_number(self) -> int:
-        numbers = {x.number for x in self.tiles}
-        counter = it.count(self.first_tile.number)
+    def _layer_stack(self):
+        return get_layer_stack_from_prop(self)
 
-        while True:
-            num = next(counter)
-            if num not in numbers:
-                return num
+    @property
+    def next_free_number(self) -> int:
+        """The next available tile number greater than the number of
+        first tile.
+        """
+        numbers = {x.number for x in self.tiles}
+        if not numbers:
+            return 1001
+
+        counter = it.count(self.first_tile.number)
+        return next(x for x in counter if x not in numbers)
 
 
 classes = (UDIMTileProps, UDIMLayout)

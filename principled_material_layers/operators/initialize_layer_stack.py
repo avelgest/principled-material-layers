@@ -16,6 +16,7 @@ from .material_ops import replace_layer_material
 
 from ..channel import BasicChannel, is_socket_supported
 
+from ..utils.image import can_pack_udims
 from ..utils.nodes import reference_inputs
 from ..utils.ops import pml_op_poll, pml_is_supported_editor
 from ..utils.layer_stack_utils import get_layer_stack
@@ -254,7 +255,9 @@ class PML_OT_initialize_layer_stack(Operator):
 
         context.scene.tool_settings.image_paint.mode = 'IMAGE'
 
-        if self.tiled:
+        # Save UDIM tiles in a specified folder on disk if packing is
+        # not supported
+        if self.tiled and not can_pack_udims():
             bpy.ops.material.pml_select_udim_dir('INVOKE_DEFAULT')
 
         return {'FINISHED'}

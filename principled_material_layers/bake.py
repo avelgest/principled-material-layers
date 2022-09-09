@@ -127,7 +127,7 @@ class BakedSocket:
         """
         return None if self.image is None else self.image.image
 
-    def get_b_image_safe(self) -> bpy.types.Image:
+    def get_bpy_image_safe(self) -> bpy.types.Image:
         """A safe way of getting the bpy.types.Image that the socket
         is baked to, since the normal b_image property may cause
         crashes in some situations.
@@ -262,7 +262,9 @@ class SocketBaker:
 
         return BakedSocket(socket, bake_img, -1)
 
-    def _bake_shared(self, image, sockets) -> List[BakedSocket]:
+    def _bake_shared(self,
+                     image: SplitChannelImageRGB,
+                     sockets: Collection[BakedSocket]) -> List[BakedSocket]:
         """Bakes multiple sockets to a single image. Expects at most
         three sockets. Returns a list of BakedSocket instances.
         """
@@ -489,8 +491,9 @@ class SocketBaker:
             # These sockets will each be baked to individual images
             unshared = [x for x in sockets if x not in shared]
 
-            for baked in self._bake_sockets_shared(shared, images):
-                yield baked
+            for baked_sockets in self._bake_sockets_shared(shared, images):
+                for x in baked_sockets:
+                    yield x
 
             for socket in unshared:
                 if socket.type == 'SHADER':

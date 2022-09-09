@@ -11,6 +11,8 @@ from .. import blending
 from .. import hardness
 from ..asset_helper import file_entry_from_handle
 from ..preferences import get_addon_preferences
+
+from ..utils.image import can_pack_udims
 from ..utils.layer_stack_utils import get_layer_stack
 
 # UILists
@@ -674,8 +676,9 @@ class UDIM_PT_base:
         layer_stack = get_layer_stack(context)
         udim_layout = layer_stack.image_manager.udim_layout
 
-        layout.prop(udim_layout, "image_dir", text="Folder")
-        layout.separator()
+        if not can_pack_udims():
+            layout.prop(udim_layout, "image_dir", text="Folder")
+            layout.separator()
 
         row = layout.row()
         row.template_list("UI_UL_list", "pml_udim_tiles_list",

@@ -41,6 +41,15 @@ def save_all_modified() -> None:
             bpy.ops.image.save(op_ctx)
 
 
+def save_image(image: bpy.types.Image, dirty_only=True) -> None:
+    if dirty_only and not image.is_dirty:
+        return
+    op_ctx = bpy.context.copy()
+    op_ctx["edit_image"] = image
+    with filter_stdstream(prefix="Info:", stdout=True):
+        bpy.ops.image.save(op_ctx)
+
+
 def pml_is_supported_editor(context: Context) -> bool:
     """Returns True if currently in a supported editor."""
     space = context.space_data
