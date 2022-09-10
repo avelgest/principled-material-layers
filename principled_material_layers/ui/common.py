@@ -185,8 +185,8 @@ class PML_UL_material_asset_list(UIList):
 
 class PML_MT_add_channel_layer(Menu):
     """Menu for adding a channel to the active layer. The menu is a
-    list of all the layer stack's layers that are not on the active
-    layer.
+    list of all the layer stack's enabled layers that are not on the
+    active layer.
     """
     bl_label = "Add Channel"
     bl_idname = "PML_MT_add_channel_layer"
@@ -200,7 +200,7 @@ class PML_MT_add_channel_layer(Menu):
         active_layer = layer_stack.active_layer
 
         for ch in layer_stack.channels:
-            if ch.name not in active_layer.channels:
+            if ch.enabled and ch.name not in active_layer.channels:
                 op_props = layout.operator("material.pml_layer_add_channel",
                                            text=ch.name)
                 op_props.channel_name = ch.name
