@@ -524,9 +524,9 @@ class active_layer_PT_base:
         op_props = row.operator("node.pml_view_shader_node_group",
                                 text="", icon='NODETREE')
         op_props.custom_description = "Edit this layer's node mask"
-        if active_layer.node_mask is not None:
-            op_props.node_group = active_layer.node_mask.name
+        op_props.node_group = getattr(active_layer.node_mask, "name", "")
 
+        if active_layer.node_mask is not None:
             layout.operator("material.pml_apply_node_mask")
 
         # Channels

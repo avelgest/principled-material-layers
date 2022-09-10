@@ -49,7 +49,8 @@ class PML_OT_view_shader_node_group(Operator):
 
     node_group: StringProperty(
         name="Node Group",
-        description="The name of the node group to view"
+        description="The name of the node group to view",
+        default=""
     )
 
     custom_description: StringProperty(

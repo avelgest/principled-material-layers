@@ -29,7 +29,8 @@ from .utils.layer_stack_utils import (get_layer_stack_by_id,
 from .utils.naming import unique_name_in
 from .utils.nodes import (set_node_group_vector_defaults,
                           get_nodes_by_type,
-                          group_output_link_default)
+                          group_output_link_default,
+                          sort_sockets_by)
 
 LAYER_TYPES = (('MATERIAL_PAINT', "Material Paint",
                 "An image-based layer for painting"),
@@ -282,6 +283,9 @@ class MaterialLayer(PropertyGroup):
             output = self.node_tree.outputs.new(
                                        name=channel.name,
                                        type=channel.socket_type_bl_idname)
+            # Sort outputs to match order in layer_stack.channels
+            sort_sockets_by(self.node_tree.outputs, self.layer_stack.channels)
+            output = self.node_tree.outputs[channel.name]
 
         if channel.socket_type == 'VECTOR':
             output.hide_value = True
