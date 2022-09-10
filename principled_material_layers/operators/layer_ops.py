@@ -210,6 +210,9 @@ class PML_OT_apply_node_mask(Operator):
         active_layer = layer_stack.active_layer
         if not active_layer:
             return False
+        if not active_layer.enabled:
+            cls.poll_message_set("Cannot apply node mask to a disabled layer")
+            return False
         if layer_stack.image_manager.uses_tiled_images:
             cls.poll_message_set("Apply node mask not yet supported for UDIMs")
             return False

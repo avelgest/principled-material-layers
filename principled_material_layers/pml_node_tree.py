@@ -164,6 +164,11 @@ class NodeTreeBuilder:
         self.nodes = self.node_tree.nodes
         self.links = self.node_tree.links
 
+        top_level_layers = layer_stack.top_level_layers
+
+        # Only enabled top level layers
+        self.enabled_tl_layers = [x for x in top_level_layers if x.enabled]
+
     def rebuild_node_tree(self):
         """Clears the layer stack's node tree and reconstructs it"""
         layer_stack = self.layer_stack
@@ -192,16 +197,18 @@ class NodeTreeBuilder:
         # Add nodes for the images that store baked layer channels
         self._add_bake_image_nodes()
 
-        layers = layer_stack.top_level_layers
+        # Add Group nodes for the node trees of disabled layers
+        self._add_disabled_layers_ma_nodes()
 
-        if not layers:
+        if not self.enabled_tl_layers:
             return
 
         # Enabled top-level layers not including the base layer
-        enabled_layers = [x for x in layers[1:] if x.enabled]
+        enabled_layers_it = iter(self.enabled_tl_layers)
 
-        self._add_base_layer(layer_stack.base_layer)
-        for layer in enabled_layers:
+        self._add_base_layer(next(enabled_layers_it))
+
+        for layer in enabled_layers_it:
             self._insert_layer(layer)
 
         self.node_manager.connect_output_layer()
@@ -210,12 +217,7 @@ class NodeTreeBuilder:
 
     def _add_base_layer(self, layer) -> None:
         """Creates the nodes for the base layer of the layer stack."""
-        nodes = self.nodes
-
-        base_ma_group = nodes.new("ShaderNodeGroup")
-        base_ma_group.name = NodeNames.layer_material(layer)
-        base_ma_group.label = layer.name
-        base_ma_group.node_tree = layer.node_tree
+        self._insert_layer_ma_group_node(layer, None)
 
         if layer.any_channel_baked:
             self._insert_layer_bake_nodes(layer)
@@ -250,6 +252,20 @@ class NodeTreeBuilder:
             split_rgb_node.location.x += 160
 
             links.new(split_rgb_node.inputs[0], image_node.outputs[0])
+
+    def _add_disabled_layers_ma_nodes(self) -> None:
+        """Adds Group nodes with the layers' node trees for layers
+        where layer.enabled == False. Done so that baking works even
+        for disabled layers.
+        """
+        disabled_layers = [x for x in self.layer_stack.layers
+                           if x and not x.enabled]
+
+        for idx, layer in enumerate(disabled_layers):
+            ma_group = self._insert_layer_ma_group_node(layer, None)
+            ma_group.label = f"{ma_group.label} (disabled)"
+            ma_group.hide = True
+            ma_group.location = (-800, idx * -100)
 
     def _add_opacity_driver(self, socket, layer):
         """Adds a driver to a float socket so that it is driven by the
@@ -402,12 +418,12 @@ class NodeTreeBuilder:
         links = self.links
 
         # Index of the layer in the top level of the layer stack
-        position = layer_stack.top_level_layers_ref.find(layer.identifier)
+        position = self.enabled_tl_layers.index(layer)
 
         if position == 0:
             raise NotImplementedError("Replacing base layer not implemented")
 
-        previous_layer = layer_stack.top_level_layers_ref[position-1].resolve()
+        previous_layer = self.enabled_tl_layers[position-1]
 
         # Frame containing all the nodes specific to this layer
         frame = nodes.new("NodeFrame")
@@ -417,13 +433,9 @@ class NodeTreeBuilder:
         frame.color = (0.1, 0.1, 0.6)
 
         # The Group node containing this layer's node tree
-        ma_group = nodes.new("ShaderNodeGroup")
-        ma_group.node_tree = layer.node_tree
-        ma_group.name = NodeNames.layer_material(layer)
-        ma_group.label = layer.name
-        ma_group.parent = frame
-        ma_group.hide = True
+        ma_group = self._insert_layer_ma_group_node(layer, frame)
         ma_group.location = (0, -100)
+        ma_group.hide = True
 
         opacity = nodes.new("ShaderNodeValue")
         opacity.name = NodeNames.layer_opacity(layer)
@@ -649,6 +661,16 @@ class NodeTreeBuilder:
         links.new(opacity_x_node_mask.inputs[1], opacity_node.outputs[0])
 
         links.new(x_opacity_node.inputs[0], opacity_x_node_mask.outputs[0])
+
+    def _insert_layer_ma_group_node(self, layer, parent):
+        """Adds the Group node containing layer's node tree."""
+        ma_group = self.nodes.new("ShaderNodeGroup")
+        ma_group.node_tree = layer.node_tree
+        ma_group.name = NodeNames.layer_material(layer)
+        ma_group.label = layer.name
+        ma_group.parent = parent
+
+        return ma_group
 
     @property
     def _one_const_socket(self):

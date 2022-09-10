@@ -144,7 +144,6 @@ class MaterialLayer(PropertyGroup):
         description="Whether this layer is initialized and can be used",
         get=lambda self: bool(self.identifier)
     )
-    # enabled is currently unavailable in the UI
     enabled: BoolProperty(
         name="Enabled",
         description="When disabled this layer is hidden",

@@ -1073,6 +1073,17 @@ class LayerStack(bpy.types.PropertyGroup):
         return self.top_level_layers_ref[-1].resolve()
 
     @property
+    def top_enabled_layer(self) -> Optional[MaterialLayer]:
+        """The top-most top level enabled layer, or None if this layer
+        stack has no enabled layers.
+        """
+        for ref in reversed(self.top_level_layers_ref):
+            layer = ref.resolve()
+            if layer.enabled:
+                return layer
+        return None
+
+    @property
     def _is_active_in_image_paint(self) -> bool:
         """Is this LayerStack's material active in image paint"""
         obj = bpy.context.image_paint_object

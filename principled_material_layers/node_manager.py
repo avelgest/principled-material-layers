@@ -201,10 +201,13 @@ class NodeManager(bpy.types.PropertyGroup):
         of the top layer of the node stack
         """
         layer_stack = self.layer_stack
-        layer = layer_stack.top_layer
+        layer = layer_stack.top_enabled_layer
         nodes = self.nodes
 
         output_node = nodes[NodeNames.output()]
+
+        if layer is None:
+            return
 
         if layer == layer_stack.base_layer:
             ma_group = nodes.get(NodeNames.layer_material(layer))
@@ -315,6 +318,14 @@ class NodeManager(bpy.types.PropertyGroup):
         owner = self._msgbus_owners[layer.identifier]
 
         msgbus_options = {'PERSISTENT'}
+
+        bpy.msgbus.subscribe_rna(
+            key=layer.path_resolve("enabled", False),
+            owner=owner,
+            notify=_rebuild_node_tree,
+            args=(layer_stack_id,),
+            options=msgbus_options
+        )
 
         # Define a function since msgbus doesn't accept methods
         def layer_channels_changed(layer_id):
@@ -464,13 +475,12 @@ class NodeManager(bpy.types.PropertyGroup):
     def set_active_layer(self, layer):
         layer_stack = self.layer_stack
         im = layer_stack.image_manager
+        nodes = layer_stack.node_tree.nodes
+
         self.active_layer_image = im.active_image
 
-        layers = layer_stack.top_level_layers
-
-        nodes = layer_stack.node_tree.nodes
         # Set the value of all is_active nodes to 0.0
-        for x in layers:
+        for x in layer_stack.top_level_layers:
             is_active = nodes.get(NodeNames.layer_is_active(x))
             if is_active is not None:
                 is_active.outputs[0].default_value = 0.0

@@ -25,6 +25,7 @@ class PML_UL_material_layers_list(UIList):
                   active_property, index=0, flt_flag=0):
 
         layer = item
+        is_base_layer = layer.is_base_layer
 
         prefs = get_addon_preferences()
 
@@ -41,14 +42,24 @@ class PML_UL_material_layers_list(UIList):
 
         row.prop(layer, "name", text="", emboss=False)
 
-        row = layout.row(align=True)
+        col = layout.column(align=True)
+        row = col.row(align=True)
         if layer.node_tree is not None:
             op_props = row.operator("node.pml_view_shader_node_group",
                                     text="", icon='NODETREE', emboss=False)
             op_props.node_group = layer.node_tree.name
             op_props.custom_description = ("Edit this layer's node tree in an "
                                            "open shader editor")
+        if not is_base_layer:
+            row.prop(layer, "enabled", icon_only=True, emboss=False,
+                     icon="HIDE_OFF" if layer.enabled else "HIDE_ON")
+        else:
+            row.label(icon="HIDE_OFF")
 
+        row = col.row(align=True)
+        row.alignment = 'RIGHT'
+
+        # Bake layer material op
         bake_op = ("material.pml_free_layer_bake" if layer.is_baked
                    else "material.pml_bake_layer")
 
@@ -60,10 +71,11 @@ class PML_UL_material_layers_list(UIList):
     def draw_filter(self, context, layout):
         prefs = get_addon_preferences()
 
-        layout.scale_y = 1/prefs.layer_ui_scale
+        col = layout.column(align=True)
+        col.scale_y = 1/prefs.layer_ui_scale
         if isinstance(prefs, bpy.types.AddonPreferences):
-            layout.prop(prefs, "show_previews", text="Show Previews")
-            layout.prop(prefs, "use_large_icons", text="Large Icons")
+            col.prop(prefs, "show_previews", text="Show Previews")
+            col.prop(prefs, "use_large_icons", text="Large Icons")
 
     def filter_items(self, context, data, propname):
         layer_stack = data
