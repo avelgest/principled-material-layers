@@ -756,11 +756,16 @@ def apply_node_mask_bake(layer,
     if layer.node_mask is None:
         raise ValueError("layer has no node mask.")
     if layer.is_base_layer:
-        raise ValueError("Cannot bake the base layer's layer mask.")
+        raise ValueError("Cannot bake the base layer's node mask.")
 
     nm = layer_stack.node_manager
     im = layer_stack.image_manager
-    socket_to_bake = nm.get_layer_final_alpha_socket(layer)
+
+    if layer.layer_type == 'MATERIAL_FILL':
+        mask_node_name = nm.node_names.layer_node_mask(layer)
+        socket_to_bake = nm.nodes[mask_node_name].outputs[0]
+    else:
+        socket_to_bake = nm.get_layer_final_alpha_socket(layer)
 
     settings = PMLBakeSettings(image_width=im.image_width,
                                image_height=im.image_height,

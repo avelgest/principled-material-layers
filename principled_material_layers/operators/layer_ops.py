@@ -210,9 +210,6 @@ class PML_OT_apply_node_mask(Operator):
         active_layer = layer_stack.active_layer
         if not active_layer:
             return False
-        if active_layer.layer_type == 'MATERIAL_FILL':
-            cls.poll_message_set("Cannot apply node masks to a fill layer")
-            return False
         if layer_stack.image_manager.uses_tiled_images:
             cls.poll_message_set("Apply node mask not yet supported for UDIMs")
             return False
@@ -221,6 +218,11 @@ class PML_OT_apply_node_mask(Operator):
 
     def draw(self, context):
         layout = self.layout
+        layer_stack = get_layer_stack(context)
+
+        if layer_stack.active_layer.layer_type != "MATERIAL_PAINT":
+            layout.label(icon="ERROR", text="Layer will be converted into a "
+                         "paint layer.")
         layout.prop(self, "samples")
         layout.prop(self, "keep_node_mask")
 
@@ -229,10 +231,6 @@ class PML_OT_apply_node_mask(Operator):
         active_layer = layer_stack.active_layer
         im = layer_stack.image_manager
 
-        if im.active_image is None:
-            self.report({'ERROR'}, "The layer stack's image manager has no "
-                                   "active image.")
-            return {'CANCELLED'}
         if not context.selected_objects:
             self.report({'WARNING'}, "No objects are selected for baking")
             return {'CANCELLED'}
@@ -242,12 +240,18 @@ class PML_OT_apply_node_mask(Operator):
         image = apply_node_mask_bake(active_layer, self.samples)
 
         try:
+            if active_layer.layer_type != 'MATERIAL_PAINT':
+                layer_stack.convert_layer(active_layer, 'MATERIAL_PAINT')
+
             copy_image(image, im.active_image)
+
         finally:
             bpy.data.images.remove(image)
 
         if not self.keep_node_mask:
             active_layer.node_mask = None
+
+        layer_stack.node_manager.rebuild_node_tree()
 
         return {'FINISHED'}
 
@@ -309,11 +313,7 @@ class PML_OT_convert_layer(Operator):
 
         save_all_modified()
 
-        active_layer.convert_to(self.new_type, self.keep_image)
-
-        layer_stack.image_manager.reload_active_layer()
-        layer_stack.image_manager.set_paint_canvas()
-        layer_stack.node_manager.rebuild_node_tree()
+        layer_stack.convert_layer(active_layer, self.new_type, self.keep_image)
 
         ensure_global_undo()
 

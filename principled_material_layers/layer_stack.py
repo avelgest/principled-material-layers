@@ -941,6 +941,24 @@ class LayerStack(bpy.types.PropertyGroup):
 
         self.node_manager.rebuild_node_tree()
 
+    def convert_layer(self, layer: MaterialLayer,
+                      new_type: str, keep_image: bool = True) -> None:
+        """Converts a MaterialLayer to a new type.
+        Params:
+            layer: The MaterialLayer to convert.
+            new_type: The type to convert to as a LAYER_TYPES enum
+                string. Must be in {'MATERIAL_PAINT', 'MATERIAL_FILL'}.
+            keep_image: If converting from a type that uses an image to
+                a type that does not then keep the image, otherwise
+                delete the image.
+        """
+        layer.convert_to(new_type, keep_image)
+
+        if layer == self.active_layer:
+            self.image_manager.reload_active_layer()
+            self.image_manager.set_paint_canvas()
+        self.node_manager.rebuild_node_tree()
+
     def add_on_load_callback(self, callback: Callable[[], None]) -> str:
         """Adds a callback to be called whenever this blend file is
         loaded.
