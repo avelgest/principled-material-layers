@@ -23,6 +23,7 @@ from .utils.naming import unique_name, unique_name_in
 from .utils.nodes import reference_inputs_from_type
 from .utils.layer_stack_utils import get_layer_stack_by_id
 
+from .bake_group import BakeGroup
 from .channel import BasicChannel, Channel
 from .image_manager import ImageManager
 from .material_layer import MaterialLayer, MaterialLayerRef
@@ -168,6 +169,11 @@ class LayerStack(bpy.types.PropertyGroup):
                     "Material Layer node to the shader node whenever a "
                     "channel is added/enabled",
         default=True
+    )
+
+    bake_groups: CollectionProperty(
+        type=BakeGroup,
+        name="Bake Groups"
     )
 
     channels: CollectionProperty(
@@ -1001,6 +1007,10 @@ class LayerStack(bpy.types.PropertyGroup):
     def free_bake(self) -> None:
         for ch in self.channels:
             ch.free_bake()
+
+        for group in self.bake_groups:
+            group.free_bake()
+        self.bake_groups.clear()
 
     @property
     def active_layer(self) -> Optional[MaterialLayer]:

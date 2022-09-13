@@ -17,6 +17,8 @@ from bpy.types import (NodeSocket,
                        ShaderNodeTree,
                        )
 
+from ..bake_group import BAKE_LAYERS_BELOW_NAME
+
 from ..bake import (BakedSocket,
                     LayerBaker,
                     LayerStackBaker,
@@ -562,12 +564,96 @@ class PML_OT_free_layer_stack_bake(Operator):
         return {'FINISHED'}
 
 
+class PML_OT_bake_layers_below(Operator):
+    bl_idname = "material.pml_bake_layers_below"
+    bl_label = "Bake Layers Below"
+    bl_description = "Bake all layers below the active layer as images"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        if not pml_op_poll(context):
+            return False
+        active_layer = get_layer_stack(context).active_layer
+        if active_layer is None:
+            return False
+        if active_layer.is_base_layer:
+            cls.poll_message_set("No layers below the base layer")
+            return False
+
+        return True
+
+    def execute(self, context):
+        layer_stack = get_layer_stack(context)
+
+        if BAKE_LAYERS_BELOW_NAME in layer_stack.bake_groups:
+            self.report({'ERROR'}, f"Bake group {BAKE_LAYERS_BELOW_NAME} "
+                                   "already exists in layer stack.")
+            return {'CANCELLED'}
+
+        save_all_modified()
+
+        bake_group = layer_stack.bake_groups.add()
+        bake_group.init_from_layers(BAKE_LAYERS_BELOW_NAME,
+                                    layer_stack.base_layer,
+                                    layer_stack.active_layer.get_layer_below())
+        try:
+            with WMProgress(0, len(bake_group.channels)) as progress:
+                for x in bake_group.bake():
+                    progress.value += 1
+        finally:
+            layer_stack.node_manager.rebuild_node_tree()
+        return {'FINISHED'}
+
+
+class PML_OT_free_bake_group(Operator):
+    bl_idname = "material.pml_free_bake_group"
+    bl_label = "Free Group Bake"
+    bl_description = "Frees the bake of a bake group"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    group_name: StringProperty(
+        name="Bake Group Name"
+    )
+
+    @classmethod
+    def poll(cls, context):
+        return pml_op_poll(context)
+
+    def execute(self, context):
+        if not self.group_name:
+            self.report({'ERROR'}, "group_name has not been set")
+            return {'CANCELLED'}
+
+        layer_stack = get_layer_stack(context)
+        bake_group = layer_stack.bake_groups.get(self.group_name)
+
+        if bake_group is None:
+            self.report({'WARNING'}, f"No bake group named {self.group_name}")
+            return {'CANCELLED'}
+
+        save_all_modified()
+
+        bake_group.free_bake()
+
+        idx = layer_stack.bake_groups.find(bake_group.name)
+        layer_stack.bake_groups.remove(idx)
+
+        layer_stack.node_manager.rebuild_node_tree()
+
+        ensure_global_undo()
+
+        return {'FINISHED'}
+
+
 classes = (PML_OT_bake_node_inputs,
            PML_OT_bake_node_outputs,
            PML_OT_bake_layer,
            PML_OT_free_layer_bake,
            PML_OT_bake_layer_stack,
-           PML_OT_free_layer_stack_bake)
+           PML_OT_free_layer_stack_bake,
+           PML_OT_bake_layers_below,
+           PML_OT_free_bake_group)
 
 _register, _unregister = bpy.utils.register_classes_factory(classes)
 

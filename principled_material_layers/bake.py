@@ -669,6 +669,14 @@ class LayerStackBaker(SocketBaker):
             return True
         return self.settings.always_use_float
 
+    def num_channels_for(self, socket: NodeSocket) -> int:
+        """Returns the number of RGB channels that a socket requires.
+        Override of method in SocketBaker.
+        """
+        ch_type = self.get_channel(socket).socket_type
+        # Use 1 channel for scalars, 3 for everything else.
+        return 1 if ch_type in ('FLOAT', 'FLOAT_FACTOR') else 3
+
     @property
     def bake_target_node_tree(self) -> ShaderNodeTree:
         """The node tree in which to place the bake target node.

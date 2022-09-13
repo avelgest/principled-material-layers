@@ -64,6 +64,42 @@ class NodeManager(bpy.types.PropertyGroup):
         """Called when the blend file is loaded."""
         self._register_msgbus()
 
+    def get_layer_input_socket(self, layer, channel, nodes=None):
+        """Returns the input socket that connects to the output of
+        channel on the previous layer.
+        """
+        if nodes is None:
+            nodes = self.nodes
+        if layer.is_base_layer:
+            return None
+
+        node_name = NodeNames.blend_node(layer, channel)
+        node = nodes[node_name]
+
+        if len(node.inputs) == 1:
+            return node.inputs[0]
+        return node.inputs[1]
+
+    def get_layer_output_socket(self, layer, channel, nodes=None):
+        """Gets the socket of layer that connects to the layer above
+        or the material output.
+        """
+        if nodes is None:
+            nodes = self.nodes
+
+        if layer.is_base_layer:
+            node = self.nodes[NodeNames.layer_material(layer)]
+            output_socket = node.outputs.get(channel.name)
+            if output_socket is None:
+                warnings.warn(f"Socket for {channel.name} not found in base "
+                              "layer node group.")
+                # Value socket which is always 0
+                return self._zero_const_socket
+            return node.outputs[channel.name]
+
+        node_name = NodeNames.blend_node(layer, channel)
+        return self.nodes[node_name].outputs[0]
+
     def get_layer_final_alpha_socket(self, layer, nodes=None):
         """Returns the socket that gives the alpha value of the layer
         after any masks and the opacity have been applied.

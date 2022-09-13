@@ -31,11 +31,12 @@ submodule_names = [
     "channel",
     "material_layer",
     "image_manager",
+    "bake",
     "pml_node_tree",
     "node_manager",
+    "bake_group",
     "layer_stack",
     "pml_node",
-    "bake",
     "asset_helper",
     "operators",
     "ui"]

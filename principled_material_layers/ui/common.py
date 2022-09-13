@@ -7,6 +7,7 @@ import bpy
 from bpy.props import BoolProperty
 from bpy.types import Menu, NodeGroupOutput, UIList, UI_UL_list
 
+from .. import bake_group
 from .. import blending
 from .. import hardness
 from ..asset_helper import file_entry_from_handle
@@ -410,11 +411,20 @@ class layer_stack_PT_base:
 
         layout.separator()
 
-        # Layer stack baking operators
+        # Layer stack baking / free bake operator
+        col = layout.column(align=True)
         if not layer_stack.is_baked:
-            layout.operator("material.pml_bake_layer_stack")
+            col.operator("material.pml_bake_layer_stack")
         else:
-            layout.operator("material.pml_free_layer_stack_bake")
+            col.operator("material.pml_free_layer_stack_bake")
+
+        # Bake Layers Below / free bake operator
+        if bake_group.BAKE_LAYERS_BELOW_NAME in layer_stack.bake_groups:
+            op_props = col.operator("material.pml_free_bake_group",
+                                    text="Free Baked Layers Below")
+            op_props.group_name = bake_group.BAKE_LAYERS_BELOW_NAME
+        else:
+            col.operator("material.pml_bake_layers_below")
 
     def draw_layers_list(self, layout, layer_stack):
         prefs = get_addon_preferences()

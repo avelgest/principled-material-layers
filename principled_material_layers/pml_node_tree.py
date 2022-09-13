@@ -211,6 +211,10 @@ class NodeTreeBuilder:
         for layer in enabled_layers_it:
             self._insert_layer(layer)
 
+        for bake_group in layer_stack.bake_groups:
+            if bake_group.is_baked:
+                self._connect_bake_group(bake_group)
+
         self.node_manager.connect_output_layer()
 
         self.node_manager.set_active_layer(layer_stack.active_layer)
@@ -353,6 +357,31 @@ class NodeTreeBuilder:
 
         links.new(active_layer_rgb.inputs[0], active_layer_node.outputs[0])
 
+    def _connect_bake_group(self, bake_group) -> None:
+        if not bake_group.is_baked:
+            return
+
+        layer_stack = self.layer_stack
+        nm = self.node_manager
+        links = self.links
+        nodes = self.nodes
+
+        layer_above = bake_group.get_enabled_layer_above()
+        layer_below = bake_group.get_enabled_layer_below()
+
+        for ch in bake_group.channels:
+            if not ch.is_baked or ch.name not in layer_stack.channels:
+                continue
+            bake_socket = self._get_baked_channel_socket(ch)
+
+            if layer_above is not None:
+                socket = nm.get_layer_input_socket(layer_above, ch, nodes)
+                links.new(socket, bake_socket)
+
+            if layer_below is not None:
+                socket = nm.get_layer_output_socket(layer_below, ch, nodes)
+                links.new(bake_socket, socket)
+
     def _get_layer_final_alpha_socket(self, layer) -> NodeSocket:
         """Returns the socket that gives the alpha value of layer
         after any masks and the opacity have been applied.
@@ -361,19 +390,8 @@ class NodeTreeBuilder:
                                                               self.nodes)
 
     def _get_layer_output_socket(self, layer, channel):
-
-        if layer == self.layer_stack.base_layer:
-            node = self.nodes[NodeNames.layer_material(layer)]
-            output_socket = node.outputs.get(channel.name)
-            if output_socket is None:
-                warnings.warn(f"Socket for {channel.name} not found in base "
-                              "layer node group.")
-                # Value socket which is always 0
-                return self._zero_const_socket
-            return node.outputs[channel.name]
-
-        node_name = NodeNames.blend_node(layer, channel)
-        return self.nodes[node_name].outputs[0]
+        return self.node_manager.get_layer_output_socket(layer, channel,
+                                                         self.nodes)
 
     # TODO Merge with NodeManager.get_ma_group_output_socket
     def _get_ma_group_output_socket(self, layer, channel):
@@ -395,6 +413,14 @@ class NodeTreeBuilder:
                       f"{'(baked)' if channel.is_baked else ''}")
 
         return self._zero_const_socket
+
+    def _get_baked_channel_socket(self, ch) -> NodeSocket:
+        if ch.bake_image_channel >= 0:
+            bake_node = self.nodes[NodeNames.bake_image_rgb(ch.bake_image)]
+            return bake_node.outputs[ch.bake_image_channel]
+
+        bake_node = self.nodes[NodeNames.bake_image(ch.bake_image)]
+        return bake_node.outputs[0]
 
     def _get_bake_image_socket(self, layer, layer_ch):
         node_name = NodeNames.baked_value(layer, layer_ch)
@@ -539,12 +565,7 @@ class NodeTreeBuilder:
             if not ch.is_baked:
                 continue
 
-            if ch.bake_image_channel >= 0:
-                bake_node = nodes[NodeNames.bake_image_rgb(ch.bake_image)]
-                bake_socket = bake_node.outputs[ch.bake_image_channel]
-            else:
-                bake_node = nodes[NodeNames.bake_image(ch.bake_image)]
-                bake_socket = bake_node.outputs[0]
+            bake_socket = self._get_baked_channel_socket(ch)
 
             baked_value_node = nodes.new("NodeReroute")
             baked_value_node.name = NodeNames.baked_value(layer, ch)
