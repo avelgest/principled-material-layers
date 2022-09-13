@@ -18,7 +18,7 @@ from bpy.types import (NodeSocket,
                        ShaderNodeTree)
 
 from .channel import Channel
-from .utils.image import SplitChannelImageRGB
+from .utils.image import SplitChannelImageRGB, copy_image
 from .utils.nodes import is_socket_simple_const
 from .utils.ops import filter_stdstream
 from .utils.temp_changes import TempChanges, TempNodes
@@ -280,7 +280,7 @@ class SocketBaker:
             for ch_idx, ch_val in enumerate(image.channel_contents):
                 if ch_val:
                     links.new(self.emit_node_rgb.inputs[ch_idx],
-                              self._existing_img_node_rgb.inputs[ch_idx])
+                              self._existing_img_node_rgb.outputs[ch_idx])
 
         for socket in sockets:
             ch_idx = image.get_unused_channel()
@@ -299,6 +299,7 @@ class SocketBaker:
         else:
             img_copy = image.image.copy()
             try:
+                copy_image(image.image, img_copy)
                 self._existing_img_node.image = img_copy
                 self._call_bake_op()
             finally:
@@ -328,10 +329,6 @@ class SocketBaker:
             None.
         """
 
-        # Images compatible with bake_type
-        compat_images = (x for x in images if not x.is_full
-                         and bake_type.is_image_compatible(x))
-
         def _bake_socket_shared_gen_() -> Optional[List[BakedSocket]]:
 
             to_bake = []
@@ -340,13 +337,11 @@ class SocketBaker:
             socket = yield
             while socket is not None:
                 if image is None:
-                    image = next(compat_images, None)
+                    # Find a compatible image that isn't full
+                    image = next((x for x in images if not x.is_full
+                                  and bake_type.is_image_compatible(x)), None)
                     if image is None:
                         image = self.create_image(socket)
-                    else:
-                        # FIXME Potential issues with compat_images generator
-                        # and removing items from images
-                        images.remove(image)
 
                 to_bake.append(socket)
                 if len(to_bake) == image.num_unused:
@@ -587,7 +582,7 @@ class LayerStackBaker(SocketBaker):
         if self.layer_stack.material.node_tree is None:
             raise ValueError("Layer stack's material has no node tree.")
 
-        return self.bake_sockets(sockets)
+        return self.bake_sockets(sockets, self.image_manager.bake_images)
 
     def create_image(self, socket: NodeSocket) -> SplitChannelImageRGB:
         """Creates a new image (via the layer stack's image manager)
@@ -744,7 +739,7 @@ class LayerBaker(LayerStackBaker):
         if self.layer_stack.material.node_tree is None:
             raise ValueError("Layer stack's material has no node tree.")
 
-        return self.bake_sockets(sockets)
+        return self.bake_sockets(sockets, self.image_manager.bake_images)
 
     def rename_image(self, image, socket) -> None:
         """Rename an image newly created by this baker.
