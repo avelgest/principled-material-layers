@@ -249,6 +249,12 @@ class ImageManager(bpy.types.PropertyGroup):
         description="Pack multiple scalar channels into the same image",
         default=True
     )
+    bake_skip_simple: BoolProperty(
+        name="Skip Simple",
+        description="Don't bake channels with values that are relatively "
+                    "inexpensive to compute",
+        default=True
+    )
 
     udim_layout: PointerProperty(
         type=UDIMLayout,

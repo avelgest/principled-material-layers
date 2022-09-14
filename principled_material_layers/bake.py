@@ -19,7 +19,7 @@ from bpy.types import (NodeSocket,
 
 from .channel import Channel
 from .utils.image import SplitChannelImageRGB, copy_image
-from .utils.nodes import is_socket_simple_const
+from .utils.nodes import is_socket_simple
 from .utils.ops import filter_stdstream
 from .utils.temp_changes import TempChanges, TempNodes
 
@@ -722,7 +722,7 @@ class LayerBaker(LayerStackBaker):
 
         return baking_sockets
 
-    def bake(self, skip_simple_const=True) -> BakedSocketGen:
+    def bake(self) -> BakedSocketGen:
         """Bakes the enabled channels of the material layer.
         Params:
             skip_simple_const: Skip any channel that has a constant
@@ -731,10 +731,13 @@ class LayerBaker(LayerStackBaker):
         Returns:
             A generator that yield BakedSocket instances.
         """
+        im = self.image_manager
+
         sockets = [x.socket for x in self.baking_sockets]
 
-        if skip_simple_const:
-            sockets = [x for x in sockets if not is_socket_simple_const(x)]
+        if im.bake_skip_simple:
+            # Filter sockets with simple constant values
+            sockets = [x for x in sockets if not is_socket_simple(x)]
 
         if self.layer_stack.material.node_tree is None:
             raise ValueError("Layer stack's material has no node tree.")

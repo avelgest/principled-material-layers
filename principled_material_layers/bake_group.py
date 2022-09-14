@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Collection, List, Optional
+from typing import Collection, List, Optional, Union
 
 import bpy
 
@@ -19,6 +19,7 @@ from .material_layer import MaterialLayer, MaterialLayerRef
 from .utils.image import SplitChannelImageRGB
 from .utils.layer_stack_utils import get_layer_stack_from_prop
 from .utils.naming import suffix_num_unique_in
+from .utils.nodes import is_socket_simple
 
 BAKE_LAYERS_BELOW_NAME = ".pml_bake_layers_below"
 
@@ -48,6 +49,9 @@ class BakeGroup(bpy.types.PropertyGroup):
         self["channel_images"] = {}
 
     def init_from_layers(self, name, from_layer, to_layer):
+        """Initialize a bake group containing all enabled layers
+        between from_layer and to_layer (including both end points).
+        """
         self.initialize(name=name)
 
         layer_refs = self.layer_stack.top_level_layers_ref
@@ -59,7 +63,9 @@ class BakeGroup(bpy.types.PropertyGroup):
         if from_idx > to_idx:
             raise ValueError("from_layer is above to_layer")
         for i in range(from_idx, to_idx+1):
-            self.add_layer(layer_refs[i])
+            layer = layer_refs[i].resolve()
+            if layer.enabled:
+                self.add_layer(layer)
 
     def _ensure_channel(self, channel: Channel) -> None:
         if channel.name in self.channels:
@@ -72,7 +78,7 @@ class BakeGroup(bpy.types.PropertyGroup):
         if idx != -1:
             self.channels.remove(idx)
 
-    def add_layer(self, layer: MaterialLayer) -> None:
+    def add_layer(self, layer: Union[MaterialLayer, MaterialLayerRef]) -> None:
         if not getattr(layer, "identifier", ""):
             raise TypeError("Expected layer to have a valid identifier")
 
@@ -97,6 +103,9 @@ class BakeGroup(bpy.types.PropertyGroup):
         return False
 
     def update_channels(self) -> None:
+        """Adds or removes channels from this bake groups based on the
+        channels of the layers it contains.
+        """
         layer_stack = self.layer_stack
 
         new_channels = set()
@@ -170,6 +179,11 @@ class BakeGroup(bpy.types.PropertyGroup):
         return get_layer_stack_from_prop(self)
 
     @property
+    def layers(self) -> List[MaterialLayer]:
+        layer_stack = self.layer_stack
+        return [layer_stack.get_layer_by_id(x) for x in self.layer_ids]
+
+    @property
     def layer_ids(self) -> List[str]:
         return self["layers"] or []
 
@@ -219,15 +233,35 @@ class BakeGroupBaker(LayerStackBaker):
     def get_baking_sockets(self) -> List[ChannelSocket]:
         nm = self.layer_stack.node_manager
         nodes = self.layer_stack.node_tree.nodes
+        skip_simple = self.image_manager.bake_skip_simple
 
         top_layer = self.bake_group.top_layer
 
+        layers = self.bake_group.layers
+
         baking_sockets = []
         for ch in self.bake_group.channels:
+            if skip_simple and self._is_simple(ch, layers):
+                continue
             socket = nm.get_layer_output_socket(top_layer, ch, nodes)
             baking_sockets.append(ChannelSocket(ch, socket))
 
         return baking_sockets
+
+    def _is_simple(self, channel, layers):
+        layer_stack = self.layer_stack
+        nm = layer_stack.node_manager
+        nodes = layer_stack.node_tree.nodes
+
+        for layer in layers:
+            layer_ch = layer.channels.get(channel.name)
+            if layer_ch is not None:
+                socket = nm.get_ma_group_output_socket(layer, layer_ch,
+                                                       use_baked=False,
+                                                       nodes=nodes)
+            if not is_socket_simple(socket):
+                return False
+        return True
 
     def bake(self) -> BakedSocketGen:
         if not self.bake_group.is_empty:

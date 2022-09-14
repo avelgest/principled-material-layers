@@ -22,90 +22,100 @@ from mathutils import Vector
 from .temp_changes import TempNodes
 
 
-# Nodes that always give a constant value for a given object
-# i.e. always produce a flat color when connected to an emission shader
-_SIMPLE_CONST_NODES = {
-                        bpy.types.ShaderNodeRGB,
-                        bpy.types.ShaderNodeValue,
-                      }
-
-# Nodes that give a constant value only if their inputs are constant
-_MAYBE_CONST_NODES = {
-    bpy.types.ShaderNodeBlackbody,
-    bpy.types.ShaderNodeBrightContrast,
-    bpy.types.ShaderNodeClamp,
-    bpy.types.ShaderNodeCombineHSV,
-    bpy.types.ShaderNodeCombineRGB,
-    bpy.types.ShaderNodeCombineXYZ,
-    bpy.types.ShaderNodeFloatCurve,
-    bpy.types.ShaderNodeGamma,
-    bpy.types.ShaderNodeHueSaturation,
-    bpy.types.ShaderNodeInvert,
-    bpy.types.ShaderNodeMapping,
-    bpy.types.ShaderNodeMapRange,
-    bpy.types.ShaderNodeMath,
-    bpy.types.ShaderNodeMixRGB,
-    bpy.types.ShaderNodeNormal,
-    bpy.types.ShaderNodeRGBCurve,
-    bpy.types.ShaderNodeRGBToBW,
-    bpy.types.ShaderNodeSeparateHSV,
-    bpy.types.ShaderNodeSeparateRGB,
-    bpy.types.ShaderNodeSeparateXYZ,
-    bpy.types.ShaderNodeValToRGB,
-    bpy.types.ShaderNodeVectorCurve,
-    bpy.types.ShaderNodeVectorMath,
-    bpy.types.ShaderNodeVectorRotate,
-    bpy.types.ShaderNodeWavelength
+# Nodes that are relatively inexpensive to compute
+# Note that this is not measured, but just guessed from the nodes' glsl
+# code in source/blender/gpu/shaders/material
+_SIMPLE_NODES = {
+    "ShaderNodeBlackbody",
+    "ShaderNodeBrightContrast",
+    "ShaderNodeClamp",
+    "ShaderNodeCombineHSV",
+    "ShaderNodeCombineRGB",
+    "ShaderNodeCombineXYZ",
+    "ShaderNodeHueSaturation",
+    "ShaderNodeInvert",
+    "ShaderNodeLightPath",
+    "ShaderNodeMapping",
+    "ShaderNodeMapRange",
+    "ShaderNodeMath",
+    "ShaderNodeMixRGB",
+    "ShaderNodeObjectInfo",
+    "ShaderNodeRGB",
+    "ShaderNodeRGBToBW",
+    "ShaderNodeSeparateHSV",
+    "ShaderNodeSeparateRGB",
+    "ShaderNodeSeparateXYZ",
+    "ShaderNodeTangent",
+    "ShaderNodeTexCoord",
+    "ShaderNodeUVMap",
+    "ShaderNodeVectorMath",
 }
 
 
-def _is_node_simple_const(node: ShaderNode, max_recur=3, recur=0) -> bool:
-    if recur > max_recur:
-        return False
+def _get_node_simplicity(node: ShaderNode,
+                         threshold: int,
+                         ignore: Optional[typing.Set[ShaderNode]] = None,
+                         ) -> int:
 
-    if type(node) in _SIMPLE_CONST_NODES:
-        return True
+    if node.rna_type.identifier not in _SIMPLE_NODES:
+        return threshold + 1
 
-    if type(node) in _MAYBE_CONST_NODES:
-        for socket in node.inputs:
-            if not socket.is_linked:
-                continue
+    if ignore is None:
+        ignore = {node}
+    else:
+        ignore.add(node)
+
+    simplicity = 1
+
+    for socket in node.inputs:
+        if socket.is_linked:
             linked_node = socket.links[0].from_node
-            if not _is_node_simple_const(linked_node, max_recur, recur+1):
-                return False
-        return True
-    return False
+            if linked_node not in ignore:
+                simplicity += _get_node_simplicity(linked_node,
+                                                   threshold,
+                                                   ignore)
+                if simplicity > threshold:
+                    break
+    return simplicity
 
 
-def is_socket_simple_const(socket: NodeSocket) -> bool:
-    """Whether a shader node sockets value is a simple constant, i.e.
-    is its value always the same on a given frame and does it produce a
-    flat color when connected to an emission shader.
+def is_socket_simple(socket: NodeSocket,
+                     threshold: int = 8) -> bool:
+    """Approximates whether a shader node socket's value is
+    computationally inexpensive. Returns True if the socket is only
+    influenced by at most 'threshold' nodes, none of which perform
+    expensive operations.
 
     Params:
         socket: An input or output socket of a shader node.
+        threshold: The max number of 'simple' nodes a socket can be
+            influenced by before this function returns False.
     Returns:
         A boolean.
     """
     if socket.is_output:
         if isinstance(socket.node, bpy.types.ShaderNodeGroup):
+            # For Group Nodes return whether the socket on the Group
+            # Output node is simple or True if there is no such node.
             node_tree = socket.node.node_tree
-            if node_tree is None:
+            if socket.node.node_tree is None:
                 return True
-            output_node = next((x for x in node_tree.nodes
-                               if isinstance(x, bpy.types.NodeGroupOutput)),
-                               None)
+            output_node = get_node_by_type(node_tree,
+                                           bpy.types.NodeGroupOutput)
             if output_node is None:
                 return True
-            socket = output_node.inputs[socket.name]
-        else:
-            return _is_node_simple_const(socket.node)
+            return is_socket_simple(output_node.inputs[socket.name], threshold)
 
-    if not socket.is_linked:
-        return True
+        # Will return whether the socket's node is a simple node
+        node = socket.node
+    else:
+        # socket is an input
+        if not socket.is_linked:
+            return True
 
-    linked_node = socket.links[0].from_node
-    return _is_node_simple_const(linked_node)
+        node = socket.links[0].from_node
+
+    return _get_node_simplicity(node, threshold) <= threshold
 
 
 def get_output_node(node_tree: ShaderNodeTree):

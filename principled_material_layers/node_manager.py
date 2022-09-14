@@ -8,7 +8,7 @@ from typing import Optional
 
 import bpy
 
-from bpy.types import NodeReroute, ShaderNode
+from bpy.types import NodeReroute, NodeSocket, ShaderNode
 
 from .on_load_manager import pml_trusted_callback
 from .pml_node_tree import NodeNames, rebuild_node_tree
@@ -110,13 +110,18 @@ class NodeManager(bpy.types.PropertyGroup):
         node_name = NodeNames.layer_alpha_x_opacity(layer)
         return nodes[node_name].outputs[0]
 
-    def get_ma_group_output_socket(self, layer, channel):
+    def get_ma_group_output_socket(self, layer, channel,
+                                   use_baked=True, nodes=None) -> NodeSocket:
         """Returns the output socket of layer's Group Node that matches
-        channel.
+        channel. If use_baked is True and the layer's material is baked
+        then the socket of the image it is baked to is returned.
         """
+        if nodes is None:
+            nodes = self.nodes
+
         ma_group = self.nodes[NodeNames.layer_material(layer)]
 
-        if channel.is_baked:
+        if channel.is_baked and use_baked:
             ma_group_output = self._get_bake_image_socket(layer, channel)
         else:
             ma_group_output = ma_group.outputs.get(channel.name)

@@ -676,6 +676,7 @@ class settings_PT_base:
         col.prop(im, "bake_samples")
         col.prop(im, "bake_float_always")
         col.prop(im, "bake_shared")
+        col.prop(im, "bake_skip_simple")
 
     def _get_mesh(self, context):
         obj = context.active_object

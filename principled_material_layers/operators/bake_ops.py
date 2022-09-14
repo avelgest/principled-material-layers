@@ -344,7 +344,7 @@ class PML_OT_bake_layer(Operator):
         baked: List[BakedSocket] = []
 
         with WMProgress(0, baker.num_to_bake) as progress:
-            for x in baker.bake(skip_simple_const=True):
+            for x in baker.bake():
                 baked.append(x)
                 progress.value += 1
 
