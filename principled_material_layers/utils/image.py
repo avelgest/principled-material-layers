@@ -10,7 +10,7 @@ from typing import Any, Optional, Tuple, Union
 import bpy
 from bpy.types import Image
 
-from ..preferences import get_addon_preferences
+from .. import preferences
 
 # 1.0 as bytes (used in _copy_image_channel_to_rgb_no_numpy)
 _FLOAT_ONE_BYTES = struct.pack("f", 1.0)
@@ -18,7 +18,7 @@ _FLOAT_ONE_BYTES = struct.pack("f", 1.0)
 
 def _use_numpy() -> bool:
     """Whether or not these functions should use numpy"""
-    return get_addon_preferences().use_numpy
+    return preferences.get_addon_preferences().use_numpy
 
 
 _CAN_PACK_UDIMS = bpy.app.version >= (3, 3)
@@ -198,6 +198,30 @@ def clear_channel(image: Image, ch: int) -> None:
             mem_view[ch::image.channels] = memoryview(zeros).cast('f')
 
     image.pixels.foreach_set(pixels)
+
+
+def has_alpha(image: Image) -> bool:
+    """Returns True if the image has an alpha channel."""
+    return image.depth in (32, 64, 128)
+
+
+def create_image_copy(image: Image) -> Image:
+    """Creates a copy of image with a copy of image's pixel data."""
+
+    if image.source not in ('GENERATED', 'FILE'):
+        raise ValueError("Only GENERATED or FILE images are supported.")
+
+    img_copy = bpy.data.images.new(f"{image.name}.copy",
+                                   image.size[0], image.size[1],
+                                   alpha=has_alpha(image),
+                                   float_buffer=image.is_float,
+                                   is_data=image.colorspace_settings.is_data)
+    try:
+        copy_image(image, img_copy)
+    except Exception as e:
+        bpy.data.remove(img_copy)
+        raise e
+    return img_copy
 
 
 def copy_image(from_img: Image, to_img: Image) -> None:

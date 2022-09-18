@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import typing
 
 from dataclasses import dataclass, field
 from typing import (Collection,
@@ -18,7 +19,7 @@ from bpy.types import (NodeSocket,
                        ShaderNodeTree)
 
 from .channel import Channel
-from .utils.image import SplitChannelImageRGB, copy_image
+from .utils.image import SplitChannelImageRGB, create_image_copy
 from .utils.nodes import is_socket_simple
 from .utils.ops import filter_stdstream
 from .utils.temp_changes import TempChanges, TempNodes
@@ -297,12 +298,12 @@ class SocketBaker:
         if image.is_empty:
             self._call_bake_op()
         else:
-            img_copy = image.image.copy()
+            img_copy = create_image_copy(image.image)
             try:
-                copy_image(image.image, img_copy)
                 self._existing_img_node.image = img_copy
                 self._call_bake_op()
             finally:
+                self._existing_img_node.image = None
                 bpy.data.images.remove(img_copy)
 
         return baked_sockets
@@ -429,7 +430,9 @@ class SocketBaker:
             A generator that yields BakedSocket instances.
         """
         scene = bpy.context.scene
-        images = list(images)
+
+        if not isinstance(images, typing.Collection):
+            images = list(images)
 
         sockets = tuple(sockets)
         if not all(x.is_output for x in sockets):
