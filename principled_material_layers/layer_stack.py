@@ -367,6 +367,8 @@ class LayerStack(bpy.types.PropertyGroup):
 
         self._register_msgbus()
 
+        self.image_manager.on_load()
+
         self.free_bake()
         for layer in self.layers:
             layer.free_bake()
@@ -448,10 +450,16 @@ class LayerStack(bpy.types.PropertyGroup):
 
         undo_invariant.pre_pointer = self.as_pointer()
 
+        active_layer = self.active_layer
+        undo_invariant.pre_active_layer_id = (None if active_layer is None
+                                              else active_layer.identifier)
+
     def _redo_post(self, *dummy):
         undo_invariant = self._undo_invariant
         if undo_invariant.skip_undo_callbacks:
             return
+
+        im = self.image_manager
 
         if self._is_active_in_image_paint:
 
@@ -463,7 +471,16 @@ class LayerStack(bpy.types.PropertyGroup):
             paint_settings = bpy.context.scene.tool_settings.image_paint
             if (not paint_settings.canvas
                     or paint_settings.canvas.name.startswith(".pml")):
-                paint_settings.canvas = self.image_manager.active_image
+                paint_settings.canvas = im.active_image
+
+        # Update the tile (stored on disk) of the old active layer if
+        # using tiled storage
+        if im.uses_tiled_storage:
+            pre_undo_layer_id = undo_invariant.pre_active_layer_id
+            active_layer_id = getattr(self.active_layer, "identifier", None)
+
+            if pre_undo_layer_id != active_layer_id:
+                self._update_layer_tiled_storage(pre_undo_layer_id)
 
         if undo_invariant.pre_pointer != self.as_pointer():
             layer_stack_id = self.identifier
@@ -490,6 +507,8 @@ class LayerStack(bpy.types.PropertyGroup):
         if undo_invariant.skip_undo_callbacks:
             return
 
+        im = self.image_manager
+
         if self._is_active_in_image_paint:
             # Set the image paint canvas to the layer stack's active
             # image unless editing an image not created by the addon
@@ -498,7 +517,7 @@ class LayerStack(bpy.types.PropertyGroup):
             if (not paint_settings.canvas
                     or paint_settings.canvas.name.startswith(".pml")):
 
-                paint_settings.canvas = self.image_manager.active_image
+                paint_settings.canvas = im.active_image
 
             pre_undo_layer_id = undo_invariant.pre_active_layer_id
             active_layer_id = getattr(self.active_layer, "identifier", None)
@@ -508,7 +527,12 @@ class LayerStack(bpy.types.PropertyGroup):
                     self._undo_workaround()
             else:
                 if pre_undo_layer_id != active_layer_id:
-                    self.image_manager.reload_tmp_active_image()
+                    im.reload_tmp_active_image()
+
+        # Update the tile (stored on disk) of the old active layer if
+        # using tiled storage
+        if pre_undo_layer_id != active_layer_id and im.uses_tiled_storage:
+            self._update_layer_tiled_storage(pre_undo_layer_id)
 
         # Check whether the layer stack has been reallocated
         if undo_invariant.pre_pointer != self.as_pointer():
@@ -555,6 +579,11 @@ class LayerStack(bpy.types.PropertyGroup):
             self.node_manager.set_active_layer(layer)
 
         self.image_manager.set_paint_canvas()
+
+    def _update_layer_tiled_storage(self, layer_id: str) -> None:
+        pre_undo_layer = self.get_layer_by_id(layer_id)
+        if pre_undo_layer:
+            self.image_manager.update_tiled_storage((pre_undo_layer,))
 
     def _search_for_layer_index_by_id(self, identifier: str) -> int:
         for idx, layer in enumerate(self.layers):

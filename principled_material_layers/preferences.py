@@ -12,6 +12,8 @@ from bpy.types import AddonPreferences
 from bpy.props import (BoolProperty,
                        FloatProperty)
 
+from . import utils
+
 
 class PMLPreferences(AddonPreferences):
     bl_idname = __package__
@@ -31,6 +33,7 @@ class PMLPreferences(AddonPreferences):
                       "show_previews": True,
                       "layer_ui_scale": 2.0,
                       "layers_share_images": True,
+                      "use_tiled_storage": False,
                       "use_large_icons": False,
                       "use_undo_workaround": bpy.app.version < (3, 2, 0),
                       "use_op_based_ma_copy": bpy.app.version > (3, 1, 0)
@@ -111,6 +114,18 @@ class PMLPreferences(AddonPreferences):
         default=default_values["use_undo_workaround"]
     )
 
+    # TODO Move to ImageManager?
+    use_tiled_storage: BoolProperty(
+        name="Use Tiled Storage",
+        description=("Only needed if shader compilation fails due to "
+                     "exceeding the fragment shader image unit limit."
+                     "Copies the images used by the addon to a tiled image "
+                     "to bypass the image limit. Significantly increases "
+                     "memory usage."),
+        default=default_values["use_tiled_storage"],
+        update=lambda self, _: self._use_tiled_storage_update()
+    )
+
     @classmethod
     def clear_cache(cls):
         """Clear the cached value of get_prefs."""
@@ -180,6 +195,22 @@ class PMLPreferences(AddonPreferences):
 
         cls._prefs = prefs
         return prefs
+
+    def _use_tiled_storage_update(self):
+        layer_stacks = utils.layer_stack_utils.get_all_layer_stacks()
+
+        if self.use_tiled_storage:
+            # Initialize tiled storage for all initiailized layer
+            # stacks using all the image_manager's images
+            for layer_stack in layer_stacks:
+                layer_stack.image_manager.update_tiled_storage_all()
+                layer_stack.node_manager.rebuild_node_tree()
+        else:
+            # Clear the tiled storage of all initiailized layer stacks
+            for layer_stack in layer_stacks:
+                if layer_stack.image_manager.uses_tiled_storage:
+                    layer_stack.image_manager.delete_tiled_storage()
+                    layer_stack.node_manager.rebuild_node_tree()
 
 
 def _get_annotations(obj: Any) -> dict:

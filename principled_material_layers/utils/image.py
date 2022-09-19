@@ -5,12 +5,14 @@ from __future__ import annotations
 import struct
 
 from array import array
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import bpy
 from bpy.types import Image
 
 from .. import preferences
+
+from .temp_changes import TempChanges
 
 # 1.0 as bytes (used in _copy_image_channel_to_rgb_no_numpy)
 _FLOAT_ONE_BYTES = struct.pack("f", 1.0)
@@ -168,6 +170,46 @@ class SplitChannelImageRGB:
     @property
     def is_shared(self) -> bool:
         return not (self.r == self.g == self.b)
+
+
+def save_image_copy(image: Image, filepath: str,
+                    image_format: str = 'OPEN_EXR',
+                    float_bit_depth: int = 16,
+                    settings: Optional[Dict[str, Any]] = None) -> None:
+    """Saves image to disk using the given settings without altering
+    its filepath.
+    Params:
+        image: A bpy.types.Image. The image will not be modified.
+        filepath: Where to save the file to.
+        float_bit_depth: The bit depth to use for saving float images.
+            Should be in {16, 32}
+        settings: Dict of names to values that can be set on an
+            ImageFormatSettings instance. May be None.
+    """
+
+    scene = bpy.context.scene
+    bit_depth = float_bit_depth if image.is_float else 8
+
+    if "OPEN_EXR" in image_format and bit_depth == 8:
+        bit_depth = 16
+
+    with TempChanges(scene.render.image_settings) as image_settings:
+        image_settings.file_format = image_format
+        image_settings.color_depth = str(bit_depth)
+        image_settings.color_management = 'OVERRIDE'
+        image_settings.color_mode = 'RGB'
+        image_settings.compression = 15
+        image_settings.use_preview = False
+        image_settings.use_zbuffer = False
+
+        if settings:
+            for k, v in settings:
+                setattr(image_settings, k, v)
+
+        with TempChanges(image_settings.linear_colorspace_settings) as cs:
+            cs.name = image.colorspace_settings.name
+
+            image.save_render(filepath)
 
 
 def get_image_pixels(image: Image) -> Union[array, "numpy.ndarray"]:

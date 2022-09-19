@@ -80,7 +80,7 @@ class TempChanges:
         """Revert all attributes to their original values."""
         obj = self._obj
 
-        for k, v in self._old_values.items():
+        for k, v in reversed(list(self._old_values.items())):
             if v is _NOT_FOUND:
                 delattr(obj, k)
             else:

@@ -45,6 +45,12 @@ def get_layer_stack_by_id(identifier: str):
     return None
 
 
+def get_all_layer_stacks():
+    """Returns a list of all initialized layer stacks in the file."""
+    return [ma.pml_layer_stack for ma in bpy.data.materials
+            if ma.pml_layer_stack]
+
+
 def get_layer_stack_from_ma(ma: bpy.types.Material):
     return ma.pml_layer_stack
 

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 from collections.abc import Collection, Container
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, Set, Tuple
 
 import bpy
 
@@ -35,13 +35,21 @@ from ..utils.ops import (WMProgress,
                          save_all_modified)
 
 
+def _get_bake_images(baked_sockets: Collection[BakedSocket]
+                     ) -> Set[bpy.types.Image]:
+    """Returns a set of all bpy.types.Image that any member of
+    baked_sockets uses.
+    """
+    return {x.get_bpy_image_safe() for x in baked_sockets}
+
+
 def _for_each_bake_image(baked_sockets: Collection[BakedSocket],
                          func: Callable[[bpy.types.Image], None]
                          ) -> None:
     """Call func exactly once for each bpy.types.Image that any member
-    bake_sockets uses.
+    of baked_sockets uses.
     """
-    images = {x.get_bpy_image_safe() for x in baked_sockets}
+    images = _get_bake_images(baked_sockets)
     for img in images:
         func(img)
 
@@ -317,6 +325,7 @@ class PML_OT_bake_layer(Operator):
 
     def execute(self, context):
         layer_stack = get_layer_stack(context)
+        im = layer_stack.image_manager
 
         if not context.selected_objects:
             self.report({'WARNING'}, "No objects are selected for baking")
@@ -349,10 +358,15 @@ class PML_OT_bake_layer(Operator):
                 progress.value += 1
 
         # Tiled images must be saved before being used in Cycles
-        if layer_stack.image_manager.uses_tiled_images:
+        if im.uses_tiled_images:
             _for_each_bake_image(baked, lambda x: x.save())
 
         layer.is_baked = True
+
+        # If storing baked images as tiles then update the tiles
+        if get_addon_preferences().use_tiled_storage:
+            im.update_tiled_storage(_get_bake_images(baked))
+
         layer_stack.node_manager.rebuild_node_tree()
 
         ensure_global_undo()

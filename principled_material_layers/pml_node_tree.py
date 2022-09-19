@@ -7,6 +7,8 @@ import bpy
 from bpy.types import NodeReroute, NodeSocket
 from mathutils import Vector
 
+from .preferences import get_addon_preferences
+
 
 class NodeNames:
     """The methods in this class return the names used for the nodes
@@ -78,9 +80,7 @@ class NodeNames:
 
     @staticmethod
     def layer_is_active(layer):
-        """Value node. 1.0 if layer is the active layer otherwise 0.
-        Only present if the layer uses a shared image.
-        """
+        """Value node. 1.0 if layer is the active layer otherwise 0."""
         return f"{layer.identifier}.is_active"
 
     @staticmethod
@@ -88,7 +88,6 @@ class NodeNames:
         """MixRGB node. Mixes the value from the layer's image with
         the value of active_layer_image using the layer's is_active
         value.
-        Only present if the layer uses a shared image.
         """
         return f"{layer.identifier}.is_active_mix"
 
@@ -135,6 +134,14 @@ class NodeNames:
         Each channel may contain a different layer's image data.
         """
         return f"{image.name}.split"
+
+    @staticmethod
+    def tiled_storage_image(image: bpy.types.Image):
+        return f"tiled_storage.{image.name}"
+
+    @staticmethod
+    def tiled_storage_image_rgb(image: bpy.types.Image):
+        return f"tiled_storage.{image.name}.rgb"
 
     @staticmethod
     def uv_map():
@@ -197,6 +204,10 @@ class NodeTreeBuilder:
         # Add nodes for the images that store baked layer channels
         self._add_bake_image_nodes()
 
+        # Add nodes for TiledStorage instances of the image_manager
+        # (Only when preferences.use_tiled_storage is True)
+        self._add_tiled_storage_nodes()
+
         # Add Group nodes for the node trees of disabled layers
         self._add_disabled_layers_ma_nodes()
 
@@ -247,15 +258,9 @@ class NodeTreeBuilder:
 
             links.new(image_node.inputs[0], uv_map.outputs[0])
 
-            split_rgb_node = nodes.new("ShaderNodeSeparateRGB")
+            split_rgb_node = self._add_split_rgb_to(image_node)
             split_rgb_node.name = NodeNames.bake_image_rgb(image)
-            split_rgb_node.label = f"{image.name} RGB"
             split_rgb_node.hide = True
-
-            split_rgb_node.location = image_node.location
-            split_rgb_node.location.x += 160
-
-            links.new(split_rgb_node.inputs[0], image_node.outputs[0])
 
     def _add_disabled_layers_ma_nodes(self) -> None:
         """Adds Group nodes with the layers' node trees for layers
@@ -315,6 +320,18 @@ class NodeTreeBuilder:
 
             links.new(split_rgb_node.inputs[0], image_node.outputs[0])
 
+    def _add_split_rgb_to(self, node) -> bpy.types.ShaderNodeSeparateRGB:
+        """Adds a Separate RGB node next to node and connects its
+        input to node's first output. Returns the added node.
+        """
+        split_rgb_node = self.nodes.new("ShaderNodeSeparateRGB")
+        split_rgb_node.label = f"{node.label or node.name} RGB"
+        split_rgb_node.location = node.location
+        split_rgb_node.location.x += (node.width + 40)
+
+        self.links.new(split_rgb_node.inputs[0], node.outputs[0])
+        return split_rgb_node
+
     def _add_standard_nodes(self) -> None:
         """Adds Group Output, UV Map, Value nodes for constants, and
         Image + Split RGB nodes that will contain the active image.
@@ -339,7 +356,7 @@ class NodeTreeBuilder:
 
         uv_map = nodes.new("ShaderNodeUVMap")
         uv_map.name = NodeNames.uv_map()
-        uv_map.location = (-600, 200)
+        uv_map.location = (-800, 200)
         uv_map.uv_map = self.layer_stack.uv_map_name
 
         active_layer_node = nodes.new("ShaderNodeTexImage")
@@ -356,6 +373,59 @@ class NodeTreeBuilder:
         active_layer_rgb.location = (-200, 50)
 
         links.new(active_layer_rgb.inputs[0], active_layer_node.outputs[0])
+
+    def _add_tiled_storage_nodes(self) -> None:
+        """Adds nodes for when storing copies of images as UDIM tiles.
+        See the TiledStorage class for details.
+        """
+        if not get_addon_preferences().use_tiled_storage:
+            return
+
+        im = self.layer_stack.image_manager
+        nodes = self.nodes
+        links = self.links
+
+        if not im.tiles_data and not im.tiles_srgb:
+            return
+
+        uv_map_out = nodes[NodeNames.uv_map()].outputs[0]
+
+        # The y position starts below the existing bake images
+        y_pos_count = it.count(len(im.bake_images))
+
+        for tile_store in (im.tiles_srgb, im.tiles_data):
+            for num_str, img in tile_store.tiles.items():
+                if img is None:
+                    continue
+
+                num = int(num_str)
+                img_node = nodes.new("ShaderNodeTexImage")
+                img_node.name = NodeNames.tiled_storage_image(img)
+                img_node.label = img.name
+                img_node.image = tile_store.udim_image
+                img_node.width = 120
+                img_node.hide = True
+                img_node.location = (-400, -240 - next(y_pos_count)*40)
+
+                img_node_rgb = self._add_split_rgb_to(img_node)
+                img_node_rgb.name = NodeNames.tiled_storage_image_rgb(img)
+                img_node_rgb.hide = True
+
+                # Node to translate UV coords onto the correct UDIM tile
+                uv_shift = nodes.new("ShaderNodeVectorMath")
+                uv_shift.label = f"UDIM Tile {num} UVs"
+                uv_shift.operation = 'ADD'
+                uv_shift.location = img_node.location
+                uv_shift.location.x -= 200
+                uv_shift.width = 120
+                uv_shift.hide = True
+
+                shift_vec = uv_shift.inputs[1].default_value
+                shift_vec[0] = (num - 1) % 10      # x coord of the UDIM tile
+                shift_vec[1] = (num - 1001) // 10  # y coord of the UDIM tile
+
+                links.new(uv_shift.inputs[0], uv_map_out)
+                links.new(img_node.inputs[0], uv_shift.outputs[0])
 
     def _connect_bake_group(self, bake_group) -> None:
         if not bake_group.is_baked:
@@ -393,53 +463,58 @@ class NodeTreeBuilder:
         return self.node_manager.get_layer_output_socket(layer, channel,
                                                          self.nodes)
 
-    # TODO Merge with NodeManager.get_ma_group_output_socket
     def _get_ma_group_output_socket(self, layer, channel):
         """Returns the output socket of layer's Group Node that matches
         channel.
         """
-        ma_group = self.nodes[NodeNames.layer_material(layer)]
-
-        if channel.is_baked:
-            ma_group_output = self._get_bake_image_socket(layer, channel)
-        else:
-            ma_group_output = ma_group.outputs.get(channel.name)
-
-        if ma_group_output is not None:
-            return ma_group_output
-
-        warnings.warn(f"Cannot find output socket '{channel.name}' for "
-                      f"the node group of layer '{layer.name}' "
-                      f"{'(baked)' if channel.is_baked else ''}")
-
-        return self._zero_const_socket
+        return self.node_manager.get_ma_group_output_socket(layer, channel,
+                                                            nodes=self.nodes)
 
     def _get_baked_channel_socket(self, ch) -> NodeSocket:
-        if ch.bake_image_channel >= 0:
-            bake_node = self.nodes[NodeNames.bake_image_rgb(ch.bake_image)]
-            return bake_node.outputs[ch.bake_image_channel]
+        nodes = self.nodes
 
-        bake_node = self.nodes[NodeNames.bake_image(ch.bake_image)]
-        return bake_node.outputs[0]
+        # Check if the image is not shared with other channels
+        # (bake_image_channel == -1 if the channel uses the whole image)
+        if ch.bake_image_channel < 0:
+            # Check for an image tile first
+            bake_node = nodes.get(NodeNames.tiled_storage_image(ch.bake_image))
+            if bake_node is None:
+                bake_node = nodes[NodeNames.bake_image(ch.bake_image)]
+            return bake_node.outputs[0]
 
-    def _get_bake_image_socket(self, layer, layer_ch):
-        node_name = NodeNames.baked_value(layer, layer_ch)
-        return self.nodes[node_name].outputs[0]
+        # Shared bake image. channel's data is in a single RGB channel.
+        bake_node = nodes.get(NodeNames.tiled_storage_image_rgb(ch.bake_image))
+        if bake_node is None:
+            bake_node = nodes[NodeNames.bake_image_rgb(ch.bake_image)]
+        return bake_node.outputs[ch.bake_image_channel]
 
     def _get_paint_image_socket(self, layer):
 
         if layer.layer_type == 'MATERIAL_FILL':
             return self._one_const_socket
 
-        if layer.has_shared_image:
-            node = self.nodes[NodeNames.paint_image_rgb(layer.image)]
-            return node.outputs[layer.image_channel]
+        nodes = self.nodes
 
-        node = self.nodes[NodeNames.paint_image(layer.image)]
-        return node.outputs[0]
+        # For layers that use all RGB channels of their image
+        if not layer.has_shared_image:
+            # Check tiled storage first
+            node = nodes.get(NodeNames.tiled_storage_image(layer.image))
+            if node is None:
+                node = nodes[NodeNames.paint_image(layer.image)]
+
+            # node should be an Image Texture node
+            return node.outputs[0]
+
+        # For layers using a shared image
+        # (Check tiled storage first)
+        node = nodes.get(NodeNames.tiled_storage_image_rgb(layer.image))
+        if node is None:
+            node = self.nodes[NodeNames.paint_image_rgb(layer.image)]
+
+        # node should be a SeparateRGB node
+        return node.outputs[layer.image_channel]
 
     def _insert_layer(self, layer) -> bpy.types.NodeFrame:
-        layer_stack = self.layer_stack
         nodes = self.nodes
         links = self.links
 
@@ -474,22 +549,10 @@ class NodeTreeBuilder:
         if layer.any_channel_baked:
             self._insert_layer_bake_nodes(layer, parent=frame)
 
-        if layer_stack.layers_share_images:
-            self._insert_layer_shared(layer, frame)
-            alpha_x_opacity = nodes[NodeNames.layer_alpha_x_opacity(layer)]
-        else:
-            # The socket for this layer's image data
-            layer_image_socket = self._get_paint_image_socket(layer)
-
-            alpha_x_opacity = nodes.new("ShaderNodeMath")
-            alpha_x_opacity.operation = 'MULTIPLY'
-            alpha_x_opacity.name = NodeNames.layer_alpha_x_opacity(layer)
-            alpha_x_opacity.label = f"{layer.name} Alpha x Opacity"
-            alpha_x_opacity.parent = frame
-            alpha_x_opacity.location = (400, 300)
-
-            links.new(alpha_x_opacity.inputs[0], opacity.outputs[0])
-            links.new(alpha_x_opacity.inputs[1], layer_image_socket)
+        # N.B. Now _insert_layer_shared is used for layers that don't
+        # use shared images as well
+        self._insert_layer_shared(layer, frame)
+        alpha_x_opacity = nodes[NodeNames.layer_alpha_x_opacity(layer)]
 
         if layer.layer_type == 'MATERIAL_FILL':
             # Ignore active_* nodes when using fill layers since
@@ -658,9 +721,7 @@ class NodeTreeBuilder:
         opacity_node = nodes[names.layer_opacity(layer)]
 
         # The node that multiplies the opacity value
-        x_opacity_node = nodes[names.layer_alpha_x_opacity(layer)
-                               if layer.has_shared_image
-                               else names.layer_alpha_x_opacity(layer)]
+        x_opacity_node = nodes[names.layer_alpha_x_opacity(layer)]
 
         group_node = nodes.new("ShaderNodeGroup")
         group_node.node_tree = layer.node_mask

@@ -17,6 +17,8 @@ from bpy.props import (BoolProperty,
 
 from bpy.types import PropertyGroup
 
+from . import tiled_storage
+
 from .utils.image import (clear_channel,
                           copy_image_channel,
                           copy_image_channel_to_rgb,
@@ -256,6 +258,20 @@ class ImageManager(bpy.types.PropertyGroup):
         default=True
     )
 
+    # For when preferences.use_tiled_storage == True
+    tiles_srgb: PointerProperty(
+        type=tiled_storage.TiledStorage,
+        name="sRGB Bake Tiles",
+        description="TiledStorage for sRGB images"
+    )
+    tiles_data: PointerProperty(
+        type=tiled_storage.TiledStorage,
+        name="Data Bake Tiles",
+        description="TiledStorage for non-color images"
+    )
+
+    # UDIM Layout used if the image manager is initialized with
+    # tiled=True
     udim_layout: PointerProperty(
         type=UDIMLayout,
         name="UDIM Layout"
@@ -295,6 +311,8 @@ class ImageManager(bpy.types.PropertyGroup):
         by the manager from the blend file."""
         self._delete_tmp_active_image(self.active_layer)
 
+        self.delete_tiled_storage()
+
         for img in self.layer_images:
             img.delete()
         self.layer_images.clear()
@@ -304,6 +322,9 @@ class ImageManager(bpy.types.PropertyGroup):
         self.bake_images.clear()
 
         self.udim_layout.delete()
+
+    def on_load(self) -> None:
+        self.delete_tiled_storage()
 
     def active_image_name(self, layer: MaterialLayer) -> str:
         """If a temporary active image is needed to paint on layer
@@ -321,6 +342,8 @@ class ImageManager(bpy.types.PropertyGroup):
         layer_image = self.layer_images.add()
         name = unique_name_in(bpy.data.images, format_str=".pml_layer_data.{}")
         layer_image.initialize_as_layer_image(name, self)
+
+        self.update_tiled_storage((layer_image.image,))
 
         return layer_image
 
@@ -620,6 +643,7 @@ class ImageManager(bpy.types.PropertyGroup):
                                0,
                                old_layer.image,
                                old_layer.image_channel)
+            self.update_tiled_storage((old_layer.image,))
 
         self._replace_active_image(new_layer, old_layer)
 
@@ -667,6 +691,39 @@ class ImageManager(bpy.types.PropertyGroup):
 
         self.image_width = width
         self.image_height = height
+
+    def delete_tiled_storage(self) -> None:
+        """Clears all TiledStorage instances used by this image manager.
+        Can be called even if the instances are uninitialized.
+        """
+        self.tiles_srgb.delete()
+        self.tiles_data.delete()
+
+    def update_tiled_storage_all(self) -> None:
+        """Updates the tiled storage with all the layer images and
+        bake images of this image manager. Will initialize the
+        TiledStorage instances if necessary.
+        """
+        images = self.layer_images_blend + self.bake_images_blend
+        self.update_tiled_storage(images)
+
+    def update_tiled_storage(self,
+                             modified_images: List[bpy.types.Image]) -> None:
+        """Updates the tiled storage with modified_images. If this
+        image manager does not use tiled storage then this method
+        does nothing. Will initialize the TiledStorage instances if
+        necessary.
+        """
+        if not self.uses_tiled_storage:
+            return
+
+        if not self.tiles_srgb:
+            self.tiles_srgb.initialize(is_data=False)
+        if not self.tiles_data:
+            self.tiles_data.initialize(is_data=True)
+
+        self.tiles_srgb.update_from(modified_images)
+        self.tiles_data.update_from(modified_images)
 
     def update_udim_images(self) -> None:
         for img in self.layer_images_blend:
@@ -724,6 +781,11 @@ class ImageManager(bpy.types.PropertyGroup):
     @property
     def uses_tiled_images(self) -> bool:
         return self.get("uses_tiled_images", False)
+
+    @property
+    def uses_tiled_storage(self) -> bool:
+        return (not self.uses_tiled_images
+                and get_addon_preferences().use_tiled_storage)
 
 
 classes = (SplitChannelImageProp, ImageManager)

@@ -652,6 +652,7 @@ class settings_PT_base:
         layer_stack = get_layer_stack(context)
         im = layer_stack.image_manager
         mesh = self._get_mesh(context)
+        prefs = get_addon_preferences()
 
         layout.prop_search(layer_stack, "uv_map_name",
                            mesh, "uv_layers", text="UV Map")
@@ -677,6 +678,10 @@ class settings_PT_base:
         col.prop(im, "bake_float_always")
         col.prop(im, "bake_shared")
         col.prop(im, "bake_skip_simple")
+
+        if isinstance(prefs, bpy.types.AddonPreferences):
+            col.separator()
+            col.prop(prefs, "use_tiled_storage")
 
     def _get_mesh(self, context):
         obj = context.active_object

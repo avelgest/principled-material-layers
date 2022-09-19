@@ -119,11 +119,11 @@ class NodeManager(bpy.types.PropertyGroup):
         if nodes is None:
             nodes = self.nodes
 
-        ma_group = self.nodes[NodeNames.layer_material(layer)]
-
         if channel.is_baked and use_baked:
-            ma_group_output = self._get_bake_image_socket(layer, channel)
+            ma_group_output = self._get_bake_image_socket(layer, channel,
+                                                          nodes=nodes)
         else:
+            ma_group = nodes[NodeNames.layer_material(layer)]
             ma_group_output = ma_group.outputs.get(channel.name)
 
         if ma_group_output is not None:
@@ -134,9 +134,11 @@ class NodeManager(bpy.types.PropertyGroup):
                       f"{'(baked)' if channel.is_baked else ''}")
         return self._zero_const_output_socket
 
-    def _get_bake_image_socket(self, layer, layer_ch):
+    def _get_bake_image_socket(self, layer, layer_ch, nodes=None):
+        if nodes is None:
+            nodes = self.nodes
         node_name = NodeNames.baked_value(layer, layer_ch)
-        return self.nodes[node_name].outputs[0]
+        return nodes[node_name].outputs[0]
 
     def update_blend_node(self, layer, channel) -> Optional[ShaderNode]:
         # Since child nodes are not yet supported ignore any layer that

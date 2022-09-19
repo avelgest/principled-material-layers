@@ -30,6 +30,7 @@ submodule_names = [
     "hardness",
     "channel",
     "material_layer",
+    "tiled_storage",
     "image_manager",
     "bake",
     "pml_node_tree",
