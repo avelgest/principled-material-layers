@@ -32,8 +32,6 @@ class PML_PT_layer_stack_ne(layer_stack_PT_base, Panel):
         if layer_stack is None:
             return False
 
-        space = context.space_data
-
         if layer_stack.is_initialized:
             return True
         if context.active_node is None:
@@ -42,6 +40,8 @@ class PML_PT_layer_stack_ne(layer_stack_PT_base, Panel):
         obj = context.active_object
         if obj is None or obj.active_material is None:
             return False
+
+        space = context.space_data
 
         # Only allow initialization from certain nodes and only when
         # editing the active material's node tree.

@@ -79,10 +79,12 @@ def pml_op_poll(context: Context) -> bool:
     if space.type == 'VIEW_3D' and context.mode == 'PAINT_TEXTURE':
         return True
     if space.type == 'NODE_EDITOR':
-        # Return True if currently editing the active layer's node tree
-        if (space.edit_tree is not None
-                and layer_stack.active_layer is not None
-                and space.edit_tree == layer_stack.active_layer.node_tree):
+        edit_tree = space.edit_tree
+        if edit_tree is None or space.shader_type != 'OBJECT':
+            return False
+
+        ma_tree = layer_stack.material.node_tree
+        if edit_tree == ma_tree or space.path[0].node_tree == ma_tree:
             return True
     return False
 
