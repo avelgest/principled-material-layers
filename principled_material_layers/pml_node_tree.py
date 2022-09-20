@@ -56,7 +56,7 @@ class NodeNames:
 
     @staticmethod
     def one_const():
-        """Value node. Always has the value 1.0"""
+        """Value node. Always has the value 1.0. Used for fill layers."""
         return "pml_one_const"
 
     @staticmethod
@@ -344,7 +344,7 @@ class NodeTreeBuilder:
 
         one_const = nodes.new("ShaderNodeValue")
         one_const.name = NodeNames.one_const()
-        one_const.label = "Fill Constant"
+        one_const.label = "One Constant"
         one_const.outputs[0].default_value = 1.0
         one_const.location = (-400, 600)
 

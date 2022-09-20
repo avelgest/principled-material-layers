@@ -729,10 +729,8 @@ class LayerBaker(LayerStackBaker):
 
     def bake(self) -> BakedSocketGen:
         """Bakes the enabled channels of the material layer.
-        Params:
-            skip_simple_const: Skip any channel that has a constant
-                value e.g. its socket is unconnected, or just connected
-                to a Value node or RGB node.
+        If the bake_skip_simple is True on the layer's image manager
+        then sockets that are relatively cheap to compute are skipped.
         Returns:
             A generator that yield BakedSocket instances.
         """

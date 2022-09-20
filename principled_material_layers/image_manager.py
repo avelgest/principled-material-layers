@@ -281,8 +281,16 @@ class ImageManager(bpy.types.PropertyGroup):
     # Name of the image to use when a blank image is needed
     _BLANK_IMAGE_NAME = ".pml_blank_image"
 
-    def initialize(self, layer_stack, image_width=1024, image_height=1024,
-                   use_float=False, tiled=False) -> None:
+    def initialize(self, image_width: int = 1024, image_height: int = 1024,
+                   use_float: bool = False, tiled: bool = False) -> None:
+        """Initialize the instance. This should be called before the
+        image manager is used.
+        Params:
+            image_width: The width (in px) of layer images.
+            image_height: The height (in px) of layer images.
+            use_float: If True then float images are used for layers.
+            tiled: If True then layers use tiled images.
+        """
         self.image_width = image_width
         self.image_height = image_height
         self.use_float = use_float
@@ -297,7 +305,10 @@ class ImageManager(bpy.types.PropertyGroup):
         self.layers_share_images = (prefs.layers_share_images
                                     and not self.uses_tiled_images)
 
-        self["layer_stack_path"] = layer_stack.path_from_id()
+        layer_stack = self.layer_stack
+        if layer_stack is None:
+            raise RuntimeError("ImageManager instance must be a property of a"
+                               " LayerStack")
 
         self["active_layer_id"] = ""
 
@@ -325,6 +336,9 @@ class ImageManager(bpy.types.PropertyGroup):
         self.udim_layout.delete()
 
     def on_load(self) -> None:
+        """Called by the layer stack instance when a blend file is
+        loaded.
+        """
         self.delete_tiled_storage()
 
     def active_image_name(self, layer: MaterialLayer) -> str:
@@ -332,7 +346,7 @@ class ImageManager(bpy.types.PropertyGroup):
         (i.e if the layer uses a shared image) then this function
         returns the name the image should have.
         Returns:
-            A string
+            The name of the active image as a string
         """
         layer_stack_id = self.layer_stack.identifier
         layer_id = layer.identifier
@@ -369,7 +383,10 @@ class ImageManager(bpy.types.PropertyGroup):
                               f"{image.name}, want {self._BLANK_IMAGE_NAME}")
         return image
 
-    def create_identifier(self):
+    def create_identifier(self) -> str:
+        """Creates a unique (in this ImageManager) identifier for a
+        SplitChannelImageProp.
+        """
         # All SplitChannelImageProp used by this ImageManager
         all_split_images = it.chain(self.layer_images, self.bake_images)
 
@@ -472,7 +489,7 @@ class ImageManager(bpy.types.PropertyGroup):
                             channel: Channel,
                             image: SplitChannelImageProp,
                             image_ch: int) -> None:
-
+        """Allocates a channel(s) of a bake image to a material channel."""
         if image.name not in self.bake_images:
             raise RuntimeError("image not found in bake_images collection")
         if channel.is_baked:
@@ -485,6 +502,7 @@ class ImageManager(bpy.types.PropertyGroup):
         channel.set_bake_image(image.image, image_ch)
 
     def deallocate_bake_image(self, channel: Channel) -> None:
+        """Deallocates a material channel's bake image (if any)."""
         image, image_ch = channel.bake_image, channel.bake_image_channel
         if image is None:
             return
@@ -551,6 +569,7 @@ class ImageManager(bpy.types.PropertyGroup):
                                       copy_alpha=True)
 
     def reload_active_layer(self) -> None:
+        """Reloads the active image from the active layer."""
         self._set_active_layer(self.active_layer)
 
     def _create_tmp_active_image(self,
@@ -665,6 +684,8 @@ class ImageManager(bpy.types.PropertyGroup):
         self["active_layer_id"] = layer.identifier
 
     def set_paint_canvas(self, context=None) -> None:
+        """Sets the image paint canvas to this ImageManager's active
+        image."""
         if context is None:
             context = bpy.context
 
@@ -727,6 +748,9 @@ class ImageManager(bpy.types.PropertyGroup):
         self.tiles_data.update_from(modified_images)
 
     def update_udim_images(self) -> None:
+        """Ensures all of this ImageManager's layer images have the
+        same tile layout given by self.udim_layout.
+        """
         for img in self.layer_images_blend:
             self.udim_layout.update_tiles(img)
 
@@ -781,10 +805,16 @@ class ImageManager(bpy.types.PropertyGroup):
 
     @property
     def uses_tiled_images(self) -> bool:
+        """True if layers use tiled images (UDIMs)."""
         return self.get("uses_tiled_images", False)
 
     @property
     def uses_tiled_storage(self) -> bool:
+        """True if this layer stack should use tiled storage i.e. store
+        a copy of each image in a tiled image which is used to bypass
+        the texture unit hardware limit. See tiled_storage.py for
+        details.
+        """
         return (not self.uses_tiled_images
                 and get_addon_preferences().use_tiled_storage)
 

@@ -446,7 +446,8 @@ class PML_UL_load_material_list(UIList):
         return flags, []  # flags, order
 
 
-class ReplaceLayerOpBase:
+class ReplaceLayerMaOpBase:
+    """Base class for ops that replace a layer's material."""
     auto_enable_channels: BoolProperty(
         name="Auto-Enable Layer Stack Channels",
         description="Automatically enable any channels used by the new "
@@ -499,7 +500,7 @@ class ReplaceLayerOpBase:
         layer_stack.node_manager.rebuild_node_tree()
 
 
-class PML_OT_replace_layer_material(ReplaceLayerOpBase, Operator):
+class PML_OT_replace_layer_material(ReplaceLayerMaOpBase, Operator):
     bl_idname = "material.pml_replace_layer_material"
     bl_label = "Replace Layer Material"
     bl_description = ("Replaces the material of a principled material "
@@ -532,9 +533,9 @@ class PML_OT_replace_layer_material(ReplaceLayerOpBase, Operator):
     ma_select_mode: EnumProperty(
         name="Material Selection Mode",
         items=(('LOCAL', "Local", "A material contained or linked by the "
-                                  "current .blend file"),
-               ('ASSET', "Asset (experimental)", "A material from an asset "
-                                                 "library")
+                                  "current .blend file", 'NONE', 0),
+               ('ASSET', "Asset", "A material from an asset library",
+                'EXPERIMENTAL', 1)
                ),
         default='LOCAL'
     )
@@ -717,7 +718,8 @@ class PML_OT_replace_layer_material(ReplaceLayerOpBase, Operator):
         return wm.pml_ma_assets[self.ma_asset_index]
 
 
-class PML_OT_replace_layer_material_ab(ReplaceLayerOpBase, Operator):
+class PML_OT_replace_layer_material_ab(ReplaceLayerMaOpBase, Operator):
+    """Replace Layer Material operator for the Asset Browser."""
     bl_idname = "material.pml_replace_layer_material_ab"
     bl_label = "Replace Layer Material"
     bl_description = ("Replaces the material of the active principled  "

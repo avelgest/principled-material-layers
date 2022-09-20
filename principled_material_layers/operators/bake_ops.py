@@ -435,7 +435,7 @@ class PML_OT_bake_layer_stack(Operator):
     samples: IntProperty(
         name="Samples",
         description="Number of samples to use for baking",
-        default=64,
+        default=16,
         min=1
     )
     size_percent: IntProperty(

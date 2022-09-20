@@ -97,6 +97,7 @@ class MaterialLayerRef(PropertyGroup):
         return self.layer_stack.get_layer_by_id(self.identifier)
 
     def set(self, layer: Optional[MaterialLayer]) -> None:
+        """Sets this ref to refer to layer. layer may be None."""
         if layer is None:
             self.name = ""
             self["_layer_stack_id"] = ""
@@ -129,8 +130,7 @@ class MaterialLayer(PropertyGroup):
     name: StringProperty(
         name="Name",
         default="Layer",
-        # Using set and get prevents CollectionProperty from
-        # accessing by name. So use update instead.
+        # TODO Use set and get with self["name"] instead of update
         update=lambda self, context: self._update_name()
     )
     identifier: StringProperty(

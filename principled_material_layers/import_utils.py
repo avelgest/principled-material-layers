@@ -3,8 +3,12 @@
 import importlib
 import sys
 
+from types import ModuleType
+from typing import Collection, List
 
-def import_all(module_names, package):
+
+def import_all(module_names: Collection[str],
+               package: str) -> List[ModuleType]:
     """Imports (or reimports) all submodules given in module_names
     and returns the result as a list
 
@@ -31,10 +35,9 @@ def import_all(module_names, package):
     return imported
 
 
-def register_all(modules):
-    """
-    Calls module.register() on each module, ignores any without a
-    register function
+def register_all(modules: Collection[ModuleType]) -> None:
+    """Calls each module's register function. Igonres any module
+    without a register function.
     """
 
     for mod in modules:
@@ -42,10 +45,9 @@ def register_all(modules):
             mod.register()
 
 
-def unregister_all(modules):
-    """
-    Calls module.unregister() on each module, ignores any without an
-    unregister function
+def unregister_all(modules: Collection[ModuleType]) -> None:
+    """Calls each module's unregister function. Igonres any module
+    without an unregister function.
     """
 
     for mod in reversed(modules):

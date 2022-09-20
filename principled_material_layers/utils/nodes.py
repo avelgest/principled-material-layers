@@ -42,6 +42,7 @@ _SIMPLE_NODES = {
     "ShaderNodeObjectInfo",
     "ShaderNodeRGB",
     "ShaderNodeRGBToBW",
+    "ShaderNodeSeparateColor",
     "ShaderNodeSeparateHSV",
     "ShaderNodeSeparateRGB",
     "ShaderNodeSeparateXYZ",

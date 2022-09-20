@@ -32,15 +32,14 @@ class NodeManager(bpy.types.PropertyGroup):
 
     node_names = NodeNames()
 
-    def initialize(self, layer_stack) -> None:
+    def initialize(self) -> None:
         """Initializes the layer_stack. Must be called before the
         NodeManager is used.
         """
-        if layer_stack.id_data is not self.id_data:
-            raise ValueError("layer_stack has a different id_data to this "
-                             "node manager")
-
-        self["layer_stack_path"] = layer_stack.path_from_id()
+        layer_stack = self.layer_stack
+        if layer_stack is None:
+            raise RuntimeError("NodeManager instance must be a property of a "
+                               "LayerStack.")
 
         self.initialize_node_tree()
 
@@ -57,7 +56,6 @@ class NodeManager(bpy.types.PropertyGroup):
             self.layer_stack.remove_on_load_callback(on_load_cb)
 
         self._unregister_msgbus()
-        self.pop("layer_stack_path", None)
 
     @pml_trusted_callback
     def _on_load(self) -> None:
@@ -81,8 +79,13 @@ class NodeManager(bpy.types.PropertyGroup):
         return node.inputs[1]
 
     def get_layer_output_socket(self, layer, channel, nodes=None):
-        """Gets the socket of layer that connects to the layer above
-        or the material output.
+        """Returns the socket that gives layer's output for channel,
+        i.e. the blended value for most layers or just the output from
+        the material if layer is the base layer.
+        This is the socket that connects to the layer above (or the
+        group output if layer is the top layer).
+        The node tree's nodes collection can be passed as nodes to
+        avoid refetching it.
         """
         if nodes is None:
             nodes = self.nodes
@@ -95,7 +98,7 @@ class NodeManager(bpy.types.PropertyGroup):
                               "layer node group.")
                 # Value socket which is always 0
                 return self._zero_const_socket
-            return node.outputs[channel.name]
+            return output_socket
 
         node_name = NodeNames.blend_node(layer, channel)
         return self.nodes[node_name].outputs[0]

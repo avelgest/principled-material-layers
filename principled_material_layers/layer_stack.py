@@ -296,7 +296,7 @@ class LayerStack(bpy.types.PropertyGroup):
                 new_ch = self.channels.add()
                 new_ch.init_from_channel(ch)
 
-        self.image_manager.initialize(self, image_width, image_height,
+        self.image_manager.initialize(image_width, image_height,
                                       use_float=use_float, tiled=tiled)
 
         base_layer = self.layers.add()
@@ -309,7 +309,7 @@ class LayerStack(bpy.types.PropertyGroup):
         self.top_level_layers_ref.add().set(base_layer)
         self.active_layer = base_layer
 
-        self.node_manager.initialize(self)
+        self.node_manager.initialize()
 
         self.on_load_manager.initialize()
         self.add_on_load_callback(self._on_load)
