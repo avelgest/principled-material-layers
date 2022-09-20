@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import os
+import re
 import struct
+import warnings
 
 from array import array
+from contextlib import ExitStack
+from random import randint
 from typing import Any, Dict, Optional, Tuple, Union
 
 import bpy
@@ -173,7 +178,7 @@ class SplitChannelImageRGB:
 
 
 def save_image_copy(image: Image, filepath: str,
-                    image_format: str = 'OPEN_EXR',
+                    image_format: str = 'AUTO',
                     float_bit_depth: int = 16,
                     settings: Optional[Dict[str, Any]] = None) -> None:
     """Saves image to disk using the given settings without altering
@@ -181,23 +186,35 @@ def save_image_copy(image: Image, filepath: str,
     Params:
         image: A bpy.types.Image. The image will not be modified.
         filepath: Where to save the file to.
+        image_format: The file format to save as. One of the enum used
+            by Image.file_format. May also be 'AUTO' which uses
+            OPEN_EXR for float images or PNG otherwise.
         float_bit_depth: The bit depth to use for saving float images.
             Should be in {16, 32}
         settings: Dict of names to values that can be set on an
             ImageFormatSettings instance. May be None.
     """
 
+    if image_format == 'AUTO':
+        image_format = 'OPEN_EXR' if image.is_float else 'PNG'
+
     scene = bpy.context.scene
     bit_depth = float_bit_depth if image.is_float else 8
+    color_mode = 'RGBA' if has_alpha(image) else 'RGB'
 
     if "OPEN_EXR" in image_format and bit_depth == 8:
         bit_depth = 16
 
-    with TempChanges(scene.render.image_settings) as image_settings:
+    with ExitStack() as exit_stack:
+
+        # File format settings
+        image_settings = exit_stack.enter_context(
+                            TempChanges(scene.render.image_settings))
+
         image_settings.file_format = image_format
         image_settings.color_depth = str(bit_depth)
         image_settings.color_management = 'OVERRIDE'
-        image_settings.color_mode = 'RGB'
+        image_settings.color_mode = color_mode
         image_settings.compression = 15
         image_settings.use_preview = False
         image_settings.use_zbuffer = False
@@ -206,10 +223,27 @@ def save_image_copy(image: Image, filepath: str,
             for k, v in settings:
                 setattr(image_settings, k, v)
 
-        with TempChanges(image_settings.linear_colorspace_settings) as cs:
-            cs.name = image.colorspace_settings.name
+        display_settings = exit_stack.enter_context(
+                            TempChanges(image_settings.display_settings))
+        display_settings.display_device = 'sRGB'
 
-            image.save_render(filepath)
+        # Colorspace settings (for OPEN_EXR etc)
+        cs_settings = exit_stack.enter_context(
+                        TempChanges(image_settings.linear_colorspace_settings))
+
+        cs_settings.name = image.colorspace_settings.name
+
+        # Color settings (for PNG, TIFF etc)
+        view_settings = exit_stack.enter_context(
+                            TempChanges(scene.view_settings))
+
+        view_settings.exposure = 0.0
+        view_settings.gamma = 1.0
+        view_settings.look = 'None'
+        view_settings.use_curve_mapping = False
+        view_settings.view_transform = 'Raw'
+
+        image.save_render(filepath)
 
 
 def get_image_pixels(image: Image) -> Union[array, "numpy.ndarray"]:
@@ -250,14 +284,17 @@ def has_alpha(image: Image) -> bool:
 def create_image_copy(image: Image) -> Image:
     """Creates a copy of image with a copy of image's pixel data."""
 
-    if image.source not in ('GENERATED', 'FILE'):
-        raise ValueError("Only GENERATED or FILE images are supported.")
+    supported = ('GENERATED', 'FILE', 'TILED')
+
+    if image.source not in supported:
+        raise ValueError(f"image source must be in {set(supported)}.")
 
     img_copy = bpy.data.images.new(f"{image.name}.copy",
                                    image.size[0], image.size[1],
                                    alpha=has_alpha(image),
                                    float_buffer=image.is_float,
-                                   is_data=image.colorspace_settings.is_data)
+                                   is_data=image.colorspace_settings.is_data,
+                                   tiled=image.source == 'TILED')
     try:
         copy_image(image, img_copy)
     except Exception as e:
@@ -266,8 +303,71 @@ def create_image_copy(image: Image) -> Image:
     return img_copy
 
 
+def delete_image_and_files(image: Image, tempdir_only=True) -> None:
+    """Deletes image and the file(s) in it's filepath (for 'FILE' or
+    'TILED' images). If tempdir_only is True then files are only
+    deleted if they are in Blender's temporary folder.
+    """
+    filepath = bpy.path.abspath(image.filepath_raw)
+
+    if filepath and (not tempdir_only
+                     or bpy.path.is_subdir(filepath, bpy.app.tempdir)):
+        if image.source == 'TILED':
+            delete_udim_files(image)
+        elif os.path.exists(image.filepath):
+            try:
+                os.remove(filepath)
+            except IOError as e:
+                warnings.warn(f"Could not delete file {filepath}: {e}")
+    bpy.data.images.remove(image)
+
+
+def delete_udim_files(image: Image) -> None:
+    """Deletes any files used by a tiled image."""
+    if not image.source == 'TILED':
+        raise ValueError("Expected a tiled image.")
+
+    folder, filename = os.path.split(image.filepath_raw)
+    if not folder:
+        folder = "."
+
+    if "<UDIM>" not in filename:
+        return
+
+    dir_files = next(os.walk(folder))[2]
+
+    split_fn = [re.escape(x) for x in filename.split("<UDIM>")]
+    filename_re = fr"{split_fn[0]}\d{{4}}{split_fn[-1]}"
+
+    to_delete = [os.path.join(folder, x) for x in dir_files
+                 if re.search(filename_re, x, flags=re.A | re.I)]
+
+    for filepath in to_delete:
+        try:
+            os.remove(filepath)
+        except OSError as e:
+            warnings.warn(f"Could not delete UDIM file: {e}")
+
+
+def _copy_tiled_image(from_img: Image, to_img: Image) -> None:
+    filename = f"pml_copy_tiled_{randint(0, 2**32):08x}.<UDIM>.exr"
+    filepath = os.path.join(bpy.app.tempdir, filename)
+
+    save_image_copy(from_img, filepath, 'AUTO', float_bit_depth=32)
+
+    to_img.filepath = filepath
+    to_img.colorspace_settings.name = from_img.colorspace_settings.name
+
+
 def copy_image(from_img: Image, to_img: Image) -> None:
-    """Copies an image's pixel data to another image."""
+    """Copies an image's pixel data to another image. For tiled images
+    this creates image files in Blender's temp folder, these can be
+    deleted using the delete_udim_files function.
+    """
+
+    if from_img.source == 'TILED' and to_img.source == 'TILED':
+        _copy_tiled_image(from_img, to_img)
+        return
 
     if (from_img.size[0] != to_img.size[0]
             or from_img.size[1] != to_img.size[0]):

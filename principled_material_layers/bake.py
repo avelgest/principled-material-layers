@@ -19,7 +19,9 @@ from bpy.types import (NodeSocket,
                        ShaderNodeTree)
 
 from .channel import Channel
-from .utils.image import SplitChannelImageRGB, create_image_copy
+from .utils.image import (SplitChannelImageRGB,
+                          create_image_copy,
+                          delete_image_and_files)
 from .utils.nodes import is_socket_simple
 from .utils.ops import filter_stdstream
 from .utils.temp_changes import TempChanges, TempNodes
@@ -304,7 +306,7 @@ class SocketBaker:
                 self._call_bake_op()
             finally:
                 self._existing_img_node.image = None
-                bpy.data.images.remove(img_copy)
+                delete_image_and_files(img_copy)
 
         return baked_sockets
 

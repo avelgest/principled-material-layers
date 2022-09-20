@@ -22,6 +22,7 @@ from . import tiled_storage
 from .utils.image import (clear_channel,
                           copy_image_channel,
                           copy_image_channel_to_rgb,
+                          delete_udim_files,
                           SplitChannelImageRGB)
 from .utils.layer_stack_utils import get_layer_stack_from_prop
 from .utils.naming import unique_name_in
@@ -29,7 +30,7 @@ from .utils.naming import unique_name_in
 from .channel import Channel
 from .material_layer import MaterialLayer
 from .preferences import get_addon_preferences
-from .udim_layout import UDIMLayout, delete_udim_files
+from .udim_layout import UDIMLayout
 
 
 class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):

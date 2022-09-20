@@ -3,8 +3,6 @@
 import itertools as it
 import os
 import random
-import re
-import warnings
 
 from typing import Optional
 
@@ -26,32 +24,6 @@ def save_tiled_image(image: Image) -> None:
     context["edit_image"] = image
 
     bpy.ops.image.save(context)
-
-
-def delete_udim_files(image: Image) -> None:
-    if not image.source == 'TILED':
-        raise ValueError("Expected a tiled image.")
-
-    folder, filename = os.path.split(image.filepath_raw)
-    if not folder:
-        folder = "."
-
-    if "<UDIM>" not in filename:
-        return
-
-    dir_files = next(os.walk(folder))[2]
-
-    split_fn = [re.escape(x) for x in filename.split("<UDIM>")]
-    filename_re = fr"{split_fn[0]}\d{{4}}{split_fn[-1]}"
-
-    to_delete = [os.path.join(folder, x) for x in dir_files
-                 if re.search(filename_re, x, flags=re.A | re.I)]
-
-    for filepath in to_delete:
-        try:
-            os.remove(filepath)
-        except OSError as e:
-            warnings.warn(f"Could not delete UDIM file: {e}")
 
 
 def _pack_image(image: Image) -> None:
