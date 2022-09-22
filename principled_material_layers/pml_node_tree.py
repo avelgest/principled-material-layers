@@ -69,6 +69,13 @@ class NodeNames:
         return f"{layer.identifier}.hardness.{channel.name}"
 
     @staticmethod
+    def hardness_threshold(layer, channel):
+        """Value node that sets the threshold for a hardness function.
+        Only used for hardness functions that support it (e.g. Binary).
+        """
+        return f"{layer.identifier}.hardness.{channel.name}.threshold"
+
+    @staticmethod
     def layer_alpha_x_opacity(layer):
         """Math node. Multiplies a layer's alpha value by its opacity."""
         return f"{layer.identifier}.alpha_x_opacity"
@@ -276,24 +283,36 @@ class NodeTreeBuilder:
             ma_group.hide = True
             ma_group.location = (-800, idx * -100)
 
+    def _add_hardness_threshold_node(self, hardness_node, layer, ch):
+        """If hardness_node has an input socket named 'threshold' then
+        adds a value node driven by the ch 'hardness_threshold' value.
+        Does nothing if there is no 'threshold' socket.
+        """
+        if not ch.hardness_supports_threshold or len(hardness_node.inputs) < 2:
+            return None
+
+        threshold_node = self.nodes.new("ShaderNodeValue")
+        threshold_node.name = NodeNames.hardness_threshold(layer, ch)
+        threshold_node.parent = hardness_node.parent
+        threshold_node.width = 100
+        threshold_node.location = hardness_node.location + Vector((-120, 30))
+
+        self.links.new(hardness_node.inputs[1], threshold_node.outputs[0])
+
+        if ch.hardness == 'DEFAULT' and ch.name in self.layer_stack.channels:
+            self._add_socket_driver(threshold_node.outputs[0],
+                                    self.layer_stack.channels[ch.name],
+                                    "hardness_threshold")
+        else:
+            self._add_socket_driver(threshold_node.outputs[0],
+                                    ch, "hardness_threshold")
+        return threshold_node
+
     def _add_opacity_driver(self, socket, layer):
         """Adds a driver to a float socket so that it is driven by the
         layer's opacity value.
         """
-        f_curve = socket.driver_add("default_value")
-        driver = f_curve.driver
-        driver.type = 'SUM'
-
-        var = driver.variables.new()
-        var.name = "var"
-        var.type = 'SINGLE_PROP'
-
-        var_target = var.targets[0]
-        var_target.id_type = 'MATERIAL'
-        var_target.id = layer.id_data
-        var_target.data_path = layer.path_from_id("opacity")
-
-        return f_curve
+        return self._add_socket_driver(socket, layer, "opacity")
 
     def _add_paint_image_nodes(self):
         """Add nodes for the images that store the layers' alpha values"""
@@ -319,6 +338,26 @@ class NodeTreeBuilder:
             split_rgb_node.location = (idx * 500 + 200, 600)
 
             links.new(split_rgb_node.inputs[0], image_node.outputs[0])
+
+    def _add_socket_driver(self, socket, data, prop_name: str):
+        """Add a driver to the default_value of a socket.
+        data and prop_name work like UILayout.prop i.e. data is a
+        bpy_struct and prop_name is the name of a property of data.
+        """
+        f_curve = socket.driver_add("default_value")
+        driver = f_curve.driver
+        driver.type = 'SUM'
+
+        var = driver.variables.new()
+        var.name = "var"
+        var.type = 'SINGLE_PROP'
+
+        var_target = var.targets[0]
+        var_target.id_type = 'MATERIAL'
+        var_target.id = data.id_data
+        var_target.data_path = data.path_from_id(prop_name)
+
+        return f_curve
 
     def _add_split_rgb_to(self, node) -> bpy.types.ShaderNodeSeparateRGB:
         """Adds a Separate RGB node next to node and connects its
@@ -696,6 +735,9 @@ class NodeTreeBuilder:
         hardness_node.width = 100
         hardness_node.parent = parent
         hardness_node.location = blend_node.location + Vector((-120, 30))
+
+        # Add and link a threshold node if supported
+        self._add_hardness_threshold_node(hardness_node, layer, ch)
 
         # Show only the first input/output
         for x in it.chain(hardness_node.inputs[1:], hardness_node.outputs[1:]):

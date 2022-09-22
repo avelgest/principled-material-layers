@@ -486,10 +486,13 @@ class layer_stack_channels_PT_base:
 
         # Effective value of hardness for layers with 'DEFAULT' hardness
         layout.separator()
-        layout.label(text="Default Hardness")
-        layout.prop(active_channel, "hardness", text="")
+        col = layout.column(align=True)
+        col.label(text="Default Hardness")
+        col.prop(active_channel, "hardness", text="")
+        if active_channel.hardness_supports_threshold:
+            col.prop(active_channel, "hardness_threshold")
         if active_channel.hardness == 'CUSTOM':
-            active_layer_PT_base.draw_custom_hardness_props(layout,
+            active_layer_PT_base.draw_custom_hardness_props(col,
                                                             active_channel)
 
     def draw_channels_list(self, layout, layer_stack):
@@ -578,9 +581,13 @@ class active_layer_PT_base:
                     layout.separator()
 
                 # Hardness
-                layout.prop(active_channel, "hardness")
+                col = layout.column(align=True)
+                col.prop(active_channel, "hardness")
+                if (active_channel.hardness != 'DEFAULT'
+                        and active_channel.hardness_supports_threshold):
+                    col.prop(active_channel, "hardness_threshold")
                 if active_channel.hardness == 'CUSTOM':
-                    self.draw_custom_hardness_props(layout, active_channel)
+                    self.draw_custom_hardness_props(col, active_channel)
 
         node_tree = active_layer.node_tree
         if node_tree is None or active_channel is None:

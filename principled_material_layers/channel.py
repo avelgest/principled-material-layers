@@ -8,6 +8,7 @@ import bpy
 
 from bpy.props import (BoolProperty,
                        EnumProperty,
+                       FloatProperty,
                        IntProperty,
                        PointerProperty,
                        StringProperty)
@@ -163,6 +164,14 @@ class Channel(BasicChannel):
                     "instantly changes between two values",
         default='DEFAULT'
     )
+    hardness_threshold: FloatProperty(
+        name="Hardness Threshold",
+        description="Affects the central value of the hardness transition"
+                    "(depending on hardness funtion used)",
+        subtype='FACTOR',
+        default=0.5, min=0.0, max=1.0
+    )
+
     hardness_custom: PointerProperty(
         type=bpy.types.ShaderNodeTree,
         name="Custom Hardness",
@@ -229,36 +238,51 @@ class Channel(BasicChannel):
         self.bake_image_channel = channel
 
     @property
+    def effective_hardness(self) -> str:
+        """The hardness enum actually used by this channel. The same as
+        self.hardness unless the value is 'DEFAULT' in which case the
+        value on the layer stack's matching channel is returned.
+        """
+        if not self.is_layer_channel:
+            return self.hardness if self.hardness != 'DEFAULT' else 'LINEAR'
+
+        if self.hardness == 'DEFAULT':
+            layer_stack_ch = self.layer_stack.channels.get(self.name)
+            if layer_stack_ch is not None:
+                return layer_stack_ch.effective_hardness
+        return self.hardness
+
+    @property
+    def effective_hardness_custom(self) -> Optional[ShaderNodeTree]:
+        """The value of hardness_custom actually used by this channel.
+        If hardness is 'DEFAULT' this is the hardness_custom property
+        of the matching channel in layer_stack.channels. Returns None
+        if hardness is not 'CUSTOM'.
+        """
+        if self.hardness == 'DEFAULT':
+            layer_stack_ch = self.layer_stack.channels.get(self.name)
+            if layer_stack_ch is not None:
+                return layer_stack_ch.effective_hardness_custom
+        return self.hardness_custom if self.hardness == 'CUSTOM' else None
+
+    @property
     def hardness_node_make_info(self):
         """The NodeMakeInfo needed to create a node for this channel's
         hardness.
         """
-        # If default hardness then use the hardness value of the layer
-        # stack's channel (or LINEAR if this is a layer_stack channel
-        # itself)
-        if self.hardness == 'DEFAULT':
-            if not self.is_layer_channel:
-                return hardness.HARDNESS_NODE_INFO['LINEAR']
-            layer_stack_ch = self.layer_stack.channels.get(self.name)
-
-            return (layer_stack_ch.hardness_node_make_info
-                    if layer_stack_ch is not None
-                    else hardness.HARDNESS_NODE_INFO['LINEAR'])
-        return hardness.HARDNESS_NODE_INFO[self.hardness]
+        return hardness.HARDNESS_NODE_INFO[self.effective_hardness]
 
     @property
-    def default_hardness_custom(self) -> Optional[ShaderNodeTree]:
-        """The default value of hardness_custom for this channel.
-        This is the hardness_custom property of the matching channel
-        in layer_stack.channels.
+    def hardness_supports_threshold(self) -> bool:
+        """Returns True if this channels effective hardness supports
+        using a threshold value.
         """
-        if not self.is_layer_channel:
-            return self.hardness_custom
+        effective_hardness = self.effective_hardness
+        if effective_hardness != 'CUSTOM':
+            return hardness.supports_threshold(effective_hardness, None)
 
-        layer_stack_ch = self.layer_stack_channel
-        if layer_stack_ch is None:
-            return None
-        return layer_stack_ch.hardness_custom
+        return hardness.supports_threshold(effective_hardness,
+                                           self.effective_hardness_custom)
 
     @property
     def blend_node_make_info(self):

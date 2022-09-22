@@ -143,6 +143,12 @@ class NodeManager(bpy.types.PropertyGroup):
         node_name = NodeNames.baked_value(layer, layer_ch)
         return nodes[node_name].outputs[0]
 
+    def has_hardness_threshold(self, layer, channel) -> bool:
+        """Returns true if a hardness threshold node exists for channel
+        of layer.
+        """
+        return NodeNames.hardness_threshold(layer, channel) in self.nodes
+
     def update_blend_node(self, layer, channel) -> Optional[ShaderNode]:
         # Since child nodes are not yet supported ignore any layer that
         # is not top level in the stack (also ignore any unintialized

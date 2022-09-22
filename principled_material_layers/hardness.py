@@ -29,6 +29,8 @@ _HARDNESS_DESCR = {
 
 }
 
+_SUPPORTS_THRESHOLD = {'BINARY'}
+
 # HARDNESS_MODES enum
 # Looks like: (('DEFAULT', "default", ""), None, ('BINARY', "binary", ""), ...)
 # May contain None as a separator
@@ -55,11 +57,25 @@ def hardness_description(hardness: str) -> str:
     return HARDNESS_MODES[idx][2]
 
 
-def _create_node_group(name: str) -> ShaderNodeTree:
+def supports_threshold(hardness: str,
+                       custom: Optional[ShaderNodeTree]) -> bool:
+    """Returns whether this hardness type supports using a threshold.
+    If hardness is 'CUSTOM' the node group used should be passed using
+    the custom parameter.
+    """
+    if hardness == 'CUSTOM' and custom is not None:
+        return len(custom.inputs) > 1
+    return hardness in _SUPPORTS_THRESHOLD
+
+
+def _create_node_group(name: str, threshold=False) -> ShaderNodeTree:
     """Create a new node group for a hardness mode"""
     node_group = bpy.data.node_groups.new(name, "ShaderNodeTree")
     node_group.inputs.new("NodeSocketFloat", "In")
     node_group.outputs.new("NodeSocketFloat", "Out")
+
+    if threshold:
+        node_group.inputs.new("NodeSocketFloat", "Threshold")
 
     node_group.nodes.new("NodeGroupInput")
     node_group.nodes.new("NodeGroupOutput").location.x += 200
@@ -132,8 +148,8 @@ def is_group_hardness_compat(node_group: Optional[bpy.types.NodeTree],
                              strict: bool = False) -> bool:
     """Whether node_group can be used as a custom hardness function
     based on its inputs and outputs.
-    If strict is True then the inputs and outputs must both be a single
-    scalar socket.
+    If strict is True then require <= 2 input sockets and only 1 output
+    socket (all must be scalar sockets).
     """
     if node_group is None:
         return False
@@ -148,8 +164,11 @@ def is_group_hardness_compat(node_group: Optional[bpy.types.NodeTree],
         return True
 
     # Require exact match in strict mode
-    return (len(inputs) == 1 and len(outputs) == 1
-            and inputs[0].type == 'VALUE' and outputs[0].type == 'VALUE')
+    # Support 1 or 2 input sockets (may have 'threshold' socket)
+    return (len(inputs) <= 2 and len(outputs) == 1
+            and inputs[0].type == 'VALUE'
+            and outputs[0].type == 'VALUE'
+            and (len(outputs) == 1 or outputs[1].type == 'VALUE'))
 
 
 def create_custom_hardness_default(name: str) -> ShaderNodeTree:
@@ -158,7 +177,7 @@ def create_custom_hardness_default(name: str) -> ShaderNodeTree:
     to the group input/ouput).
     """
 
-    node_group = _create_node_group(name)
+    node_group = _create_node_group(name, threshold=True)
 
     group_in = get_node_by_type(node_group, "NodeGroupInput")
     group_out = get_node_by_type(node_group, "NodeGroupOutput")
@@ -208,10 +227,7 @@ def _custom_hardness_fnc(node: ShaderNode, channel) -> None:
     hardness_custom property. Uses a fallback group if the property's
     value is incompatible.
     """
-    if channel.hardness == 'DEFAULT':
-        node.node_tree = channel.default_hardness_custom
-    else:
-        node.node_tree = channel.hardness_custom
+    node.node_tree = channel.effective_hardness_custom
 
     if not is_group_hardness_compat(node.node_tree, strict=False):
         node.node_tree = _get_fallback_node_group()
