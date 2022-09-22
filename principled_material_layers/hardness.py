@@ -25,10 +25,21 @@ _HARDNESS_TYPES = (
 )
 
 _HARDNESS_DESCR = {
-    "DEFAULT": "",
-
+    "DEFAULT": "Use the layer stack's default hardness for this channel type",
+    "BINARY": "Channel instantly transitions (at threshold value) between 0%"
+              " and 100%",
+    "SMOOTHSTEP": "Channel transitions using a smoothstep function",
+    "SMOOTHERSTEP": "Channel transitions using a smootherstep function "
+                    "(sharper than Smoothstep)",
+    "SMOOTHERSTEP_X2": "Channel transitions using a chain of two smootherstep"
+                       "functions (sharper than Smootherstep)",
+    "SMOOTHERSTEP_X3": "Channel transitions using a chain of three "
+                       "smootherstep functions (sharper than Smootherstep x3)",
+    "CUSTOM": "Use a custom node group for this channel's hardness"
 }
 
+
+# Set of hardness modes that support a threshold value
 _SUPPORTS_THRESHOLD = {'BINARY'}
 
 # HARDNESS_MODES enum

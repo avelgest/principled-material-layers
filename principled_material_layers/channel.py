@@ -160,8 +160,7 @@ class Channel(BasicChannel):
     hardness: EnumProperty(
         items=hardness.HARDNESS_MODES,
         name="Hardness",
-        description="How smoothly this channel transitions. E.g Binary "
-                    "instantly changes between two values",
+        description="How smoothly this channel transitions between values",
         default='DEFAULT'
     )
     hardness_threshold: FloatProperty(
