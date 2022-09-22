@@ -247,6 +247,15 @@ class ImageManager(bpy.types.PropertyGroup):
         description="Always use 32-bit float images when baking layers",
         default=False
     )
+    bake_srgb_never: BoolProperty(
+        name="Never bake to sRGB",
+        description="Always bake images as non-color data. Reduces the number "
+                    "of shader image units used when using tiled storage",
+        default=False,
+        get=lambda self: (self.uses_tiled_storage
+                          and self.get("bake_srgb_never", False)),
+        set=lambda self, value: self.__setitem__("bake_srgb_never", value)
+    )
     bake_shared: BoolProperty(
         name="Shared Bake Images",
         description="Pack multiple scalar channels into the same image",

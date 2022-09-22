@@ -655,6 +655,8 @@ class LayerStackBaker(SocketBaker):
         """Use SRGB for this socket. Should only be True for color.
         Override of method in SocketBaker.
         """
+        if self.image_manager.bake_srgb_never:
+            return False
         ch_type = self.get_channel(socket).socket_type
         return ch_type == 'COLOR'
 

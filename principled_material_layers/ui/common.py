@@ -689,6 +689,8 @@ class settings_PT_base:
         if isinstance(prefs, bpy.types.AddonPreferences):
             col.separator()
             col.prop(prefs, "use_tiled_storage")
+        if prefs.use_tiled_storage:
+            col.prop(im, "bake_srgb_never")
 
     def _get_mesh(self, context):
         obj = context.active_object
