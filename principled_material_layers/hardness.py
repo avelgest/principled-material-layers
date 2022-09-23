@@ -26,6 +26,7 @@ _HARDNESS_TYPES = (
 
 _HARDNESS_DESCR = {
     "DEFAULT": "Use the layer stack's default hardness for this channel type",
+    "LINEAR": "Channel transitions normally",
     "BINARY": "Channel instantly transitions (at threshold value) between 0%"
               " and 100%",
     "SMOOTHSTEP": "Channel transitions using a smoothstep function",

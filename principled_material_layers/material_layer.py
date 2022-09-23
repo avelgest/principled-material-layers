@@ -711,8 +711,11 @@ class MaterialLayer(PropertyGroup):
     @property
     def active_channel(self) -> Optional[Channel]:
         """The channel that is currently selected in the UI."""
-        if not self.channels:
+        num_channels = len(self.channels)
+        if not num_channels:
             return None
+        if self.active_channel_index > num_channels:
+            self.active_channel_index = num_channels - 1
         return self.channels[self.active_channel_index]
 
     @active_channel.setter

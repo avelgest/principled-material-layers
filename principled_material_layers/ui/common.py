@@ -486,14 +486,7 @@ class layer_stack_channels_PT_base:
 
         # Effective value of hardness for layers with 'DEFAULT' hardness
         layout.separator()
-        col = layout.column(align=True)
-        col.label(text="Default Hardness")
-        col.prop(active_channel, "hardness", text="")
-        if active_channel.hardness_supports_threshold:
-            col.prop(active_channel, "hardness_threshold")
-        if active_channel.hardness == 'CUSTOM':
-            active_layer_PT_base.draw_custom_hardness_props(col,
-                                                            active_channel)
+        self.draw_hardness(layout, active_channel)
 
     def draw_channels_list(self, layout, layer_stack):
         active_channel = layer_stack.active_channel
@@ -511,6 +504,20 @@ class layer_stack_channels_PT_base:
             op_props = col.operator("material.pml_stack_remove_channel",
                                     icon='REMOVE', text="")
             op_props.channel_name = active_channel.name
+
+    def draw_hardness(self, layout, channel) -> None:
+        col = layout.column(align=True)
+        col.label(text="Default Hardness")
+
+        row = col.row(align=True)
+        row.prop(channel, "hardness", text="")
+        row.operator("material.pml_copy_hardness_to_all_ls",
+                     text="", icon='DUPLICATE')
+
+        if channel.hardness_supports_threshold:
+            col.prop(channel, "hardness_threshold")
+        if channel.hardness == 'CUSTOM':
+            active_layer_PT_base.draw_custom_hardness_props(col, channel)
 
 
 class active_layer_PT_base:
@@ -581,13 +588,8 @@ class active_layer_PT_base:
                     layout.separator()
 
                 # Hardness
-                col = layout.column(align=True)
-                col.prop(active_channel, "hardness")
-                if (active_channel.hardness != 'DEFAULT'
-                        and active_channel.hardness_supports_threshold):
-                    col.prop(active_channel, "hardness_threshold")
-                if active_channel.hardness == 'CUSTOM':
-                    self.draw_custom_hardness_props(col, active_channel)
+                self.draw_hardness(layout, active_channel)
+                layout.separator()
 
         node_tree = active_layer.node_tree
         if node_tree is None or active_channel is None:
@@ -599,6 +601,23 @@ class active_layer_PT_base:
 
         if output_node is not None and socket is not None:
             layout.template_node_view(node_tree, output_node, socket)
+
+    @classmethod
+    def draw_hardness(cls, layout, channel) -> None:
+        col = layout.column(align=True)
+        col.label(text="Hardness")
+
+        row = col.row(align=True)
+        row.prop(channel, "hardness", text="")
+        row.operator("material.pml_copy_hardness_to_all",
+                     text="", icon='DUPLICATE')
+
+        if (channel.hardness != 'DEFAULT'
+                and channel.hardness_supports_threshold):
+            col.prop(channel, "hardness_threshold")
+
+        if channel.hardness == 'CUSTOM':
+            cls.draw_custom_hardness_props(col, channel)
 
     @staticmethod
     def draw_custom_ch_node_group(layout, channel, prop, menu, compat):

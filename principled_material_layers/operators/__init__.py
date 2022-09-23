@@ -4,6 +4,7 @@ from ..import_utils import import_all, register_all, unregister_all
 
 
 submodule_names = ("initialize_layer_stack",
+                   "channel_ops",
                    "layer_ops",
                    "node_ops",
                    "material_ops",
