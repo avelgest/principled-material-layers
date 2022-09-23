@@ -7,7 +7,6 @@ from typing import Collection, List, Optional, Union
 import bpy
 
 from bpy.props import CollectionProperty, StringProperty
-from bpy.types import NodeSocket
 
 from .bake import (BakedSocketGen,
                    ChannelSocket,
@@ -287,21 +286,18 @@ class BakeGroupBaker(LayerStackBaker):
 
         return self.bake_sockets([x.socket for x in self.baking_sockets])
 
-    def rename_image(self,
-                     image: SplitChannelImageRGB,
-                     socket: NodeSocket) -> None:
-        """Rename an image newly created by this baker."""
-        ch = next((x.channel for x in self.baking_sockets
-                   if x.socket is socket), None)
-        if ch is None:
-            return
+    def post_bake_rename(self,
+                         image: SplitChannelImageRGB,
+                         channel_socket) -> None:
+        channel = channel_socket.channel
 
-        # TODO rename_image is only called when a new image is created,
-        # should be called after each socket is baked.
-        if image.name.startswith(f".{self.bake_group.name}"):
-            image.name = f"{image.name} {ch.name}"
+        layer_stack = channel.layer_stack
+        ma = layer_stack.material
+
+        if image.name.startswith(f".{ma.name} {self.bake_group.name}"):
+            image.name = f"{image.name} {channel.name}"
         else:
-            image.name = f".{self.bake_group.name} {ch.name}"
+            image.name = f".{ma.name} {self.bake_group.name} {channel.name}"
 
 
 def register():

@@ -558,6 +558,8 @@ class ChannelSocket(NamedTuple):
 class LayerStackBaker(SocketBaker):
     """Subclass of socket baker for baking the channels of a LayerStack"""
 
+    DEFAULT_IMG_NAME = ".pml_bake_image_unnamed"
+
     def __init__(self, layer_stack, settings: PMLBakeSettings):
         self.layer_stack = layer_stack
 
@@ -589,6 +591,11 @@ class LayerStackBaker(SocketBaker):
 
         return self.bake_sockets(sockets, self.image_manager.bake_images)
 
+    def bake_sockets(self, *args, **kwargs) -> BakedSocketGen:
+        for baked_socket in super().bake_sockets(*args, **kwargs):
+            self.post_bake(baked_socket)
+            yield baked_socket
+
     def create_image(self, socket: NodeSocket) -> SplitChannelImageRGB:
         """Creates a new image (via the layer stack's image manager)
         to bake to.
@@ -602,7 +609,7 @@ class LayerStackBaker(SocketBaker):
         image = self.image_manager.create_bake_image(is_data=is_data,
                                                      is_float=is_float,
                                                      size=size)
-        self.rename_image(image, socket)
+        image.name = self.DEFAULT_IMG_NAME
         return image
 
     def get_baking_sockets(self) -> List[ChannelSocket]:
@@ -631,20 +638,28 @@ class LayerStackBaker(SocketBaker):
 
         return baking_sockets
 
-    def rename_image(self,
-                     image: SplitChannelImageRGB,
-                     socket: NodeSocket) -> None:
-        """Rename an image newly created by this baker."""
+    def post_bake(self, baked_socket: BakedSocket):
+        """Method called on BakedSocket instances immediately after
+        they have been returned by bake_sockets.
+        """
+        image = baked_socket.get_image_safe()
         channel_socket = next((x for x in self.baking_sockets
-                               if x.socket is socket), None)
-        if channel_socket is None:
-            return
+                               if x.socket is baked_socket.socket), None)
 
+        if channel_socket is not None:
+            self.post_bake_rename(image, channel_socket)
+
+    def post_bake_rename(self, image, channel_socket):
+        """Renames the image after it has been baked to."""
         channel = channel_socket.channel
-        layer_stack = channel.layer_stack
-        ma = layer_stack.material
+        ma = channel.layer_stack.material
 
-        image.name = f"{ma.name} {channel.name} baked"
+        if image.name.startswith(self.DEFAULT_IMG_NAME):
+            # image has not been renamed since creation
+            image.name = f"{ma.name} Baked {channel.name}"
+        else:
+            # image has been renamed before so append the channel name
+            image.name = f"{image.name} {channel.name}"
 
     def get_channel(self, socket: NodeSocket) -> Channel:
         try:
@@ -704,6 +719,7 @@ class LayerBaker(LayerStackBaker):
     """Subclass of SocketBaker for baking the channels of a MaterialLayer"""
     def __init__(self, layer):
         self._layer = layer
+        self._layer_id = layer.identifier
 
         layer_stack = layer.layer_stack
         im = layer_stack.image_manager
@@ -752,11 +768,17 @@ class LayerBaker(LayerStackBaker):
 
         return self.bake_sockets(sockets, self.image_manager.bake_images)
 
-    def rename_image(self, image, socket) -> None:
-        """Rename an image newly created by this baker.
-        Override of LayerStackBaker method.
-        """
-        # No code. Don't rename and just keep the default name.
+    def post_bake_rename(self, image, channel_socket):
+        channel = channel_socket.channel
+
+        layer_stack = channel.layer_stack
+        layer = layer_stack.get_layer_by_id(self._layer_id)
+        ma = layer_stack.material
+
+        if image.name.startswith(self.DEFAULT_IMG_NAME):
+            image.name = f".{ma.name} Baked {layer.name} {channel.name}"
+        else:
+            image.name = f"{image.name} {channel.name}"
 
 
 def apply_node_mask_bake(layer,

@@ -445,6 +445,13 @@ class PML_OT_bake_layer_stack(Operator):
         description="Size of image to bake to",
         default=100, min=1, soft_max=100
     )
+    share_images: BoolProperty(
+        name="Channels Share Images",
+        description="Allows multiple scalar channels to be packed into the "
+                    "RGB channels of the same image",
+        default=False
+    )
+
     use_float: BoolProperty(
         name="Use Float",
         description="Use 32-bit float images",
@@ -481,6 +488,7 @@ class PML_OT_bake_layer_stack(Operator):
         bake_size = self._get_bake_size(im)
         layout.prop(self, "size_percent",
                     text=f"Bake Size: {bake_size[0]} x {bake_size[1]}")
+        layout.prop(self, "share_images")
 
         layout.separator()
         layout.prop(self, "hide_images")
@@ -509,7 +517,7 @@ class PML_OT_bake_layer_stack(Operator):
                                    image_height=bake_size[1],
                                    uv_map=layer_stack.uv_map_name,
                                    always_use_float=self.use_float,
-                                   share_images=False,
+                                   share_images=self.share_images,
                                    samples=self.samples)
 
         baker = LayerStackBaker(layer_stack, settings)
