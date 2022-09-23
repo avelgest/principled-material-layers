@@ -293,8 +293,10 @@ class NodeTreeBuilder:
 
         threshold_node = self.nodes.new("ShaderNodeValue")
         threshold_node.name = NodeNames.hardness_threshold(layer, ch)
+        threshold_node.label = "Threshold"
         threshold_node.parent = hardness_node.parent
         threshold_node.width = 100
+        threshold_node.hide = True
         threshold_node.location = hardness_node.location + Vector((-120, 30))
 
         self.links.new(hardness_node.inputs[1], threshold_node.outputs[0])
