@@ -597,8 +597,11 @@ class LayerStackBaker(SocketBaker):
         is_data = not self.use_srgb_for(socket)
         is_float = self.use_float_for(socket)
 
+        size = (self.settings.image_width, self.settings.image_height)
+
         image = self.image_manager.create_bake_image(is_data=is_data,
-                                                     is_float=is_float)
+                                                     is_float=is_float,
+                                                     size=size)
         self.rename_image(image, socket)
         return image
 

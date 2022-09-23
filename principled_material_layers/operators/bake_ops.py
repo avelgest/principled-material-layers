@@ -407,6 +407,8 @@ class PML_OT_free_layer_bake(Operator):
 
         layer.free_bake()
 
+        layer_stack.image_manager.update_tiled_storage()
+
         layer_stack.node_manager.rebuild_node_tree()
 
         ensure_global_undo()
@@ -527,6 +529,8 @@ class PML_OT_bake_layer_stack(Operator):
         if layer_stack.image_manager.uses_tiled_images:
             _for_each_bake_image(baked, lambda x: x.save())
 
+        im.update_tiled_storage((x.get_bpy_image_safe() for x in baked))
+
         layer_stack.node_manager.rebuild_node_tree()
 
         ensure_global_undo()
@@ -571,6 +575,7 @@ class PML_OT_free_layer_stack_bake(Operator):
 
         layer_stack = get_layer_stack(context)
         layer_stack.free_bake()
+        layer_stack.image_manager.update_tiled_storage()
         layer_stack.node_manager.rebuild_node_tree()
 
         ensure_global_undo()
@@ -611,11 +616,15 @@ class PML_OT_bake_layers_below(Operator):
         bake_group.init_from_layers(BAKE_LAYERS_BELOW_NAME,
                                     layer_stack.base_layer,
                                     layer_stack.active_layer.get_layer_below())
+        baked: List[BakedSocket] = []
         try:
             with WMProgress(0, len(bake_group.channels)) as progress:
                 for x in bake_group.bake():
+                    baked.append(x)
                     progress.value += 1
         finally:
+            bpy_images = (x.get_bpy_image_safe() for x in baked)
+            layer_stack.image_manager.update_tiled_storage(bpy_images)
             layer_stack.node_manager.rebuild_node_tree()
         return {'FINISHED'}
 
@@ -653,6 +662,7 @@ class PML_OT_free_bake_group(Operator):
         idx = layer_stack.bake_groups.find(bake_group.name)
         layer_stack.bake_groups.remove(idx)
 
+        layer_stack.image_manager.update_tiled_storage()
         layer_stack.node_manager.rebuild_node_tree()
 
         ensure_global_undo()

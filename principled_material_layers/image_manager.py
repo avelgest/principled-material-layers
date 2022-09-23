@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import itertools as it
+import typing
 import warnings
 
-from typing import List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple
 
 import bpy
 
@@ -15,7 +16,7 @@ from bpy.props import (BoolProperty,
                        PointerProperty,
                        StringProperty)
 
-from bpy.types import PropertyGroup
+from bpy.types import Image, PropertyGroup
 
 from . import tiled_storage
 
@@ -74,15 +75,21 @@ class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
         return super().__eq__(other)
 
     def delete(self):
-        if self.image is None:
-            return
-        if self.image.source == 'TILED':
-            im = self.image_manager
-            if im.udim_layout.is_temp_image(self.image):
-                delete_udim_files(self.image)
+        image = self.image
 
-        if self.image.name.startswith("."):
-            bpy.data.images.remove(self.image)
+        if image is None:
+            return
+        if image.source == 'TILED':
+            im = self.image_manager
+            if im.udim_layout.is_temp_image(image):
+                delete_udim_files(image)
+
+        # Remove hidden images or images that are not saved
+        if (image.name.startswith(".")
+                or (not image.filepath_raw and not image.packed_files)):
+            bpy.data.images.remove(image)
+
+        self.image_manager.remove_from_tiled_storage(image)
 
         self.image = None
 
@@ -134,7 +141,8 @@ class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
     def initialize_as_bake_image(self,
                                  image_manager: ImageManager,
                                  is_data: bool,
-                                 is_float: bool) -> None:
+                                 is_float: bool,
+                                 size: Tuple[int, int]) -> None:
         """Initialize the image so that it can be used for baking
         MaterialLayer channels."""
         if self.image is not None:
@@ -143,14 +151,13 @@ class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
         im = image_manager
 
         name = ".pml_bake_image"
-        width, height = im.bake_size
 
         if im.uses_tiled_images:
             self.image = im.udim_layout.create_tiled_image(
                             name, is_data=is_data, is_float=is_float,
                             temp=True)
         else:
-            self.image = bpy.data.images.new(name, width, height,
+            self.image = bpy.data.images.new(name, size[0], size[1],
                                              alpha=False,
                                              is_data=is_data,
                                              float_buffer=is_float)
@@ -485,13 +492,19 @@ class ImageManager(bpy.types.PropertyGroup):
 
     def create_bake_image(self,
                           is_data: bool,
-                          is_float: bool) -> SplitChannelImageProp:
+                          is_float: bool,
+                          size: Optional[Tuple[int, int]] = None
+                          ) -> SplitChannelImageProp:
         """Creates and stores an image used when baking layers."""
+
+        if size is None:
+            size = self.bake_size
 
         bake_image = self.bake_images.add()
         bake_image.initialize_as_bake_image(self,
                                             is_data=is_data,
-                                            is_float=is_float)
+                                            is_float=is_float,
+                                            size=size)
         return bake_image
 
     def allocate_bake_image(self,
@@ -730,6 +743,13 @@ class ImageManager(bpy.types.PropertyGroup):
         self.tiles_srgb.delete()
         self.tiles_data.delete()
 
+    def remove_from_tiled_storage(self, image: Image) -> None:
+        """Remove an image from tiled storage."""
+        if self.tiles_srgb and image in self.tiles_srgb:
+            self.tiles_srgb.remove_image(image)
+        if self.tiles_data and image in self.tiles_data:
+            self.tiles_data.remove_image(image)
+
     def update_tiled_storage_all(self) -> None:
         """Updates the tiled storage with all the layer images and
         bake images of this image manager. Will initialize the
@@ -739,11 +759,12 @@ class ImageManager(bpy.types.PropertyGroup):
         self.update_tiled_storage(images)
 
     def update_tiled_storage(self,
-                             modified_images: List[bpy.types.Image]) -> None:
-        """Updates the tiled storage with modified_images. If this
-        image manager does not use tiled storage then this method
-        does nothing. Will initialize the TiledStorage instances if
-        necessary.
+                             modified_images: Optional[Iterable[Image]] = None
+                             ) -> None:
+        """Updates the tiled storage with modified_images and clears
+        any tiles that are no longer valid. If this image manager does
+        not use tiled storage then this method does nothing. Will
+        initialize the TiledStorage instances if necessary.
         """
         if not self.uses_tiled_storage:
             return
@@ -752,6 +773,11 @@ class ImageManager(bpy.types.PropertyGroup):
             self.tiles_srgb.initialize(is_data=False)
         if not self.tiles_data:
             self.tiles_data.initialize(is_data=True)
+
+        if modified_images is None:
+            modified_images = []
+        elif not isinstance(modified_images, typing.Collection):
+            modified_images = list(modified_images)
 
         self.tiles_srgb.update_from(modified_images)
         self.tiles_data.update_from(modified_images)

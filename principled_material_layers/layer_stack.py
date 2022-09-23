@@ -508,6 +508,7 @@ class LayerStack(bpy.types.PropertyGroup):
             return
 
         im = self.image_manager
+        pre_undo_layer_id = undo_invariant.pre_active_layer_id
 
         if self._is_active_in_image_paint:
             # Set the image paint canvas to the layer stack's active
@@ -519,7 +520,6 @@ class LayerStack(bpy.types.PropertyGroup):
 
                 paint_settings.canvas = im.active_image
 
-            pre_undo_layer_id = undo_invariant.pre_active_layer_id
             active_layer_id = getattr(self.active_layer, "identifier", None)
 
             if get_addon_preferences().use_undo_workaround:
@@ -1040,6 +1040,7 @@ class LayerStack(bpy.types.PropertyGroup):
         for group in self.bake_groups:
             group.free_bake()
         self.bake_groups.clear()
+        self.image_manager.update_tiled_storage()
 
     @property
     def active_layer(self) -> Optional[MaterialLayer]:

@@ -231,11 +231,14 @@ def save_image_copy(image: Image, filepath: str,
         cs_settings = exit_stack.enter_context(
                         TempChanges(image_settings.linear_colorspace_settings))
 
-        cs_settings.name = image.colorspace_settings.name
+        if "OPEN_EXR" in image_format:
+            cs_settings.name = "Linear"
+        else:
+            cs_settings.name = image.colorspace_settings.name
 
         # Color settings (for PNG, TIFF etc)
         view_settings = exit_stack.enter_context(
-                            TempChanges(scene.view_settings))
+                            TempChanges(image_settings.view_settings))
 
         view_settings.exposure = 0.0
         view_settings.gamma = 1.0
