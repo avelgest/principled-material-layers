@@ -275,7 +275,18 @@ class ImageManager(bpy.types.PropertyGroup):
         default=True
     )
 
-    # For when preferences.use_tiled_storage == True
+    # Props for when using tiled storage (copies all images to a UDIM
+    # and uses that in the shader instead of indivdual images)
+    uses_tiled_storage: BoolProperty(
+        name="Use Tiled Storage",
+        description=("Only needed if shader compilation fails due to "
+                     "exceeding the shader image unit limit."
+                     "Copies the images used by the add-on to a tiled image "
+                     "to bypass the image limit. Significantly increases "
+                     "memory usage."),
+        default=False,
+        update=lambda self, _: self._uses_tiled_storage_update()
+    )
     tiles_srgb: PointerProperty(
         type=tiled_storage.TiledStorage,
         name="sRGB Bake Tiles",
@@ -333,6 +344,9 @@ class ImageManager(bpy.types.PropertyGroup):
 
         if layer_stack.active_layer is not None:
             self.set_active_layer(layer_stack.active_layer)
+
+        if prefs.use_tiled_storage_default and not self.uses_tiled_images:
+            self.uses_tiled_storage = True
 
     def delete(self) -> None:
         """Deletes the image manager. This removes all images created
@@ -736,6 +750,17 @@ class ImageManager(bpy.types.PropertyGroup):
         self.image_width = width
         self.image_height = height
 
+    def _uses_tiled_storage_update(self):
+        """Called when the uses_tiled_storage prop changes."""
+        if self.uses_tiled_storage:
+            # Initialize tiled storage using all this image_manager's
+            # images
+            self.update_tiled_storage_all()
+        else:
+            # Clear tiled storage
+            self.delete_tiled_storage()
+        self.layer_stack.node_manager.rebuild_node_tree()
+
     def delete_tiled_storage(self) -> None:
         """Clears all TiledStorage instances used by this image manager.
         Can be called even if the instances are uninitialized.
@@ -842,16 +867,6 @@ class ImageManager(bpy.types.PropertyGroup):
     def uses_tiled_images(self) -> bool:
         """True if layers use tiled images (UDIMs)."""
         return self.get("uses_tiled_images", False)
-
-    @property
-    def uses_tiled_storage(self) -> bool:
-        """True if this layer stack should use tiled storage i.e. store
-        a copy of each image in a tiled image which is used to bypass
-        the texture unit hardware limit. See tiled_storage.py for
-        details.
-        """
-        return (not self.uses_tiled_images
-                and get_addon_preferences().use_tiled_storage)
 
 
 classes = (SplitChannelImageProp, ImageManager)

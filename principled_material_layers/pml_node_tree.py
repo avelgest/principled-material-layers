@@ -7,8 +7,6 @@ import bpy
 from bpy.types import NodeReroute, NodeSocket
 from mathutils import Vector
 
-from .preferences import get_addon_preferences
-
 
 class NodeNames:
     """The methods in this class return the names used for the nodes
@@ -212,7 +210,7 @@ class NodeTreeBuilder:
         self._add_bake_image_nodes()
 
         # Add nodes for TiledStorage instances of the image_manager
-        # (Only when preferences.use_tiled_storage is True)
+        # (Only when image_manager.uses_tiled_storage is True)
         self._add_tiled_storage_nodes()
 
         # Add Group nodes for the node trees of disabled layers
@@ -419,7 +417,7 @@ class NodeTreeBuilder:
         """Adds nodes for when storing copies of images as UDIM tiles.
         See the TiledStorage class for details.
         """
-        if not get_addon_preferences().use_tiled_storage:
+        if not self.layer_stack.image_manager.uses_tiled_storage:
             return
 
         im = self.layer_stack.image_manager

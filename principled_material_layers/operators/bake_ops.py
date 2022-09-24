@@ -364,7 +364,7 @@ class PML_OT_bake_layer(Operator):
         layer.is_baked = True
 
         # If storing baked images as tiles then update the tiles
-        if get_addon_preferences().use_tiled_storage:
+        if im.uses_tiled_storage:
             im.update_tiled_storage(_get_bake_images(baked))
 
         layer_stack.node_manager.rebuild_node_tree()
