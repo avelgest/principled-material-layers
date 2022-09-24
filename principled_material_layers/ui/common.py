@@ -26,7 +26,6 @@ class PML_UL_material_layers_list(UIList):
                   active_property, index=0, flt_flag=0):
 
         layer = item
-        is_base_layer = layer.is_base_layer
 
         prefs = get_addon_preferences()
 
@@ -43,22 +42,41 @@ class PML_UL_material_layers_list(UIList):
 
         row.prop(layer, "name", text="", emboss=False)
 
+        self.draw_layer_buttons(layout, layer)
+
+    def draw_layer_buttons(self, layout, layer):
         col = layout.column(align=True)
+
+        layer_stack = layer.layer_stack
+        is_base_layer = layer.is_base_layer
+
+        # First row
         row = col.row(align=True)
+
+        # View layer nodes
         if layer.node_tree is not None:
             op_props = row.operator("node.pml_view_shader_node_group",
                                     text="", icon='NODETREE', emboss=False)
             op_props.node_group = layer.node_tree.name
             op_props.custom_description = ("Edit this layer's node tree in an "
                                            "open shader editor")
-        if not is_base_layer:
-            row.prop(layer, "enabled", icon_only=True, emboss=False,
-                     icon="HIDE_OFF" if layer.enabled else "HIDE_ON")
-        else:
-            row.label(icon="HIDE_OFF")
+        # Layer enabled
+        row1 = row.row()
+        # N.B. The base layer's enabled prop is ignored
+        row1.enabled = not is_base_layer
+        row1.prop(layer, "enabled", icon_only=True, emboss=False,
+                  icon="HIDE_OFF" if layer.enabled else "HIDE_ON")
 
+        # Second row
         row = col.row(align=True)
         row.alignment = 'RIGHT'
+
+        # Is in bake group indicator
+        if layer_stack.bake_groups and layer in layer_stack.bake_groups[0]:
+            # Currently only support one bake group (which must contain
+            # the base layer)
+            row.label(icon='TRIA_DOWN' if not is_base_layer
+                           else 'TRIA_DOWN_BAR')
 
         # Bake layer material op
         bake_op = ("material.pml_free_layer_bake" if layer.is_baked

@@ -51,6 +51,10 @@ class BakeGroup(bpy.types.PropertyGroup):
         """Initialize a bake group containing all enabled layers
         between from_layer and to_layer (including both end points).
         """
+        if not from_layer.is_base_layer:
+            raise NotImplementedError("Only bake groups starting with the "
+                                      "base layer are currently supported.")
+
         self.initialize(name=name)
 
         layer_refs = self.layer_stack.top_level_layers_ref
@@ -191,6 +195,9 @@ class BakeGroup(bpy.types.PropertyGroup):
         if not isinstance(value, Collection):
             raise TypeError("Expected a collection.")
         self["layers"] = value or None
+
+    # TODO Sort layer_ids by layer stack order the get the top and
+    # bottom layers by indexing
 
     @property
     def top_layer(self):
