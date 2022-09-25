@@ -2,9 +2,11 @@
 
 import itertools as it
 
+from typing import Dict
+
 import bpy
 
-from bpy.types import Operator
+from bpy.types import Operator, ShaderNode
 
 from bpy.props import (BoolProperty,
                        CollectionProperty,
@@ -15,10 +17,11 @@ from bpy.props import (BoolProperty,
 from .material_ops import replace_layer_material
 
 from ..channel import BasicChannel, is_socket_supported
+from ..pml_node import get_pml_nodes_from
 
 from ..utils.image import can_pack_udims
 from ..utils.nodes import reference_inputs
-from ..utils.ops import pml_op_poll, pml_is_supported_editor
+from ..utils.ops import pml_op_poll, pml_is_supported_editor, save_all_modified
 from ..utils.layer_stack_utils import get_layer_stack
 
 
@@ -435,7 +438,135 @@ class PML_OT_delete_layer_stack(Operator):
         return {'FINISHED'}
 
 
+class PML_OT_apply_layer_stack(Operator):
+    bl_idname = "material.pml_apply_layer_stack"
+    bl_label = "Apply Layer Stack"
+    bl_description = ("Deletes the layer stack and replaces it with "
+                      "the current result of 'Bake Layer Stack'")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return pml_op_poll(context) and get_layer_stack(context).is_baked
+
+    def __init__(self):
+        super().__init__()
+        self.layer_stack = None
+
+    def execute(self, context):
+        self.layer_stack = get_layer_stack(context)
+
+        save_all_modified()
+
+        self.process_bake_images()
+        self.replace_pml_nodes()
+
+        self.layer_stack.delete()
+
+        return {'FINISHED'}
+
+    def replace_pml_nodes(self):
+        """Replaces all Layer Stack nodes in the material's node tree
+        with image nodes for each baked layer stack channel.
+        """
+
+        # N.B. Nodes may be located in different node trees
+        pml_nodes = get_pml_nodes_from(self.layer_stack.material.node_tree,
+                                       self.layer_stack, check_groups=True)
+
+        for node in pml_nodes:
+            self._replace_sockets(node)
+
+        for name, node_tree in [(x.name, x.id_data) for x in pml_nodes]:
+            node = node_tree.nodes.get(name)
+            if node is not None:
+                node_tree.nodes.remove(node)
+
+    def _replace_sockets(self, node: ShaderNode) -> None:
+        """Replaces the sockets for node with Image/Split RGB nodes and
+        relink any links to node's sockets to the new nodes.
+        """
+        channels = self.layer_stack.channels
+        nodes = node.id_data.nodes
+        links = node.id_data.links
+
+        count = it.count(0)
+        split_rgb_nodes: Dict[str, ShaderNode] = {}
+
+        for socket in node.outputs:
+            ch = channels.get(socket.name)
+            if ch is None or not ch.enabled or not ch.is_baked:
+                continue
+
+            image_ch = ch.bake_image_channel
+            is_shared_bake = image_ch >= 0
+
+            # If the bake image is shared then check for a existing
+            # node and use that.
+            if is_shared_bake and ch.bake_image.name in split_rgb_nodes:
+                split_rgb = split_rgb_nodes[ch.bake_image.name]
+                split_rgb_out = split_rgb.outputs[image_ch]
+                # Set name of output socket e.g. "R: Subsurface"
+                split_rgb_out.name = f"{'RGB'[image_ch]}: {ch.name}"
+                self._replace_links(socket, split_rgb_out)
+                continue
+
+            idx = next(count)
+
+            img_node = nodes.new('ShaderNodeTexImage')
+            img_node.name = ch.bake_image.name
+            img_node.label = (ch.name if not is_shared_bake
+                              else "Multiple Channels")
+            img_node.image = ch.bake_image
+            img_node.hide = True
+            img_node.width = 160
+            img_node.location = (node.location.x - img_node.width - 40,
+                                 node.location.y - idx * 50)
+
+            # Add a Split RGB node if image is shared between channels
+            if is_shared_bake:
+                split_rgb = nodes.new('ShaderNodeSeparateRGB')
+                split_rgb.name = f"{img_node.name}.rgb"
+                split_rgb.location = img_node.location
+                split_rgb.location.x += img_node.width + 40
+                split_rgb_nodes[ch.bake_image.name] = split_rgb
+
+                links.new(split_rgb.inputs[0], img_node.outputs[0])
+
+                split_rgb_out = split_rgb.outputs[image_ch]
+                split_rgb_out.name = f"{'RGB'[image_ch]}: {ch.name}"
+                self._replace_links(socket, split_rgb_out)
+            else:
+                self._replace_links(socket, img_node.outputs[0])
+
+    def _replace_links(self, old_socket, new_socket) -> None:
+        if not old_socket.is_linked:
+            return
+
+        assert old_socket.is_output and new_socket.is_output
+
+        node_tree = old_socket.id_data
+        link_to = [x.to_socket for x in old_socket.links]
+
+        for to_socket in link_to:
+            node_tree.links.new(to_socket, new_socket)
+
+    def process_bake_images(self):
+        """Ensures that the bake images are not hidden and won't be
+        deleted when the layer stack is deleted.
+        """
+        im = self.layer_stack.image_manager
+
+        images = {ch.bake_image for ch in self.layer_stack.channels
+                  if ch.is_baked}
+        for img in images:
+            if img.name.startswith("."):
+                img.name = img.name.lstrip(".")
+            im.release_image(img)
+
+
 classes = (PML_OT_initialize_layer_stack,
-           PML_OT_delete_layer_stack)
+           PML_OT_delete_layer_stack,
+           PML_OT_apply_layer_stack)
 
 register, unregister = bpy.utils.register_classes_factory(classes)

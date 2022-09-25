@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Optional
+from typing import List, Optional
 from warnings import warn
 
 import bpy
@@ -244,6 +244,31 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
     @property
     def _msgbus_owner(self):
         return self._msgbus_owners_cls[self.identifier]
+
+
+def get_pml_nodes_from(node_tree: ShaderNodeTree,
+                       layer_stack,
+                       check_groups: bool = False) -> List[ShaderNodePMLStack]:
+    """Gets all Layer Stack nodes in node_tree that use layer_stack.
+    If check_groups is True then also check the node trees of any Group
+    Nodes in node_tree."""
+    pml_id_name = ShaderNodePMLStack.bl_idname
+
+    if not layer_stack.is_initialized:
+        return []
+
+    pml_nodes = []
+
+    for node in node_tree.nodes:
+        node_type_str = node.bl_rna.identifier
+
+        if node_type_str == pml_id_name and node.layer_stack == layer_stack:
+            pml_nodes.append(node)
+        elif (node_type_str == "ShaderNodeGroup"
+                and node.node_tree is not None and check_groups):
+            pml_nodes += get_pml_nodes_from(node.node_tree, layer_stack, True)
+
+    return pml_nodes
 
 
 # Reregistering ShaderNodePMLStack can cause crashes if there is a panel

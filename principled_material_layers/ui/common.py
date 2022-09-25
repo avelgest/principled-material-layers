@@ -430,8 +430,9 @@ class layer_stack_PT_base:
         layout.separator()
 
         # Layer stack baking / free bake operator
+        is_baked = layer_stack.is_baked
         col = layout.column(align=True)
-        if not layer_stack.is_baked:
+        if not is_baked:
             col.operator("material.pml_bake_layer_stack")
         else:
             col.operator("material.pml_free_layer_stack_bake")
@@ -443,6 +444,10 @@ class layer_stack_PT_base:
             op_props.group_name = bake_group.BAKE_LAYERS_BELOW_NAME
         else:
             col.operator("material.pml_bake_layers_below")
+
+        if is_baked:
+            layout.separator()
+            layout.operator("material.pml_apply_layer_stack")
 
     def draw_layers_list(self, layout, layer_stack):
         prefs = get_addon_preferences()

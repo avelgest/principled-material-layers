@@ -93,6 +93,18 @@ class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
 
         self.image = None
 
+    def release_image(self) -> Optional[Image]:
+        """Disassociate the underlying bpy.types.Image from this
+        instance, setting self.image to None. Returns the
+        bpy.types.Image or None if this instance has no image.
+        """
+        image = self.image
+        if image is None:
+            return None
+        self.image_manager.remove_from_tiled_storage(image)
+        self.image = None
+        return image
+
     def allocate_all_to_layer(self, layer: MaterialLayer) -> None:
         self.allocate_all_to(layer.identifier)
 
@@ -488,8 +500,7 @@ class ImageManager(bpy.types.PropertyGroup):
 
         layer_image = self.layer_images.get(layer.image.name)
         if layer_image is None:
-            raise RuntimeError(f"Cannot find image {layer.image.name} in "
-                               "layer_images")
+            return
 
         # TODO check that the layer_image is actually allocated to layer
         if not layer.has_shared_image:
@@ -546,9 +557,9 @@ class ImageManager(bpy.types.PropertyGroup):
             # image may have been renamed
             bake_image = next((x for x in self.bake_images
                                if x.image is image), None)
-            bake_image.name = image.name
             if bake_image is None:
-                raise RuntimeError("image not found in bake_images collection")
+                return
+            bake_image.name = image.name
         else:
             bake_image = self.bake_images[image.name]
 
@@ -581,6 +592,20 @@ class ImageManager(bpy.types.PropertyGroup):
         bake images) with the given identifier."""
         return next((x for x in it.chain(self.layer_images, self.bake_images)
                      if x.identifier == identifier), None)
+
+    def release_image(self, image: Image) -> None:
+        """Disassociate image from this image manager. The image will
+        not be deleted when this image manager is deleted.
+        """
+
+        for img_coll in (self.layer_images, self.bake_images):
+            identifiers = [x.identifier for x in img_coll if x.image is image]
+            for identifier in identifiers:
+                split_image = self.get_image_by_id(identifier)
+                split_image.release_image()
+                split_image.delete()
+
+                img_coll.remove(img_coll.find(split_image.name))
 
     def reload_tmp_active_image(self) -> None:
         """If a temporary active image is being used instead of the
