@@ -352,17 +352,30 @@ class PML_OT_link_sockets_by_name(Operator):
     bl_idname = "node.pml_link_sockets_by_name"
     bl_label = "Link Sockets by Name"
     bl_description = ("Link the active node's outputs to the selected node(s) "
-                      "based on their socket names")
+                      "based on their socket names. Prioritizes linking Layer "
+                      "Stack nodes. Does not replace input socket links")
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
-        return (context.space_data.type == 'NODE_EDITOR'
-                and context.active_node is not None
-                and len(context.selected_nodes) >= 2)
+        if context.space_data.type != 'NODE_EDITOR':
+            return False
+        if context.active_node is None or len(context.selected_nodes) < 2:
+            cls.poll_message_set("At least 2 nodes must be selected")
+            return False
+        return True
 
     def execute(self, context):
         active_node = context.active_node
+
+        # Prioritize linking Layer Stacks over other nodes
+        # N.B. Only do for PML nodes without inputs otherwise it would
+        # be impossible to link those inputs with this operator.
+        for node in context.selected_nodes:
+            if (node.bl_rna.identifier == "ShaderNodePMLStack"
+                    and not node.inputs):
+                active_node = node
+                break
 
         node_tree = context.space_data.edit_tree
         if node_tree.nodes.get(active_node.name) != active_node:
@@ -370,12 +383,12 @@ class PML_OT_link_sockets_by_name(Operator):
             return {'CANCELLED'}
 
         input_sockets = it.chain(*[x.inputs for x in context.selected_nodes
-                                   if x != active_node])
+                                   if x is not active_node])
 
         output_names = {x.name for x in active_node.outputs if not x.hide}
 
         for in_socket in input_sockets:
-            if in_socket.name in output_names:
+            if in_socket.name in output_names and not in_socket.is_linked:
                 node_tree.links.new(in_socket,
                                     active_node.outputs[in_socket.name])
 

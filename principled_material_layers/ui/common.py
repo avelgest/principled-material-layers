@@ -545,6 +545,7 @@ class layer_stack_channels_PT_base:
 
 class active_layer_PT_base:
     bl_label = "Active Layer"
+    bl_options = set()
 
     @classmethod
     def poll(cls, context):

@@ -95,7 +95,6 @@ def filter_stdstream(*strings: str, prefix=None,
     """Context manager that filters strings from stdout or stderr
     printing any unfiltered strings when the context manager exits.
     """
-    assert not isinstance(strings, str)
     to_filter = set(strings)
 
     filter_buffers = {"stdout": io.StringIO() if stdout else None,
@@ -115,7 +114,8 @@ def filter_stdstream(*strings: str, prefix=None,
             if not buffer:
                 continue
             lines = buffer.getvalue().split("\n")
-            if lines[-1] == "\n":
+
+            if not lines[-1]:
                 lines.pop()
 
             stream = getattr(sys, st_type)

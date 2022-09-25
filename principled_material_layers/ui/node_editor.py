@@ -15,12 +15,13 @@ from ..preferences import running_as_proper_addon
 from ..utils.layer_stack_utils import get_layer_stack
 
 
-class PML_PT_layer_stack_ne(layer_stack_PT_base, Panel):
-    bl_label = "Material Painting"
+class NodeEdPanel(Panel):
     bl_space_type = 'NODE_EDITOR'
     bl_region_type = 'UI'
     bl_category = "Material Layers"
-    bl_options = set()
+
+
+class PML_PT_layer_stack_ne(layer_stack_PT_base, NodeEdPanel):
 
     _can_init_from = {"ShaderNodeBsdfPrincipled",
                       "ShaderNodeGroup",
@@ -54,51 +55,38 @@ class PML_PT_layer_stack_ne(layer_stack_PT_base, Panel):
                                    text="Initialize")
         op_props.use_active_node = True
 
+    def draw_initialized(self, context):
+        super().draw_initialized(context)
 
-class PML_PT_layer_stack_channels_ne(layer_stack_channels_PT_base, Panel):
-    bl_label = "Layer Stack Channels"
-    bl_space_type = 'NODE_EDITOR'
-    bl_region_type = 'UI'
-    bl_parent_id = "PML_PT_layer_stack_ne"
-    bl_options = {'DEFAULT_CLOSED'}
+        layout = self.layout
 
-
-class PML_PT_active_layer_ne(active_layer_PT_base, Panel):
-    bl_label = "Active Layer"
-    bl_space_type = 'NODE_EDITOR'
-    bl_region_type = 'UI'
-    bl_parent_id = "PML_PT_layer_stack_ne"
+        layout.separator()
+        layout.operator("node.pml_link_sockets_by_name")
 
 
-class PML_PT_udim_layout_ne(UDIM_PT_base, Panel):
-    bl_space_type = 'NODE_EDITOR'
-    bl_region_type = 'UI'
-    bl_parent_id = "PML_PT_layer_stack_ne"
+class PML_PT_layer_stack_channels_ne(layer_stack_channels_PT_base,
+                                     NodeEdPanel):
+    pass
 
 
-class PML_PT_layer_stack_settings_ne(settings_PT_base, Panel):
-    bl_label = "Settings"
-    bl_space_type = 'NODE_EDITOR'
-    bl_region_type = 'UI'
-    bl_parent_id = "PML_PT_layer_stack_ne"
-    bl_options = {'DEFAULT_CLOSED'}
+class PML_PT_active_layer_ne(active_layer_PT_base, NodeEdPanel):
+    pass
 
 
-class PML_PT_debug_ne(debug_PT_base, Panel):
-    bl_label = "Debug"
-    bl_space_type = 'NODE_EDITOR'
-    bl_region_type = 'UI'
-    bl_parent_id = "PML_PT_layer_stack_ne"
-    bl_options = {'DEFAULT_CLOSED'}
+class PML_PT_udim_layout_ne(UDIM_PT_base, NodeEdPanel):
+    pass
+
+
+class PML_PT_layer_stack_settings_ne(settings_PT_base, NodeEdPanel):
+    pass
+
+
+class PML_PT_debug_ne(debug_PT_base, NodeEdPanel):
 
     def draw(self, context):
         layout = self.layout
 
-        # TODO Move to more visible panel?
-        col = layout.column(align=True)
-        col.operator("node.pml_verify_layer_outputs")
-        col.operator("node.pml_link_sockets_by_name")
-
+        layout.operator("node.pml_verify_layer_outputs")
         layout.separator()
 
         super().draw(context)
@@ -119,5 +107,5 @@ def register():
     if not running_as_proper_addon():
         # New sidebar categories may not appear if not running as a
         # proper addon
-        PML_PT_layer_stack_ne.bl_category = "Node"
+        NodeEdPanel.bl_category = "Node"
     _register()
