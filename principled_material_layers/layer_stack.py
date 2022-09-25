@@ -509,6 +509,7 @@ class LayerStack(bpy.types.PropertyGroup):
 
         im = self.image_manager
         pre_undo_layer_id = undo_invariant.pre_active_layer_id
+        active_layer_id = getattr(self.active_layer, "identifier", None)
 
         if self._is_active_in_image_paint:
             # Set the image paint canvas to the layer stack's active
@@ -519,8 +520,6 @@ class LayerStack(bpy.types.PropertyGroup):
                     or paint_settings.canvas.name.startswith(".pml")):
 
                 paint_settings.canvas = im.active_image
-
-            active_layer_id = getattr(self.active_layer, "identifier", None)
 
             if get_addon_preferences().use_undo_workaround:
                 if undo_invariant.pre_pointer != self.as_pointer():
