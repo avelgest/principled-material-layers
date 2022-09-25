@@ -40,6 +40,8 @@ class PMLPreferences(AddonPreferences):
     # Differences in debug mode:
     #   - node_manager always rebuilds immediately rather than using a
     #     timer.
+    # N.B. Disallow enabling Debug in preferences since it doesn't
+    #      do much
     debug: BoolProperty(
         name="Debug Mode",
         description="Enable debug mode",
@@ -168,7 +170,8 @@ class PMLPreferences(AddonPreferences):
 
         layout.separator()
         col = layout.column(align=True)
-        col.prop(self, "debug")
+        if self.debug:  # Only allow disabling debug option
+            col.prop(self, "debug")
         col.prop(self, "use_undo_workaround")
         col.prop(self, "use_op_based_ma_copy")
 
