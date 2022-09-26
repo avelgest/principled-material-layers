@@ -146,9 +146,12 @@ class PML_OT_initialize_layer_stack(Operator):
         if not pml_is_supported_editor(context):
             return False
         obj = context.active_object
-        if obj is None or obj.active_material is None:
+        if obj is None:
+            cls.poll_message_set("No active object")
             return False
-
+        if obj.active_material is None:
+            cls.poll_message_set("Object has no active material")
+            return False
         return True
 
     def __init__(self):
@@ -321,7 +324,11 @@ class PML_OT_initialize_layer_stack(Operator):
 
         ma_output_node = self.get_output_node(context)
         if ma_output_node is None:
-            self.report('WARNING', f"{ma.name} has no active output node")
+            self.report({'WARNING'}, f"{ma.name} has no active output node")
+            return {'CANCELLED'}
+        if not ma_output_node.inputs[0].is_linked:
+            self.report({'WARNING'}, f"{ma.name} has no surface shader for "
+                                     "the active material output.")
             return {'CANCELLED'}
 
         self.populate_channels_list(context)

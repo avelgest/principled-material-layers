@@ -523,23 +523,21 @@ class PML_OT_bake_layer_stack(Operator):
         baker = LayerStackBaker(layer_stack, settings)
         baked: List[BakedSocket] = []
 
-        with WMProgress(0, baker.num_to_bake) as progress:
-            for x in baker.bake():
-                baked.append(x)
-                progress.value += 1
+        if self._is_any_layer_baked(layer_stack):
+            # Ensure we are not using baked images instead of the
+            # materials themselves.
+            layer_stack.node_manager.reconnect_ma_groups(baked=False)
 
-        if self.hide_images:
-            self._ensure_images_hidden(baked)
-        else:
-            self._report_baked_names(baked)
+        try:
+            with WMProgress(0, baker.num_to_bake) as progress:
+                for x in baker.bake():
+                    baked.append(x)
+                    progress.value += 1
 
-        # Tiled images must be saved before being used in Cycles
-        if layer_stack.image_manager.uses_tiled_images:
-            _for_each_bake_image(baked, lambda x: x.save())
+            self._process_images(im, baked)
 
-        im.update_tiled_storage((x.get_bpy_image_safe() for x in baked))
-
-        layer_stack.node_manager.rebuild_node_tree()
+        finally:
+            layer_stack.node_manager.rebuild_node_tree()
 
         ensure_global_undo()
 
@@ -554,6 +552,25 @@ class PML_OT_bake_layer_stack(Operator):
         for img in images:
             if not img.name.startswith("."):
                 img.name = f".{img.name}"
+
+    def _is_any_layer_baked(self, layer_stack) -> bool:
+        return any(x.is_baked for x in layer_stack.layers if x)
+
+    def _process_images(self, image_manager, baked: List[BakedSocket]) -> None:
+        im = image_manager
+
+        if self.hide_images:
+            # Make sure the images start with '.'
+            self._ensure_images_hidden(baked)
+        else:
+            # Output the names of the images in the UI
+            self._report_baked_names(baked)
+
+        # Tiled images must be saved before being used in Cycles
+        if im.uses_tiled_images:
+            _for_each_bake_image(baked, lambda x: x.save())
+
+        im.update_tiled_storage((x.get_bpy_image_safe() for x in baked))
 
     def _report_baked_names(self, baked_sockets: List[BakedSocket]) -> None:
         image_names = [f'"{x.get_image_safe().name}"' for x in baked_sockets]

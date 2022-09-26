@@ -41,7 +41,7 @@ class NodeManager(bpy.types.PropertyGroup):
             raise RuntimeError("NodeManager instance must be a property of a "
                                "LayerStack.")
 
-        self.initialize_node_tree()
+        self._initialize_node_tree()
 
         self._register_msgbus()
 
@@ -283,6 +283,26 @@ class NodeManager(bpy.types.PropertyGroup):
         if layer_stack.is_baked:
             self._connect_output_baked()
 
+    def reconnect_ma_groups(self, baked: bool) -> None:
+        """Reconnect the Group node of each layer's material. If baked
+        is True then existing baked images are connected instead
+        (when present).
+        """
+        layer_stack = self.layer_stack
+        nodes = self.layer_stack.node_tree.nodes
+        links = self.layer_stack.node_tree.links
+
+        for layer in layer_stack.layers:
+            if not layer or not layer.enabled:
+                continue
+            for ch in layer.channels:
+                ma_output = self.get_ma_group_output_socket(layer, ch,
+                                                            use_baked=baked,
+                                                            nodes=nodes)
+                blend_node = nodes.get(NodeNames.blend_node(layer, ch))
+                if blend_node:
+                    links.new(blend_node.inputs[-1], ma_output)
+
     def _on_active_image_change(self):
         layer_stack = self.layer_stack
         im = layer_stack.image_manager
@@ -481,7 +501,7 @@ class NodeManager(bpy.types.PropertyGroup):
         self._unregister_msgbus()
         self._register_msgbus()
 
-    def initialize_node_tree(self) -> None:
+    def _initialize_node_tree(self) -> None:
         node_tree = self.node_tree
 
         if node_tree is None:
