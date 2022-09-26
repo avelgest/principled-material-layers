@@ -445,9 +445,8 @@ class layer_stack_PT_base:
         else:
             col.operator("material.pml_bake_layers_below")
 
-        if is_baked:
-            layout.separator()
-            layout.operator("material.pml_apply_layer_stack")
+        # Apply Layer Stack
+        col.operator("material.pml_apply_layer_stack")
 
     def draw_layers_list(self, layout, layer_stack):
         prefs = get_addon_preferences()

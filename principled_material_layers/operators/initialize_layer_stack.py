@@ -447,7 +447,12 @@ class PML_OT_apply_layer_stack(Operator):
 
     @classmethod
     def poll(cls, context):
-        return pml_op_poll(context) and get_layer_stack(context).is_baked
+        if not pml_op_poll(context):
+            return False
+        if not get_layer_stack(context).is_baked:
+            cls.poll_message_set("The layer stack must be baked first")
+            return False
+        return True
 
     def __init__(self):
         super().__init__()
