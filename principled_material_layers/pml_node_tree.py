@@ -4,7 +4,7 @@ import itertools as it
 import warnings
 
 import bpy
-from bpy.types import NodeReroute, NodeSocket
+from bpy.types import NodeReroute, NodeSocket, ShaderNode
 from mathutils import Vector
 
 
@@ -139,6 +139,13 @@ class NodeNames:
         Each channel may contain a different layer's image data.
         """
         return f"{image.name}.split"
+
+    @staticmethod
+    def renormalize(layer, channel):
+        """Optional Vector Math node that renormalizes vector channels
+        after blending.
+        """
+        return f"{layer.identifier}.renormalize.{channel.name}"
 
     @staticmethod
     def tiled_storage_image(image: bpy.types.Image):
@@ -338,6 +345,23 @@ class NodeTreeBuilder:
             split_rgb_node.location = (idx * 500 + 200, 600)
 
             links.new(split_rgb_node.inputs[0], image_node.outputs[0])
+
+    def _add_renorm_node(self, socket) -> ShaderNode:
+        """Creates and returns a Vector Math node that normalizes
+        socket. Note that this method does not give the new node a name.
+        """
+        socket_node = socket.node
+        renorm = self.nodes.new("ShaderNodeVectorMath")
+        renorm.label = "Renormalize"
+        renorm.operation = 'NORMALIZE'
+        renorm.hide = True
+        renorm.width = 100
+        renorm.parent = socket_node.parent
+        renorm.location = socket_node.location
+        renorm.location.x += socket_node.width + 30
+
+        self.links.new(renorm.inputs[0], socket)
+        return renorm
 
     def _add_socket_driver(self, socket, data, prop_name: str):
         """Add a driver to the default_value of a socket.
@@ -718,6 +742,10 @@ class NodeTreeBuilder:
             links.new(ch_blend.inputs[2], ma_group_output)
 
             self._insert_layer_hardness_nodes(layer, layer_ch, parent)
+
+            if ch.renormalize:
+                renorm = self._add_renorm_node(ch_blend.outputs[0])
+                renorm.name = NodeNames.renormalize(layer, ch)
 
     def _insert_layer_hardness_nodes(self, layer, ch, parent) -> None:
         node_make = ch.hardness_node_make_info

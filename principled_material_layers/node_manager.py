@@ -90,18 +90,32 @@ class NodeManager(bpy.types.PropertyGroup):
         if nodes is None:
             nodes = self.nodes
 
+        if channel.renormalize:
+            node = nodes.get(NodeNames.renormalize(layer, channel))
+            if node:
+                return node.outputs[0]
+
         if layer.is_base_layer:
-            node = self.nodes[NodeNames.layer_material(layer)]
+            # Use channel's baked value if present
+            node = nodes.get(NodeNames.baked_value(layer, channel))
+            if node is not None:
+                return node.outputs[0]
+
+            node = nodes[NodeNames.layer_material(layer)]
             output_socket = node.outputs.get(channel.name)
             if output_socket is None:
                 warnings.warn(f"Socket for {channel.name} not found in base "
                               "layer node group.")
                 # Value socket which is always 0
-                return self._zero_const_socket
+                return self._zero_const_output_socket
             return output_socket
 
-        node_name = NodeNames.blend_node(layer, channel)
-        return self.nodes[node_name].outputs[0]
+        node = nodes.get(NodeNames.blend_node(layer, channel))
+        if node is None:
+            warnings.warn(f"Blend node for {channel.name} not found in layer "
+                          f"{layer.name}")
+            return self._zero_const_output_socket
+        return node.outputs[0]
 
     def get_layer_final_alpha_socket(self, layer, nodes=None):
         """Returns the socket that gives the alpha value of the layer
@@ -255,28 +269,27 @@ class NodeManager(bpy.types.PropertyGroup):
         layer_stack = self.layer_stack
         layer = layer_stack.top_enabled_layer
         nodes = self.nodes
+        links = self.links
 
         output_node = nodes[NodeNames.output()]
 
         if layer is None:
             return
 
+        for ch in layer_stack.channels:
+            if not ch.enabled:
+                continue
+            in_socket = output_node.inputs.get(ch.name)
+            if in_socket is None:
+                warnings.warn(f"No socket found for {ch.name} in PML internal "
+                              "node tree's group output.")
+                continue
+            out_socket = self.get_layer_output_socket(layer, ch, nodes)
+            links.new(in_socket, out_socket)
+
         if layer == layer_stack.base_layer:
-            ma_group = nodes.get(NodeNames.layer_material(layer))
-
-            for socket in output_node.inputs:
-                out_socket = ma_group.outputs.get(socket.name)
-
-                if out_socket is not None:
-                    self.links.new(socket, out_socket)
-
             output_node.location.x = 400
         else:
-            for socket in output_node.inputs:
-                node = nodes.get(NodeNames.blend_node(layer, socket))
-                if node is not None:
-                    self.links.new(socket, node.outputs[0])
-
             layer_frame = nodes[NodeNames.layer_frame(layer)]
             output_node.location.x = layer_frame.location.x + 900
 

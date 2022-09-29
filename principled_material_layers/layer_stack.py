@@ -384,6 +384,11 @@ class LayerStack(bpy.types.PropertyGroup):
                                  args=(self.identifier, ch.name),
                                  notify=_on_channel_enabled,
                                  options={'PERSISTENT'})
+        bpy.msgbus.subscribe_rna(key=ch.path_resolve("renormalize", False),
+                                 owner=owner,
+                                 args=(self.identifier,),
+                                 notify=_rebuild_node_tree,
+                                 options={'PERSISTENT'})
 
     def _register_msgbus(self) -> None:
         msgbus_owner = self._msgbus_owner

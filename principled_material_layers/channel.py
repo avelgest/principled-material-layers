@@ -183,10 +183,19 @@ class Channel(BasicChannel):
         description="The image that this channel is currently baked to"
     )
     bake_image_channel: IntProperty(
-        name="The image channel of 'bake_image' in which this channel "
-             "is baked",
+        name="Bake Image Channel",
+        description="The image channel of 'bake_image' in which this channel "
+                    "is baked",
         min=-1, max=3, default=-1
     )
+    renormalize: BoolProperty(
+        name="Renormalize",
+        description="Should this channel be renormalized after blending",
+        get=lambda self: self._renormalize,
+        set=lambda self, value: setattr(self, "_renormalize", value),
+        default=False
+    )
+
     # The identifier of the layer this channel belongs to. May be "" if
     # this channel instance is in LayerStack.channels rather than on a
     # layer
@@ -350,6 +359,26 @@ class Channel(BasicChannel):
         """
         layer_stack = self.layer_stack
         return layer_stack and layer_stack.channels.get(self.name)
+
+    @property
+    def _renormalize(self) -> bool:
+        """Whether this channel should be renormalized. Always False if
+        this channel is not a vector channel on the layer stack itself.
+        """
+        if self.socket_type != 'VECTOR':
+            return False
+
+        if not self.is_layer_channel:
+            return bool(self.get("renormalize", False))
+        layer_stack_ch = self.layer_stack_channel
+        if layer_stack_ch is None:
+            return False
+        return bool(layer_stack_ch.get("renormalize", False))
+
+    @_renormalize.setter
+    def _renormalize(self, value: bool):
+        if not self.is_layer_channel:
+            self["renormalize"] = bool(value)
 
 
 classes = (Channel, BasicChannel,)

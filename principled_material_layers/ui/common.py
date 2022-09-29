@@ -496,6 +496,9 @@ class layer_stack_channels_PT_base:
         row.enabled = False
         row.prop(active_channel, "socket_type", text="Type")
 
+        if active_channel.socket_type == 'VECTOR':
+            layout.prop(active_channel, "renormalize")
+
         # The blend modes of the layer stack's channels are the defaults
         # for its layers' channels
         layout.separator()
