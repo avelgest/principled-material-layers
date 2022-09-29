@@ -198,6 +198,7 @@ class PML_OT_initialize_layer_stack(Operator):
         col.prop(self, "image_width")
         col.prop(self, "image_height")
         col.prop(self, "keep_size_ratio")
+        col.prop(self, "use_float_images")
 
         layout.prop_search(mesh.uv_layers, "active", mesh, "uv_layers",
                            text="UV Map")
