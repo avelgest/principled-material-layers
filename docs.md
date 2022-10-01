@@ -1,4 +1,8 @@
 # Principled Material Layers
+
+*For the latest documentation see 
+[here](https://github.com/avelgest/principled-material-layers/wiki)*
+
 Principled Material Layers is a system for layering and painting materials that
 use the Principled BSDF shader node. It works by adding a new node (the
 [Material Layers](#material-layers-node) node) to the shader editor that

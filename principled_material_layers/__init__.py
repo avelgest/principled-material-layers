@@ -4,14 +4,13 @@ bl_info = {
     "name": "Principled Material Layers",
     "description": "Addon for painting node-based material layers",
     "author": "Avelgest",
-    "version": (0, 5, 2),
+    "version": (0, 6, 0),
     "blender": (3, 0, 1),
     "category": "Material",
     "location": ("View3D > Texture Paint Sidebar > Material Layers "
                  "or Shader Editor > Sidebar > Material Layers"),
-    "warning": "Early beta version",
-    "doc_url": ("https://github.com/avelgest/"
-                "principled-material-painting/blob/main/docs.md")
+    "warning": "Beta version",
+    "doc_url": "https://github.com/avelgest/principled-material-layers/wiki"
 }
 
 if "import_utils" in locals():

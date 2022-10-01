@@ -10,8 +10,7 @@ materials based on each layer’s painted alpha. Each enabled channel has a
 corresponding output socket on the node, which often matches an input socket on
 a Principled BSDF node, although any channel may be added.
 
-**This add-on is currently in early-beta and has not been thoroughly tested.**
-**Some bugs are to be expected.**
+**This add-on is currently in beta and has not been thoroughly tested.**
 
 ![Suzanne painted with three materials](
 https://user-images.githubusercontent.com/111190478/184520872-12deb2ec-1857-4e57-a20c-892b7e21e050.jpg)
@@ -33,8 +32,8 @@ library (experimental) as layers.
 and allows adding additional channels.
 - Individually set the blend mode of each of a layer’s channels or disable the
 channel entirely.
-- Use a node group as a custom blend mode.
-- Add node-based masks to layers in the layer stack.
+- Use node groups to mask layers or as custom blend modes.
+- Most features support using UDIMs.
 
 ## Usage
 Go into Texture Paint mode and open the “Material Layers” tab in the sidebar.
@@ -66,13 +65,16 @@ A layer’s channels may be added/removed or enabled/disabled in the “Active
 Layer” panel. When a channel is disabled/removed from a layer then that layer
 no longer contributes to the final value of the channel.
 
-For more information see the [documentation](/docs.md).
+For more information see the 
+[documentation](https://github.com/avelgest/principled-material-layers/wiki)
+and the [getting started](https://github.com/avelgest/principled-material-layers/wiki/Getting-Started)
+guide.
 
 ## Limitations
-- UDIMs are not yet supported.
-- Loading materials from an asset library is considered experimental.
-- Early beta version, has not been thoroughly tested (see the issues section of
- the repository for known bugs).
+- Some features are not supported for UDIMs.
+- Loading materials from an asset library outside of the asset browser area is
+ considered experimental.
+- Beta version, has not been thoroughly tested.
  
  https://user-images.githubusercontent.com/111190478/184711235-25bf5c51-ef9a-4372-a519-1eb4960c685a.mp4
 
