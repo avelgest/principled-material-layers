@@ -165,6 +165,7 @@ class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
         name = ".pml_bake_image"
 
         if im.uses_tiled_images:
+            # TODO Use the size argument
             self.image = im.udim_layout.create_tiled_image(
                             name, is_data=is_data, is_float=is_float,
                             temp=True)
@@ -267,7 +268,7 @@ class ImageManager(bpy.types.PropertyGroup):
         default=False
     )
     bake_srgb_never: BoolProperty(
-        name="Never bake to sRGB",
+        name="Never Bake to sRGB",
         description="Always bake images as non-color data. Reduces the number "
                     "of shader image units used when using tiled storage",
         default=False,

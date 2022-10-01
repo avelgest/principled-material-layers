@@ -139,7 +139,8 @@ class PML_OT_copy_hardness_to_all(Operator):
                 and active_layer.active_channel is not None)
 
     def execute(self, context):
-        layer = get_layer_stack(context).active_layer
+        layer_stack = get_layer_stack(context)
+        layer = layer_stack.active_layer
         active_ch = layer.active_channel
 
         # Don't copy group/threshold for DEFAULT hardness
@@ -159,6 +160,8 @@ class PML_OT_copy_hardness_to_all(Operator):
                 ch.hardness_custom = active_ch.hardness_custom
             if supports_threshold:
                 ch.hardness_threshold = active_ch.hardness_threshold
+
+        layer_stack.node_manager.rebuild_node_tree()
         return {'FINISHED'}
 
 
@@ -188,6 +191,8 @@ class PML_OT_copy_hardness_to_all_ls(Operator):
                 ch.hardness_custom = active_ch.hardness_custom
             if supports_threshold:
                 ch.hardness_threshold = active_ch.hardness_threshold
+
+        layer_stack.node_manager.rebuild_node_tree()
         return {'FINISHED'}
 
 

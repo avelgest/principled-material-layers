@@ -714,6 +714,12 @@ class settings_PT_base:
             layout.label(text="Layer Size: {} x {}".format(*im.layer_size))
             layout.operator("material.pml_stack_resize_layers")
 
+            col = layout.column(align=True)
+            col.prop(im, "uses_tiled_storage")
+
+            if im.uses_tiled_storage:
+                col.prop(im, "bake_srgb_never")
+
         layout.separator()
         col = layout.column(align=True)
         col.label(text="Bake Settings")
@@ -729,12 +735,6 @@ class settings_PT_base:
         col.prop(im, "bake_float_always")
         col.prop(im, "bake_shared")
         col.prop(im, "bake_skip_simple")
-
-        col.separator()
-        col.prop(im, "uses_tiled_storage")
-
-        if im.uses_tiled_storage:
-            col.prop(im, "bake_srgb_never")
 
     def _get_mesh(self, context):
         obj = context.active_object
@@ -769,6 +769,14 @@ class UDIM_PT_base:
         col.operator("material.pml_add_udim_layout_tile", text="", icon='ADD')
         col.operator("material.pml_remove_udim_layout_tile", text="",
                      icon='REMOVE')
+
+        tile = udim_layout.active_tile
+        if tile is not None:
+            col = layout.column(align=True)
+            col.alignment = 'RIGHT'
+            col.label(text=f"{tile.number}")
+            col.label(text=f"{tile.width} x {tile.height}, "
+                           f"{'float' if tile.is_float else 'byte'}")
 
 
 class debug_PT_base:

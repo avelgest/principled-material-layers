@@ -531,7 +531,7 @@ class PML_OT_replace_layer_material(ReplaceLayerMaOpBase, Operator):
     )
 
     ma_select_mode: EnumProperty(
-        name="Material Selection Mode",
+        name="Material Selection",
         items=(('LOCAL', "Local", "A material contained or linked by the "
                                   "current .blend file", 'NONE', 0),
                ('ASSET', "Asset", "A material from an asset library",

@@ -72,6 +72,11 @@ class UDIMTileProps(PropertyGroup):
         self.has_alpha = has_alpha
         self.label = label or str(self.number)
 
+    def __setitem__(self, item, value):
+        if item == "name" and not value:
+            value = str(self.number)
+        super().__setitem__(item, value)
+
 
 class UDIMLayout(PropertyGroup):
     """Stores a tiled image layout that can be used to create UDIM
