@@ -432,6 +432,7 @@ class SocketBaker:
             A generator that yields BakedSocket instances.
         """
         scene = bpy.context.scene
+        active_object = bpy.context.active_object
 
         if not isinstance(images, typing.Collection):
             images = list(images)
@@ -442,6 +443,11 @@ class SocketBaker:
 
         with contextlib.ExitStack() as exit_stack:
             exit_stack.callback(self._reset_state)
+
+            # Active object must be selected in order to bake
+            if not active_object.select_get():
+                active_object.select_set(True)
+                exit_stack.callback(lambda: active_object.select_set(False))
 
             self.temp_nodes = TempNodes(self.node_tree)
             exit_stack.enter_context(self.temp_nodes)

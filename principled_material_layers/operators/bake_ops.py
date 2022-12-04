@@ -327,10 +327,6 @@ class PML_OT_bake_layer(Operator):
         layer_stack = get_layer_stack(context)
         im = layer_stack.image_manager
 
-        if not context.selected_objects:
-            self.report({'WARNING'}, "No objects are selected for baking")
-            return {'CANCELLED'}
-
         layer = layer_stack.layers.get(self.layer_name)
         if layer is None:
             self.report({'ERROR'}, "Layer stack has no layer named "
@@ -504,10 +500,6 @@ class PML_OT_bake_layer_stack(Operator):
 
         if layer_stack.is_baked:
             self.report({'WARNING'}, "Layer stack is already baked.")
-            return {'CANCELLED'}
-
-        if not context.selected_objects:
-            self.report({'WARNING'}, "No objects are selected for baking")
             return {'CANCELLED'}
 
         save_all_modified()
