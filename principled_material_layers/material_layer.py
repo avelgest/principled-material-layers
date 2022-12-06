@@ -274,14 +274,23 @@ class MaterialLayer(PropertyGroup):
         outputs = self.node_tree.outputs
 
         output = outputs.get(channel.name)
+
         if output is not None:
             if output.type != channel.socket_type_bl_enum:
                 # Convert the existing output if it has the wrong type
                 output.type = channel.socket_type_bl_enum
         else:
+            # Add a new output
             output = self.node_tree.outputs.new(
                                        name=channel.name,
                                        type=channel.socket_type_bl_idname)
+
+            # Set the new output's default_value
+            default_value = self.layer_stack.get_channel_default_value(channel)
+            if default_value is not None:
+                output.default_value = default_value
+                self._set_output_nodes_value(channel, default_value)
+
             # Sort outputs to match order in layer_stack.channels
             sort_sockets_by(self.node_tree.outputs, self.layer_stack.channels)
             output = self.node_tree.outputs[channel.name]
@@ -291,12 +300,6 @@ class MaterialLayer(PropertyGroup):
         elif channel.socket_type == 'FLOAT_FACTOR':
             output.min_value = 0.0
             output.max_value = 1.0
-
-        # Set the output's default_value
-        default_value = self.layer_stack.get_channel_default_value(channel)
-        if default_value is not None:
-            output.default_value = default_value
-            self._set_output_nodes_value(channel, default_value)
 
         # Links any normal or tangent sockets on the Group Output node
         # so they have the expected value. Does nothing for other sockets.
