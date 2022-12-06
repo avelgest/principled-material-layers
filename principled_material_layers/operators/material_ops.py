@@ -718,14 +718,8 @@ class PML_OT_replace_layer_material(ReplaceLayerMaOpBase, Operator):
         return wm.pml_ma_assets[self.ma_asset_index]
 
 
-class PML_OT_replace_layer_material_ab(ReplaceLayerMaOpBase, Operator):
+class ReplaceLayerMaOpAssetBrowser(ReplaceLayerMaOpBase):
     """Replace Layer Material operator for the Asset Browser."""
-    bl_idname = "material.pml_replace_layer_material_ab"
-    bl_label = "Replace Layer Material"
-    bl_description = ("Replaces the material of the active principled  "
-                      "material layer")
-    bl_options = {'REGISTER', 'UNDO'}
-
     @classmethod
     def poll(cls, context):
         if not SpaceAssetInfo.is_asset_browser(context.space_data):
@@ -806,9 +800,51 @@ class PML_OT_replace_layer_material_ab(ReplaceLayerMaOpBase, Operator):
         return ma
 
 
+class PML_OT_replace_layer_material_ab(ReplaceLayerMaOpAssetBrowser, Operator):
+    bl_idname = "material.pml_replace_layer_material_ab"
+    bl_label = "Replace Layer Material"
+    bl_description = ("Replaces the material of the active principled  "
+                      "material layer")
+    bl_options = {'REGISTER', 'UNDO'}
+
+
+class PML_OT_new_layer_material_ab(ReplaceLayerMaOpAssetBrowser, Operator):
+    """Import a material as a new layer (for the Asset Browser)."""
+    bl_idname = "material.pml_new_layer_material_ab"
+    bl_label = "Import as New Layer"
+    bl_description = "Imports the selected material as a new layer"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        layer_stack = get_layer_stack(context)
+
+        # Adding a new layer seems to cause context.active_file to
+        # become None. So can't add a layer and then call
+        # super().execute to replace the material.
+
+        with ExitStack() as self.exit_stack:
+            material = self._get_material(context)
+            if material is None:
+                return {'CANCELLED'}
+
+            new_layer = layer_stack.insert_layer(material.name or "Layer", -1)
+
+            try:
+                self.replace_layer_material(context, new_layer, material)
+            except Exception as e:
+                layer_stack.remove_layer(new_layer)
+                raise e
+
+            layer_stack.active_layer = new_layer
+
+            return {'FINISHED'}
+
+
 classes = (PML_UL_load_material_list,
+           PML_OT_new_layer_material_ab,
            PML_OT_replace_layer_material,
-           PML_OT_replace_layer_material_ab)
+           PML_OT_replace_layer_material_ab,
+           )
 
 _register, _unregister = bpy.utils.register_classes_factory(classes)
 
