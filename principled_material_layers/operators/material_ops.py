@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 from contextlib import ExitStack
-from typing import Any, Container, Dict, List, NamedTuple, Optional, Union
+from typing import (Any, Container, Dict, List, NamedTuple, Optional, Tuple,
+                    Union)
 
 import bpy
 
@@ -24,6 +25,7 @@ from bpy_extras.asset_utils import SpaceAssetInfo
 from ..preferences import get_addon_preferences
 
 from ..asset_helper import append_material_asset
+from ..channel import BasicChannel
 
 from ..utils.duplicate_node_tree import duplicate_node_tree
 from ..utils.layer_stack_utils import get_layer_stack
@@ -33,8 +35,10 @@ from ..utils.materials import (IsMaterialCompat,
 from ..utils.nodes import (delete_nodes_not_in,
                            get_node_by_type,
                            get_output_node,
+                           nodes_bounding_box,
                            reference_inputs,
-                           sort_sockets_by)
+                           sort_sockets_by,
+                           vector_socket_link_default_generic)
 from ..utils.ops import pml_op_poll
 
 
@@ -52,6 +56,29 @@ CHANNEL_DETECT_MODES = (
      "The layer will have only channels that are affected by the "
      "new material")
     )
+
+
+def _temp_switch_to_node_editor(context, exit_stack, node_tree) -> None:
+    old_area_type = context.area.type
+    exit_stack.callback(lambda: setattr(context.area, "type",
+                                        old_area_type))
+    context.area.type = 'NODE_EDITOR'
+    space = context.space_data
+
+    old_tree_type = space.tree_type
+    exit_stack.callback(lambda: setattr(space, "tree_type",
+                                        old_tree_type))
+    space.tree_type = "ShaderNodeTree"
+
+    old_pin = space.node_tree if space.pin else None
+    if old_pin is not None:
+        exit_stack.callback(lambda: setattr(space, "node_tree",
+                                            old_pin))
+    else:
+        exit_stack.callback(lambda: setattr(space, "pin", False))
+
+    space.pin = True
+    space.node_tree = node_tree
 
 
 def _duplicate_ma_node_tree(context,
@@ -75,28 +102,9 @@ def _duplicate_ma_node_tree(context,
 
         node_tree = material.node_tree
 
-        old_area_type = context.area.type
-        exit_stack.callback(lambda: setattr(context.area, "type",
-                                            old_area_type))
-        context.area.type = 'NODE_EDITOR'
-        space = context.space_data
+        _temp_switch_to_node_editor(context, exit_stack, node_tree)
 
-        old_tree_type = space.tree_type
-        exit_stack.callback(lambda: setattr(space, "tree_type",
-                                            old_tree_type))
-        space.tree_type = "ShaderNodeTree"
-
-        old_pin = space.node_tree if space.pin else None
-        if old_pin is not None:
-            exit_stack.callback(lambda: setattr(space, "node_tree",
-                                                old_pin))
-        else:
-            exit_stack.callback(lambda: setattr(space, "pin", False))
-
-        space.pin = True
-        space.node_tree = node_tree
-
-        nodes = space.node_tree.nodes
+        nodes = node_tree.nodes
 
         for node in nodes:
             node.select = True
@@ -109,6 +117,7 @@ def _duplicate_ma_node_tree(context,
         bpy.ops.node.duplicate()
         bpy.ops.node.group_make()
 
+        space = bpy.context.space_data
         new_node_tree = space.edit_tree
 
         assert space.edit_tree is not node_tree
@@ -321,6 +330,167 @@ class _ReplaceMaterialHelper:
                 layer_ch.enabled = ch.enabled
 
 
+class _CombineMaterialHelper(_ReplaceMaterialHelper):
+
+    # Nodes to use to replace the default_value of unlinked sockets
+    _value_node_types = {'VALUE': "ShaderNodeValue",
+                         'RGBA': "ShaderNodeRGB",
+                         'VECTOR': "ShaderNodeCombineXYZ"}
+
+    @staticmethod
+    def _link_default_node(socket) -> Tuple[ShaderNode, NodeSocket]:
+        node_tree = socket.id_data
+        value_node = None
+
+        if socket.type == 'VECTOR':
+            # For normal or tangent sockets use the appropriate nodes
+            value_node = vector_socket_link_default_generic(socket)
+            if value_node is not None:
+                value_soc = next(x for x in value_node.outputs if x.is_linked)
+                return value_node, value_soc
+
+            # For other sockets use the default_value with a CombineXYZ node
+            value_node = node_tree.nodes.new("ShaderNodeCombineXYZ")
+            for i, component in enumerate(socket.default_value):
+                value_node.inputs[i].default_value = component
+
+        elif socket.type == 'VALUE':
+            value_node = node_tree.nodes.new("ShaderNodeValue")
+            value_node.outputs[0].default_value = socket.default_value
+
+        elif socket.type == 'RGBA':
+            value_node = node_tree.nodes.new("ShaderNodeRGB")
+            value_node.outputs[0].default_value = socket.default_value
+            value_node.hide = True
+        else:
+            return None, None
+
+        value_node.label = socket.name
+        return value_node, value_node.outputs[0]
+
+    def setup_combine_node_tree(self, node_tree: ShaderNodeTree) -> None:
+        """Setup a node tree to be combined with a material's existing
+        node tree.
+        """
+
+        node_tree.outputs.clear()
+
+        # Ensure that there's a group output node
+        group_out = get_node_by_type(node_tree, "NodeGroupOutput")
+        if group_out is None:
+            group_out = node_tree.nodes.new("NodeGroupOutput")
+
+        # The material output node
+        ma_output_node = get_output_node(node_tree)
+        if ma_output_node is not None:
+            # Replace the surface shader with reroute nodes etc.
+            surface_shader = self._get_surface_shader(ma_output_node)
+            if surface_shader is not None:
+                self._replace_surface_shader(surface_shader, group_out)
+
+        # Remove all material output nodes
+        for node in list(node_tree.nodes):
+            if isinstance(node, bpy.types.ShaderNodeOutputMaterial):
+                node_tree.nodes.remove(node)
+
+    def _replace_surface_shader(self,
+                                surface_shader: ShaderNode,
+                                group_out: ShaderNode):
+        """Replace the node surface_shader shader with reroute nodes
+        and value nodes and connect the new nodes to Group Output
+        node group_out.
+        """
+        node_tree = surface_shader.id_data
+
+        # Dict of channel names to reroute nodes that output the
+        # channels' values
+        channel_nodes: Dict[str: ShaderNode] = {}
+
+        y_pos = surface_shader.location.y
+        x_pos = surface_shader.location.y + surface_shader.width
+        for ch in self.layer_stack.channels:
+            if not ch.enabled or ch.name not in surface_shader.inputs:
+                continue
+
+            socket = surface_shader.inputs[ch.name]
+
+            reroute = node_tree.nodes.new("NodeReroute")
+            reroute.label = socket.name
+            reroute.location = (x_pos, y_pos)
+
+            channel_nodes[socket.name] = reroute
+
+            if socket.is_linked:
+                link = socket.links[0]
+                node_tree.links.new(reroute.inputs[0], link.from_socket)
+
+            elif socket.type in ('VALUE', 'RGBA', 'VECTOR'):
+                # Add a value/color node etc and link it to replace
+                # socket's default_value
+                value_node, value_soc = self._link_default_node(socket)
+                if value_node is None:
+                    continue
+
+                value_node.location = (x_pos - 200, y_pos)
+
+                node_tree.links.new(reroute.inputs[0], value_soc)
+                y_pos -= value_node.height
+            y_pos -= 20
+
+            # Add a socket for the channel to the node group output
+            if socket.name not in node_tree.outputs:
+                node_tree.outputs.new(socket.bl_rna.identifier, socket.name)
+
+            # Connect the reroute node to group_out
+            group_out_soc = group_out.inputs[socket.name]
+            node_tree.links.new(group_out_soc, reroute.outputs[0])
+
+        node_tree.nodes.remove(surface_shader)
+
+    def expand_group_node(self, group_node: ShaderNode) -> bpy.types.NodeFrame:
+        """Expands a group node into the node tree. Returns a NodeFrame
+        containing the extracted nodes.
+        """
+        node_tree = group_node.id_data
+
+        for node in node_tree.nodes:
+            node.select = (node == group_node)
+        node_tree.nodes.active = group_node
+
+        # Ungroup (expand) the group into node_tree
+        with ExitStack() as exit_stack:
+            _temp_switch_to_node_editor(bpy.context, exit_stack, node_tree)
+            bpy.ops.node.group_ungroup()
+
+        frame = node_tree.nodes.new("NodeFrame")
+
+        # Parent the new nodes (now selected) to frame
+        for node in node_tree.nodes:
+            if node.select and node.parent is None:
+                node.parent = frame
+        frame.select = True
+
+        return frame
+
+    def position_frame(self, frame) -> None:
+        """Positions the frame containing the new nodes from the combined
+        material.
+        """
+        node_tree = frame.id_data
+
+        nodes_to_check = [x for x in node_tree.nodes if x.parent is None]
+        bb = nodes_bounding_box(nodes_to_check)
+
+        group_out = get_node_by_type(node_tree, "NodeGroupOutput")
+
+        # TODO Improve positioning
+
+        nodes_in_frame = [x for x in node_tree.nodes if x.parent == frame]
+        framebb = nodes_bounding_box(nodes_in_frame)
+        frame.location.y = bb.bottom - framebb.height/2 - 200
+        frame.location.x = group_out.location.x - framebb.width/2 - 200
+
+
 def replace_layer_material(context,
                            layer,
                            material: Material,
@@ -368,6 +538,40 @@ def replace_layer_material(context,
                                             enabled_only=ch_select != 'ALL')
 
     sort_sockets_by(layer.node_tree.outputs, layer.layer_stack.channels)
+
+
+def combine_layer_material(context,
+                           layer,
+                           material: Material,
+                           channel_names: List[str]) -> None:
+    helper = _CombineMaterialHelper(layer, material)
+    layer_nt = layer.node_tree
+
+    # Duplicate the material's node tree as a node group
+    node_tree = _duplicate_ma_node_tree(context, material)
+
+    helper.setup_combine_node_tree(node_tree)
+
+    group_node = layer_nt.nodes.new("ShaderNodeGroup")
+    group_node.node_tree = node_tree
+
+    # Assumes the layer has only one group output node
+    layer_output = get_node_by_type(layer_nt, "NodeGroupOutput")
+
+    if layer_output is not None:
+        # Connect the requested channels from the group node to the
+        # layer output
+        for ch_name in channel_names:
+            group_soc = group_node.outputs.get(ch_name)
+            layer_soc = layer_output.inputs.get(ch_name)
+            if group_soc is not None and layer_soc is not None:
+                layer_nt.links.new(layer_soc, group_soc)
+
+    frame = helper.expand_group_node(group_node)
+    helper.position_frame(frame)
+    frame.label = material.name
+
+    bpy.data.node_groups.remove(node_tree)
 
 
 class PML_UL_load_material_list(UIList):
@@ -840,10 +1044,92 @@ class PML_OT_new_layer_material_ab(ReplaceLayerMaOpAssetBrowser, Operator):
             return {'FINISHED'}
 
 
+class PML_OT_combine_material_ab(ReplaceLayerMaOpAssetBrowser, Operator):
+    bl_idname = "material.pml_combine_material_ab"
+    bl_label = "Combine with Active Layer"
+    bl_description = ("Adds/replaces some of the active layer's channels "
+                      "using channels from the selected material")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    channels: CollectionProperty(
+        name="Channels",
+        type=BasicChannel,
+        description="The channels of the imported material"
+    )
+
+    def _clean_up(self) -> None:
+        if getattr(self, "exit_stack", None) is not None:
+            self.exit_stack.close()
+
+    # def cancel(self, context):
+        # self._clean_up()
+
+    def draw(self, context):
+        layout = self.layout
+        layer_stack = get_layer_stack(context)
+
+        layout.label(text="Channels")
+        flow = layout.grid_flow(columns=2, even_columns=True, align=True)
+
+        # Show a bool prop for each channel in the material that is
+        # also enabled on the layer stack
+        layer_stack_chs = [x for x in layer_stack.channels if x.enabled]
+        for layer_stack_ch in layer_stack_chs:
+            ch = self.channels.get(layer_stack_ch.name)
+            if ch is not None:
+                flow.prop(ch, "enabled", text=ch.name)
+
+    def execute(self, context):
+        layer_stack = get_layer_stack(context)
+
+        channels_to_replace = [ch.name for ch in self.channels if ch.enabled]
+
+        if not channels_to_replace:
+            return {'CANCELLED'}
+
+        with ExitStack() as self.exit_stack:
+            material = self._get_material(context)
+            combine_layer_material(context,
+                                   layer_stack.active_layer,
+                                   material,
+                                   channels_to_replace)
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        layer_stack = get_layer_stack(context)
+
+        with ExitStack() as self.exit_stack:
+            material = self._get_material(context)
+
+            if material is None:
+                return {'CANCELLED'}
+            if material.node_tree is None:
+                self.report({'WARNING'},
+                            f"{material.name} does not use nodes")
+                return {'CANCELLED'}
+
+            self._populate_channels(layer_stack, material)
+
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self)
+
+    def _populate_channels(self, layer_stack, ma: Material) -> None:
+        """Populate this operator's channels property from material ma."""
+        helper = _ReplaceMaterialHelper(layer_stack.active_layer, ma)
+        socket_values = helper.get_channel_socket_values(ma.node_tree)
+
+        for soc_value in socket_values:
+            new_ch = self.channels.add()
+            new_ch.name = soc_value.name  # Only need the socket name
+            new_ch.enabled = False
+
+
 classes = (PML_UL_load_material_list,
            PML_OT_new_layer_material_ab,
            PML_OT_replace_layer_material,
            PML_OT_replace_layer_material_ab,
+           PML_OT_combine_material_ab,
            )
 
 _register, _unregister = bpy.utils.register_classes_factory(classes)

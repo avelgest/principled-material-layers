@@ -55,6 +55,7 @@ class PML_PT_asset_browser_panel(bpy.types.Panel):
         col.enabled = bool(locals().get("is_compat", True))
         col.operator("material.pml_new_layer_material_ab")
         col.operator("material.pml_replace_layer_material_ab")
+        col.operator("material.pml_combine_material_ab")
 
     def check_compat(self, context, layer_stack) -> IsMaterialCompat:
         """Checks the compatibility of the active asset."""

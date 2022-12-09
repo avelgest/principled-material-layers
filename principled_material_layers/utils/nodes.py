@@ -6,7 +6,8 @@ import itertools as it
 import math
 import typing
 
-from collections.abc import Container, Iterator, Sequence
+from collections.abc import Collection, Container, Iterator, Sequence
+from dataclasses import dataclass
 from typing import Any, Callable, List, NamedTuple, Optional, Tuple, Union
 
 import bpy
@@ -172,6 +173,57 @@ def delete_nodes_not_in(nodes: bpy.types.Nodes,
         nodes.remove(node)
 
 
+@dataclass
+class Rect:
+    left: float
+    top: float
+    width: float
+    height: float
+
+    @property
+    def right(self) -> float:
+        return self.left + self.width
+
+    @right.setter
+    def right(self, value) -> None:
+        self.width = value - self.left
+
+    @property
+    def bottom(self) -> float:
+        return self.top - self.height
+
+    @bottom.setter
+    def bottom(self, value) -> None:
+        self.height = self.top - value
+
+
+def nodes_bounding_box(nodes: Collection[Node]) -> Rect:
+    if not nodes:
+        return Rect(0, 0, 0, 0)
+
+    box = None
+
+    for node in nodes:
+        left, top = node.location
+        width, height = node.dimensions
+        right = left + width
+        bottom = top - height
+
+        if box is None:
+            box = Rect(left, top, width, height)
+            continue
+
+        if left < box.left:
+            box.left = left
+        elif right > box.right:
+            box.right = right
+        if top > box.top:
+            box.top = top
+        elif bottom < box.bottom:
+            box.bottom = bottom
+    return box
+
+
 def ensure_outputs_match_channels(outputs: bpy.types.NodeTreeOutputs,
                                   channels: Sequence["BasicChannel"]) -> None:
     """Adds, removes, sets the type of, and reorders the sockets in
@@ -296,6 +348,37 @@ def vector_socket_link_default(socket: NodeSocket) -> None:
         return
 
     node_tree.links.new(socket, default_vec_socket)
+
+
+# TODO rename?
+def vector_socket_link_default_generic(socket) -> ShaderNode:
+    """Links an unconnected normal or tangent input socket to a new
+    node that provides them with a correct default value. Returns the
+    new node or None if no node was necesscary.
+    """
+    node_tree = socket.id_data
+    socket_name_lower = socket.name.lower()
+
+    node = None
+
+    if "normal" in socket_name_lower:
+        node = node_tree.nodes.new("ShaderNodeTexCoord")
+        node.label = "Normal"
+        for x in node.outputs:
+            if "normal" not in x.name.lower():
+                x.hide = True
+            else:
+                node_tree.links.new(socket, x)
+
+    elif "tangent" in socket_name_lower:
+        node = node_tree.nodes.new("ShaderNodeTangent")
+        node.label = "Default Tangent"
+        node_tree.links.new(socket, node.outputs[0])
+    else:
+        return None
+
+    node.hide = True
+    return node
 
 
 def _get_group_output_bottom_left(node_tree: ShaderNodeTree) -> Vector:
