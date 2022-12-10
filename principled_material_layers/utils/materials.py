@@ -276,14 +276,39 @@ def _delayed_check_ma_asset_compat(asset: FileSelectEntry,
 
 
 def remove_appended_material(ma: Material) -> None:
+    """Remove a linked or appended material and any images or
+    node groups imported with it. Note: Despite the name currently
+    only removes local or linked materials.
+    """
+    # Removing appended material assets can cause a crash when
+    # linking to a library in the future.
+    # So only delete local or linked materials
+    if not ma.library and ma.library_weak_reference:
+        return
+
     images = set()
+    node_groups = set()
     if ma.node_tree is not None:
         for node in ma.node_tree.nodes:
             if (isinstance(node, bpy.types.ShaderNodeTexImage)
                     and node.image is not None):
                 images.add(node.image)
+            if (isinstance(node, bpy.types.ShaderNodeGroup)
+                    and node.node_tree is not None):
+                node_groups.add(node.node_tree)
+
+    lib = ma.library  # May be None
+
     bpy.data.materials.remove(ma)
 
+    # Remove all linked images and node groups previously used by ma
+    # that now have 0 users
     for img in images:
-        if not img.users:
+        if img.library and not img.users:
             bpy.data.images.remove(img)
+    for node_group in node_groups:
+        if node_group.library and not node_group.users:
+            bpy.data.node_groups.remove(node_group)
+
+    if lib is not None and not lib.users_id:
+        bpy.data.libraries.remove(lib)
