@@ -136,7 +136,10 @@ class PML_OT_remove_udim_layout_tile(Operator):
 class PML_OT_add_to_tiled_storage(Operator):
     bl_idname = "material.pml_add_to_tiled_storage"
     bl_label = "Add to Tiled Storage"
-    bl_description = ""
+    bl_description = ("Adds the image of selected Image Texture nodes to the "
+                      "layer stack's tiled storage and updates the node to "
+                      "refer to the stored image (helps prevent reaching the "
+                      "hardware limit of the number of images in a shader")
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -172,7 +175,7 @@ class PML_OT_add_to_tiled_storage(Operator):
 class PML_OT_remove_from_tiled_storage(Operator):
     bl_idname = "material.pml_remove_from_tiled_storage"
     bl_label = "Remove from Tiled Storage"
-    bl_description = ""
+    bl_description = "Removes an image from tiled storage"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
