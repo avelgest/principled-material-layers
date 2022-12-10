@@ -31,7 +31,8 @@ from ..utils.duplicate_node_tree import duplicate_node_tree
 from ..utils.layer_stack_utils import get_layer_stack
 from ..utils.materials import (IsMaterialCompat,
                                check_material_compat,
-                               check_material_asset_compat)
+                               check_material_asset_compat,
+                               remove_appended_material)
 from ..utils.nodes import (delete_nodes_not_in,
                            get_node_by_type,
                            get_output_node,
@@ -832,7 +833,7 @@ class PML_OT_replace_layer_material(ReplaceLayerMaOpBase, Operator):
             return None
 
         if self.exit_stack is not None:
-            self.exit_stack.callback(lambda: bpy.data.materials.remove(ma))
+            self.exit_stack.callback(lambda: remove_appended_material(ma))
 
         return ma
 
@@ -999,7 +1000,7 @@ class ReplaceLayerMaOpAssetBrowser(ReplaceLayerMaOpBase):
                                    "asset is not supported for this version.")
             return None
 
-        self.exit_stack.callback(lambda: bpy.data.materials.remove(ma))
+        self.exit_stack.callback(lambda: remove_appended_material(ma))
 
         return ma
 
@@ -1056,13 +1057,6 @@ class PML_OT_combine_material_ab(ReplaceLayerMaOpAssetBrowser, Operator):
         type=BasicChannel,
         description="The channels of the imported material"
     )
-
-    def _clean_up(self) -> None:
-        if getattr(self, "exit_stack", None) is not None:
-            self.exit_stack.close()
-
-    # def cancel(self, context):
-        # self._clean_up()
 
     def draw(self, context):
         layout = self.layout

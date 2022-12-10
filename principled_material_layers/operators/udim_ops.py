@@ -7,6 +7,8 @@ from bpy.types import Operator
 
 from bpy_extras.io_utils import ImportHelper
 
+from .. import tiled_storage
+
 from ..utils.layer_stack_utils import get_layer_stack
 from ..utils.ops import ensure_global_undo, pml_op_poll, save_all_modified
 
@@ -131,9 +133,79 @@ class PML_OT_remove_udim_layout_tile(Operator):
         return {'FINISHED'}
 
 
+class PML_OT_add_to_tiled_storage(Operator):
+    bl_idname = "material.pml_add_to_tiled_storage"
+    bl_label = "Add to Tiled Storage"
+    bl_description = ""
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        active_node = getattr(context, "active_node", None)
+        return (pml_op_poll(context)
+                and active_node is not None
+                and isinstance(active_node, bpy.types.ShaderNodeTexImage)
+                and get_layer_stack(context).image_manager.uses_tiled_storage)
+
+    def execute(self, context):
+        layer_stack = get_layer_stack(context)
+
+        nodes = set(context.selected_nodes)
+        nodes.add(context.active_node)
+
+        # Filter invalid nodes
+        nodes = [x for x in nodes
+                 if isinstance(x, bpy.types.ShaderNodeTexImage)
+                 and x.image is not None
+                 and x.image.source == 'FILE'
+                 and not tiled_storage.is_tiled_storage_node(x)]
+
+        if not nodes:
+            self.report({'WARNING'}, "No valid nodes selected")
+            return {'CANCELLED'}
+
+        tiled_storage.replace_nodes_with_tiled_storage(layer_stack, *nodes)
+
+        return {'FINISHED'}
+
+
+class PML_OT_remove_from_tiled_storage(Operator):
+    bl_idname = "material.pml_remove_from_tiled_storage"
+    bl_label = "Remove from Tiled Storage"
+    bl_description = ""
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        active_node = getattr(context, "active_node", None)
+        return (pml_op_poll(context)
+                and active_node is not None
+                and tiled_storage.is_tiled_storage_node(active_node))
+
+    def execute(self, context):
+        layer_stack = get_layer_stack(context)
+
+        nodes = set(context.selected_nodes)
+        nodes.add(context.active_node)
+
+        nodes = {x for x in nodes
+                 if isinstance(x, bpy.types.ShaderNodeTexImage)
+                 and tiled_storage.is_tiled_storage_node(x)}
+
+        if not nodes:
+            self.report({'WARNING'}, "No valid nodes selected")
+            return {'CANCELLED'}
+
+        tiled_storage.remove_from_tiled_storage(layer_stack, *nodes)
+
+        return {'FINISHED'}
+
+
 classes = (PML_OT_select_udim_dir,
            PML_OT_add_udim_layout_tile,
-           PML_OT_remove_udim_layout_tile
+           PML_OT_remove_udim_layout_tile,
+           PML_OT_add_to_tiled_storage,
+           PML_OT_remove_from_tiled_storage
            )
 
 register, unregister = bpy.utils.register_classes_factory(classes)

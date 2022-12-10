@@ -475,6 +475,7 @@ class NodeTreeBuilder:
                 img_node_rgb.hide = True
 
                 # Node to translate UV coords onto the correct UDIM tile
+                # TODO Possibly use tiled_storage.add_tiled_helper_nodes
                 uv_shift = nodes.new("ShaderNodeVectorMath")
                 uv_shift.label = f"UDIM Tile {num} UVs"
                 uv_shift.operation = 'ADD'

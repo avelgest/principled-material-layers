@@ -63,7 +63,7 @@ class PML_PT_asset_browser_panel(bpy.types.Panel):
 
         if asset_file is None:
             return IsMaterialCompat("No active asset")
-
+        
         return check_material_asset_compat(asset_file,
                                            context.asset_library_ref,
                                            layer_stack,

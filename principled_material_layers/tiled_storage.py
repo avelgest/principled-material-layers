@@ -31,6 +31,8 @@ class TiledStorage(bpy.types.PropertyGroup):
         return self.is_initialized
 
     def __contains__(self, image: Image):
+        if not self.is_initialized:
+            return False
         return next((True for x in self.tiles.values() if x is image), False)
 
     def initialize(self, is_data) -> None:
@@ -159,6 +161,23 @@ class TiledStorage(bpy.types.PropertyGroup):
         if images:
             self.reload()
 
+    def on_load(self) -> None:
+        """Called after a .blend file is loaded. Does nothing if the
+        TiledStorage has not been initialized.
+        """
+        if not self.is_initialized:
+            return
+
+        # Set the filepath of the UDIM to be in the new tempdir
+        filename = os.path.basename(self.udim_image.filepath_raw)
+        self.udim_image.filepath_raw = os.path.join(bpy.app.tempdir, filename)
+
+        self._clear_invalid_tiles()
+
+        # Rewrite all images to disk
+        for img in self.tiles.values():
+            self.rewrite_image(img)
+
     def reload(self) -> None:
         """Reloads all tiles from disk."""
         self.udim_image.reload()
@@ -267,6 +286,108 @@ class TiledStorage(bpy.types.PropertyGroup):
         except KeyError:
             self["tiles"] = {}
             return self["tiles"]
+
+
+def add_tiled_helper_nodes(img_node: bpy.types.ShaderNodeTexImage,
+                           tile_num: int,
+                           uv_map_name: str) -> None:
+    """Adds nodes to map input of img_node to UDIM tile index
+    tile_num.
+    """
+    node_tree = img_node.id_data
+
+    # Node to translate UV coords onto the correct UDIM tile
+    uv_shift = node_tree.nodes.new("ShaderNodeVectorMath")
+    uv_shift.name = f".pml_tiled_storage.{uv_shift.name}"
+    uv_shift.label = f"{img_node.label} Map UVs"
+    uv_shift.operation = 'ADD'
+    uv_shift.location = (img_node.location.x - 200, img_node.location.y)
+    uv_shift.width = 120
+    uv_shift.hide = True
+
+    # Set the value of the second input of the Vector Math node
+    shift_vec = uv_shift.inputs[1].default_value
+    shift_vec[0] = (tile_num - 1) % 10      # x coord of the UDIM tile
+    shift_vec[1] = (tile_num - 1001) // 10  # y coord of the UDIM tile
+
+    uv_map = node_tree.nodes.new("ShaderNodeUVMap")
+    uv_map.name = f".pml_tiled_storage.{uv_map.name}"
+    uv_map.location = (uv_shift.location.x - 200, uv_shift.location.y)
+    uv_map.uv_map = uv_map_name
+    uv_map.hide = True
+
+    uv_shift.parent = uv_map.parent = img_node.parent
+
+    node_tree.links.new(img_node.inputs[0], uv_shift.outputs[0])
+    node_tree.links.new(uv_shift.inputs[0], uv_map.outputs[0])
+
+
+def remove_tiled_helper_nodes(img_node: bpy.types.ShaderNodeTexImage) -> None:
+    nodes = img_node.id_data.nodes
+
+    if not img_node.inputs[0].is_linked:
+        return
+
+    shift_node = img_node.inputs[0].links[0].from_node
+    if not shift_node.name.startswith(".pml_tiled_storage"):
+        return
+
+    if shift_node.inputs[0].is_linked:
+        uv_map = shift_node.inputs[0].links[0].from_node
+        if uv_map.name.startswith(".pml_tiled_storage"):
+            nodes.remove(uv_map)
+    nodes.remove(shift_node)
+
+
+def replace_nodes_with_tiled_storage(layer_stack,
+                                     *nodes: bpy.types.ShaderNodeTexImage
+                                     ) -> None:
+    nodes = [x for x in nodes
+             if isinstance(x, bpy.types.ShaderNodeTexImage)
+             and x.image is not None
+             and x.image.source == 'FILE']
+
+    im = layer_stack.image_manager
+
+    images = set(x.image for x in nodes)
+    im.update_tiled_storage(images)
+
+    for node in nodes:
+        tiled_storage, tile_num = im.find_in_tiled_storage(node.image)
+        if tiled_storage is None:
+            continue
+
+        node.label = node.image.name
+        node["pml_tiled_storage_old_image"] = node.image
+
+        node.image = tiled_storage.udim_image
+        node.hide = True
+
+        add_tiled_helper_nodes(node, tile_num, layer_stack.uv_map_name)
+
+
+def remove_from_tiled_storage(layer_stack,
+                              *nodes: bpy.types.ShaderNodeTexImage) -> None:
+    im = layer_stack.image_manager
+
+    nodes = {x for x in nodes
+             if is_tiled_storage_node(x)}
+
+    for node in nodes:
+        old_img = node["pml_tiled_storage_old_image"]
+        im.remove_from_tiled_storage(old_img)
+
+        node.image = old_img
+        del node["pml_tiled_storage_old_image"]
+
+        remove_tiled_helper_nodes(node)
+
+
+def is_tiled_storage_node(node: bpy.types.ShaderNodeTexImage) -> bool:
+    """Returns True if an Image Texture is set-up to refer to a tile
+    of a TiledStorage instance.
+    """
+    return "pml_tiled_storage_old_image" in node
 
 
 def register():

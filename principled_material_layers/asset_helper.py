@@ -98,6 +98,19 @@ def import_material_asset(asset: Union[AssetHandle, FileSelectEntry],
 def _import_material_asset_path(name: str,
                                 library_path: str,
                                 link: bool) -> Material:
+
+    if not hasattr(bpy.data.libraries, "load"):
+        return _import_material_asset_path2(name, library_path, link)
+
+    with bpy.data.libraries.load(library_path, link=link, assets_only=True)\
+            as (_data_from, data_to):
+        data_to.materials = [name]
+    return data_to.materials[0]
+
+
+def _import_material_asset_path2(name: str,
+                                 library_path: str,
+                                 link: bool) -> Material:
     import_op = bpy.ops.wm.link if link else bpy.ops.wm.append
 
     if link:
@@ -109,10 +122,15 @@ def _import_material_asset_path(name: str,
         # newly appended material later)
         existing = _local_material_names()
 
+    kwargs = {}
+    if not link:
+        kwargs["do_reuse_local_id"] = True
+
     # Link or append the material into the current blend file
     result = import_op(filepath=library_path,
                        directory=os.path.join(library_path, "Material"),
-                       filename=name)
+                       filename=name,
+                       link=link, **kwargs)
 
     if 'FINISHED' not in result:
         raise RuntimeError(f"Could not link asset '{name}' from "
@@ -157,12 +175,17 @@ def _get_linked_material(name: str, library_path: str) -> Optional[Material]:
     material = bpy.data.materials.get(name)
     if material is None:
         return None
+
+    # Check both absolute and relative paths
+    lib_paths = (bpy.path.relpath(library_path),
+                 bpy.path.abspath(library_path))
+
     # Check that the material is linked from the given library path
-    if material.library is None or material.library.filepath != library_path:
+    if material.library is None or material.library.filepath not in lib_paths:
         # Search through all materials in the blend file
         for ma in bpy.data.materials:
-            if (ma.name == name and material.library is not None
-                    and material.library.filepath == library_path):
+            if (ma.name == name and ma.library is not None
+                    and ma.library.filepath in lib_paths):
                 return ma
         return None
 

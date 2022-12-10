@@ -382,7 +382,8 @@ class ImageManager(bpy.types.PropertyGroup):
         """Called by the layer stack instance when a blend file is
         loaded.
         """
-        self.delete_tiled_storage()
+        self.tiles_srgb.on_load()
+        self.tiles_data.on_load()
 
     def active_image_name(self, layer: MaterialLayer) -> str:
         """If a temporary active image is needed to paint on layer
@@ -725,6 +726,8 @@ class ImageManager(bpy.types.PropertyGroup):
                                0,
                                old_layer.image,
                                old_layer.image_channel)
+
+        if self.uses_tiled_storage and old_layer.image is not None:
             self.update_tiled_storage((old_layer.image,))
 
         self._replace_active_image(new_layer, old_layer)
@@ -793,6 +796,23 @@ class ImageManager(bpy.types.PropertyGroup):
         """
         self.tiles_srgb.delete()
         self.tiles_data.delete()
+
+    def find_in_tiled_storage(self,
+                              image: Image
+                              ) -> Tuple[tiled_storage.TiledStorage, int]:
+        """Searches for image in this ImageManager's TiledStorage
+        instances returning the instance and the tile number of image.
+        Params:
+            image: a bpy.types.Image
+        Returns:
+            A tuple, (TiledStorage instance, tile_number) or (None, -1)
+                if the image was not found.
+        """
+        if image in self.tiles_srgb:
+            return self.tiles_srgb, self.tiles_srgb.get_image_tile_num(image)
+        if image in self.tiles_data:
+            return self.tiles_data, self.tiles_data.get_image_tile_num(image)
+        return None, -1
 
     def remove_from_tiled_storage(self, image: Image) -> None:
         """Remove an image from tiled storage."""
@@ -891,7 +911,9 @@ class ImageManager(bpy.types.PropertyGroup):
 
     @property
     def uses_tiled_images(self) -> bool:
-        """True if layers use tiled images (UDIMs)."""
+        """True if layers use tiled images (UDIMs).
+        Not to be confused with uses_tiled_storage.
+        """
         return self.get("uses_tiled_images", False)
 
 

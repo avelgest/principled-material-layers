@@ -16,10 +16,10 @@ from bpy.types import (AssetHandle,
                        FileSelectEntry,
                        Material)
 
+from .. import asset_helper
+
 from .layer_stack_utils import get_layer_stack_by_id
-from ..asset_helper import (append_material_asset,
-                            delayed_append_material_asset,
-                            file_entry_from_handle)
+from ..asset_helper import file_entry_from_handle
 from ..utils.nodes import get_output_node
 
 _LayerStackID = str
@@ -222,14 +222,14 @@ def check_material_asset_compat(asset: Union[AssetHandle, FileSelectEntry],
                 if not isinstance(ma, Material):
                     raise RuntimeError("ma_appender did not return a Material")
             else:
-                ma = append_material_asset(asset, library)
+                ma = asset_helper.link_material_asset(asset, library)
 
         except Exception as e:
             is_compat = IsMaterialCompat(f"Error: {e}")
             _set_cached_asset_compat(asset, layer_stack, is_compat)
             raise e
 
-        exit_stack.callback(lambda: bpy.data.materials.remove(ma))
+        exit_stack.callback(lambda: remove_appended_material(ma))
 
         is_compat = check_material_compat(ma, layer_stack)
         _set_cached_asset_compat(asset, layer_stack, is_compat)
@@ -261,7 +261,7 @@ def _delayed_check_ma_asset_compat(asset: FileSelectEntry,
         return cached
 
     # Use only pure Python classes to prevent crashes
-    ma_appender = delayed_append_material_asset(asset, library)
+    ma_appender = asset_helper.delayed_link_material_asset(asset, library)
     fake_asset = _FakeAsset(asset)
     layer_stack_id = layer_stack.identifier
 
@@ -273,3 +273,17 @@ def _delayed_check_ma_asset_compat(asset: FileSelectEntry,
     is_compat = IsMaterialCompat.make_in_progress()
     _set_cached_asset_compat(asset, layer_stack, is_compat)
     return is_compat
+
+
+def remove_appended_material(ma: Material) -> None:
+    images = set()
+    if ma.node_tree is not None:
+        for node in ma.node_tree.nodes:
+            if (isinstance(node, bpy.types.ShaderNodeTexImage)
+                    and node.image is not None):
+                images.add(node.image)
+    bpy.data.materials.remove(ma)
+
+    for img in images:
+        if not img.users:
+            bpy.data.images.remove(img)
