@@ -339,9 +339,9 @@ def remove_tiled_helper_nodes(img_node: bpy.types.ShaderNodeTexImage) -> None:
     nodes.remove(shift_node)
 
 
-def replace_nodes_with_tiled_storage(layer_stack,
-                                     *nodes: bpy.types.ShaderNodeTexImage
-                                     ) -> None:
+def add_nodes_to_tiled_storage(layer_stack,
+                               *nodes: bpy.types.ShaderNodeTexImage
+                               ) -> None:
     nodes = [x for x in nodes
              if isinstance(x, bpy.types.ShaderNodeTexImage)
              and x.image is not None

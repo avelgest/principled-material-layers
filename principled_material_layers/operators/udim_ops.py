@@ -164,7 +164,7 @@ class PML_OT_add_to_tiled_storage(Operator):
             self.report({'WARNING'}, "No valid nodes selected")
             return {'CANCELLED'}
 
-        tiled_storage.replace_nodes_with_tiled_storage(layer_stack, *nodes)
+        tiled_storage.add_nodes_to_tiled_storage(layer_stack, *nodes)
 
         return {'FINISHED'}
 

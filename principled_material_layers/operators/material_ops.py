@@ -22,6 +22,8 @@ from bpy.types import (Material,
 
 from bpy_extras.asset_utils import SpaceAssetInfo
 
+from .. import tiled_storage
+
 from ..preferences import get_addon_preferences
 
 from ..asset_helper import append_material_asset
@@ -666,6 +668,13 @@ class ReplaceLayerMaOpBase:
         default='MODIFIED_OR_ENABLED'
     )
 
+    tiled_storage_add: BoolProperty(
+        name="Add Images to Tiled Storage",
+        description="Add any images in the material to the layer stack's "
+                    "tiled storage",
+        default=False
+    )
+
     def __init__(self):
         # Used during execute for deleting temporarily appended materials
         self.exit_stack: Optional[ExitStack] = None
@@ -701,6 +710,11 @@ class ReplaceLayerMaOpBase:
             # Ensure all channels in layer are enabled on the layer
             # and the layer stack
             self.enable_stack_channels(layer_stack, layer)
+
+        if (self.tiled_storage_add
+                and layer_stack.image_manager.uses_tiled_storage):
+            tiled_storage.add_nodes_to_tiled_storage(layer_stack,
+                                                     *layer.node_tree.nodes)
 
         layer_stack.node_manager.rebuild_node_tree()
 
@@ -766,6 +780,8 @@ class PML_OT_replace_layer_material(ReplaceLayerMaOpBase, Operator):
             col.prop(self, "auto_enable_channels")
         else:
             layout.separator(factor=2.0)
+        if layer_stack.image_manager.uses_tiled_storage:
+            col.prop(self, "tiled_storage_add")
 
         layout.prop(self, "ma_select_mode", expand=True)
 
@@ -941,11 +957,14 @@ class ReplaceLayerMaOpAssetBrowser(ReplaceLayerMaOpBase):
 
     def draw(self, context):
         layout = self.layout
+        layer_stack = get_layer_stack(context)
 
         col = layout.column(align=True)
         col.prop(self, "ch_detect_mode")
         if self.ch_detect_mode in ('MODIFIED_ONLY', 'MODIFIED_OR_ENABLED'):
             col.prop(self, "auto_enable_channels")
+        if layer_stack.image_manager.uses_tiled_storage:
+            col.prop(self, "tiled_storage_add")
 
         asset = context.active_file
 

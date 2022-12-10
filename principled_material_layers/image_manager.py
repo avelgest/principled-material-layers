@@ -727,7 +727,9 @@ class ImageManager(bpy.types.PropertyGroup):
                                old_layer.image,
                                old_layer.image_channel)
 
-        if self.uses_tiled_storage and old_layer.image is not None:
+        if (self.uses_tiled_storage
+                and old_layer is not None
+                and old_layer.has_image):
             self.update_tiled_storage((old_layer.image,))
 
         self._replace_active_image(new_layer, old_layer)
