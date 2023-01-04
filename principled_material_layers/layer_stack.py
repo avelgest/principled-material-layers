@@ -176,6 +176,13 @@ class LayerStack(bpy.types.PropertyGroup):
         name="Bake Groups"
     )
 
+    is_baked: BoolProperty(
+        name="Is Baked",
+        description="Are any of this layer stack's cannels currently baked"
+                    "to an image",
+        get=lambda self: any(ch.is_baked for ch in self.channels)
+    )
+
     channels: CollectionProperty(
         type=Channel,
         name="Channels"
@@ -1134,10 +1141,6 @@ class LayerStack(bpy.types.PropertyGroup):
         if obj is not None and obj.active_material is self.material:
             return True
         return False
-
-    @property
-    def is_baked(self) -> bool:
-        return any(ch.is_baked for ch in self.channels)
 
     @property
     def is_initialized(self) -> bool:
