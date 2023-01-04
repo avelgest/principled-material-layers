@@ -10,7 +10,7 @@ from bpy.props import (BoolProperty,
                        IntVectorProperty,
                        StringProperty)
 
-from ..bake import apply_node_mask_bake
+from ..bake import apply_node_mask_bake, bake_node_mask_to_image
 from ..channel import SOCKET_TYPES
 from ..material_layer import LAYER_TYPES
 
@@ -213,7 +213,7 @@ class PML_OT_apply_node_mask(Operator):
             cls.poll_message_set("Cannot apply node mask to a disabled layer")
             return False
         if layer_stack.image_manager.uses_tiled_images:
-            cls.poll_message_set("Apply node mask not yet supported for UDIMs")
+            cls.poll_message_set("Not yet supported for UDIMs")
             return False
         return (active_layer.node_mask is not None
                 and active_layer.image is not None)
@@ -260,6 +260,51 @@ class PML_OT_apply_node_mask(Operator):
     def invoke(self, context, event):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
+
+
+class PML_OT_node_mask_to_stencil(Operator):
+    bl_idname = "material.pml_node_mask_to_stencil"
+    bl_label = "Set as Stencil Mask"
+    bl_description = ("Converts the node mask to an image and sets it as "
+                      "the current Stencil Mask")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    MASK_IMAGE_NAME = "Node Mask Image (PML)"
+
+    @classmethod
+    def poll(cls, context):
+        if not pml_op_poll(context):
+            return False
+        layer_stack = get_layer_stack(context)
+        active_layer = layer_stack.active_layer
+
+        if layer_stack.image_manager.uses_tiled_images:
+            cls.poll_message_set("Not yet supported for UDIMs")
+            return False
+
+        return (active_layer is not None
+                and active_layer.node_mask is not None)
+
+    def execute(self, context):
+        layer_stack = get_layer_stack(context)
+        active_layer = layer_stack.active_layer
+
+        baked_image = bake_node_mask_to_image(active_layer)
+
+        existing = bpy.data.images.get(self.MASK_IMAGE_NAME)
+        if existing is not None:
+            bpy.data.images.remove(existing)
+
+        baked_image.name = self.MASK_IMAGE_NAME
+
+        self.set_as_stencil_mask(baked_image, context)
+
+        return {'FINISHED'}
+
+    def set_as_stencil_mask(self, image, context) -> None:
+        paint_settings = context.tool_settings.image_paint
+        paint_settings.use_stencil_layer = True
+        paint_settings.stencil_image = image
 
 
 class PML_OT_convert_layer(Operator):
@@ -624,6 +669,7 @@ classes = (PML_OT_set_active_layer_index,
            PML_OT_move_layer_down,
            PML_OT_new_node_mask,
            PML_OT_apply_node_mask,
+           PML_OT_node_mask_to_stencil,
            PML_OT_convert_layer,
            PML_OT_layer_add_channel,
            PML_OT_layer_remove_channel,

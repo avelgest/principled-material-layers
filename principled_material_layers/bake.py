@@ -829,3 +829,36 @@ def apply_node_mask_bake(layer,
     image = baked.b_image
     image.name = f"{layer.name} Node Mask"
     return image
+
+
+def bake_node_mask_to_image(layer, samples: int = 0) -> bpy.types.Image:
+    """Bakes a node mask to an image. If samples is 0 the value of
+    bake_samples in the layer stack's image manager will be used.
+    """
+    layer_stack = layer.layer_stack
+    im = layer_stack.image_manager
+    nm = layer_stack.node_manager
+
+    if layer.node_mask is None:
+        raise ValueError("layer has no node mask.")
+    if samples == 0:
+        samples = im.bake_samples
+
+    mask_node_name = nm.node_names.layer_node_mask(layer)
+    mask_node = layer_stack.node_tree.nodes[mask_node_name]
+
+    settings = PMLBakeSettings(image_width=im.image_width,
+                               image_height=im.image_height,
+                               uv_map=layer_stack.uv_map_name,
+                               always_use_float=True,
+                               share_images=False,
+                               samples=samples,
+                               bake_target_tree=layer_stack.material.node_tree)
+
+    baker = SocketBaker(layer_stack.node_tree, settings)
+    baked = next(baker.bake_sockets((mask_node.outputs[0],)))
+
+    image = baked.b_image
+    image.name = f"{layer.name} Node Mask"
+
+    return image

@@ -585,7 +585,9 @@ class active_layer_PT_base:
         op_props.node_group = getattr(active_layer.node_mask, "name", "")
 
         if active_layer.node_mask is not None:
-            layout.operator("material.pml_apply_node_mask")
+            col = layout.column(align=True)
+            col.operator("material.pml_apply_node_mask")
+            ool.operator("material.pml_node_mask_to_stencil")
 
         # Channels
         layout.label(text="Channels")
