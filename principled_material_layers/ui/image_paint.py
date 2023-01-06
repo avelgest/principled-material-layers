@@ -11,7 +11,9 @@ from .common import (layer_stack_PT_base,
                      debug_PT_base
                      )
 
-from ..preferences import running_as_proper_addon
+from ..preferences import get_addon_preferences, running_as_proper_addon
+
+from ..utils.layer_stack_utils import get_layer_stack
 
 
 class ImgPaintPanel(Panel):
@@ -46,12 +48,37 @@ class PML_PT_debug_ip(debug_PT_base, ImgPaintPanel):
     pass
 
 
+class PML_PT_layer_stack_popover_ip(layer_stack_PT_base, ImgPaintPanel):
+    bl_context = ".imagepaint"
+    bl_category = "Tool"
+    bl_options = {'DEFAULT_CLOSED', 'HIDE_HEADER'}
+
+    @classmethod
+    def poll(cls, context):
+        if (not super().poll(context)
+                or not get_addon_preferences().show_popover_panel):
+            return False
+        # Only show when there is an initailized layer_stack
+        return bool(get_layer_stack(context))
+
+    def draw(self, context):
+        if not self.is_popover:
+            return
+        super().draw(context)
+
+    def draw_initialized(self, context):
+        layer_stack = get_layer_stack(context)
+
+        self.draw_layers_list(self.layout, layer_stack, rows=4)
+
+
 classes = (PML_PT_layer_stack_ip,
            PML_PT_active_layer_ip,
            PML_PT_layer_stack_channels_ip,
            PML_PT_udim_layout_ip,
            PML_PT_layer_stack_settings_ip,
-           PML_PT_debug_ip
+           PML_PT_debug_ip,
+           PML_PT_layer_stack_popover_ip
            )
 
 _register, unregister = bpy.utils.register_classes_factory(classes)

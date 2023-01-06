@@ -28,6 +28,7 @@ class PMLPreferences(AddonPreferences):
                       "use_numpy": False,
                       "check_assets_compat": True,
                       "show_misc_ops": False,
+                      "show_popover_panel": True,
                       "show_previews": True,
                       "layer_ui_scale": 2.0,
                       "layers_share_images": True,
@@ -83,6 +84,13 @@ class PMLPreferences(AddonPreferences):
         description="Enables the 'Bake Node Outputs' and 'Bake Node Inputs' "
                     "operators",
         default=default_values["show_misc_ops"]
+    )
+
+    show_popover_panel: BoolProperty(
+        name="Enable Popover Panel",
+        description="Shows a popover panel to quickly change layers in "
+                    "Texture Paint mode's header",
+        default=default_values["show_popover_panel"]
     )
 
     show_previews: BoolProperty(
@@ -163,6 +171,7 @@ class PMLPreferences(AddonPreferences):
         row.prop(self, "show_previews")
         row.prop(self, "use_large_icons")
 
+        col.prop(self, "show_popover_panel")
         col.prop(self, "check_assets_compat")
         col.prop(self, "use_numpy")
         col.prop(self, "layers_share_images")

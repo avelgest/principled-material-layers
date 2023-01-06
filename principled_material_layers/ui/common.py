@@ -400,32 +400,26 @@ class layer_stack_PT_base:
 
         col = layout.column(align=True)
 
-        # Opacity Slider
-        opacity_row = col.row()
-        opacity_row.prop(active_layer, "opacity", slider=True)
+        if active_layer:
+            # Opacity Slider
+            opacity_row = col.row()
+            opacity_row.prop(active_layer, "opacity", slider=True)
 
-        if active_layer == layer_stack.base_layer:
-            # Cannot change opacity of the base layer
-            opacity_row.enabled = False
+            if active_layer == layer_stack.base_layer:
+                # Cannot change opacity of the base layer
+                opacity_row.enabled = False
 
-        row = col.row()
-        op_props = row.operator("node.pml_view_shader_node_group",
-                                text="Edit Nodes")
-        op_props.custom_description = "Edit this layer's node tree"
-        if active_layer.node_tree is not None:
-            op_props.node_group = active_layer.node_tree.name
-        else:
-            row.enabled = False
+            self.draw_edit_nodes_btn(col, active_layer)
 
-        # Load material
-        op_props = col.operator("material.pml_replace_layer_material")
+            # Load material
+            op_props = col.operator("material.pml_replace_layer_material")
 
-        # Change layer type
-        row = col.row()
-        text = ("Convert to Fill Layer"
-                if active_layer.layer_type == 'MATERIAL_PAINT'
-                else "Convert to Paint Layer")
-        row.operator("material.pml_convert_layer", text=text)
+            # Change layer type
+            row = col.row()
+            text = ("Convert to Fill Layer"
+                    if active_layer.layer_type == 'MATERIAL_PAINT'
+                    else "Convert to Paint Layer")
+            row.operator("material.pml_convert_layer", text=text)
 
         layout.separator()
 
@@ -448,7 +442,17 @@ class layer_stack_PT_base:
         # Apply Layer Stack
         col.operator("material.pml_apply_layer_stack")
 
-    def draw_layers_list(self, layout, layer_stack):
+    def draw_edit_nodes_btn(self, layout, active_layer):
+        row = layout.row()
+        op_props = row.operator("node.pml_view_shader_node_group",
+                                text="Edit Nodes")
+        op_props.custom_description = "Edit this layer's node tree"
+        if active_layer and active_layer.node_tree is not None:
+            op_props.node_group = active_layer.node_tree.name
+        else:
+            row.enabled = False
+
+    def draw_layers_list(self, layout, layer_stack, rows=5):
         prefs = get_addon_preferences()
 
         row = layout.row(align=True)
@@ -458,7 +462,7 @@ class layer_stack_PT_base:
 
         col.template_list("PML_UL_material_layers_list", "", layer_stack,
                           "layers", layer_stack, "active_layer_index",
-                          sort_lock=True, sort_reverse=True)
+                          sort_lock=True, sort_reverse=True, rows=rows)
         col = row.column(align=True)
         col.operator("material.pml_add_layer", icon='ADD', text="")
         col.operator("material.pml_remove_layer", icon='REMOVE', text="")
