@@ -188,12 +188,12 @@ class Channel(BasicChannel):
                     "is baked",
         min=-1, max=3, default=-1
     )
+    # renormalize is only used by the layer stack, not individual layers
     renormalize: BoolProperty(
         name="Renormalize",
         description="Should this channel be renormalized after blending",
         get=lambda self: self._renormalize,
         set=lambda self, value: setattr(self, "_renormalize", value),
-        default=False
     )
 
     # The identifier of the layer this channel belongs to. May be "" if
@@ -361,6 +361,12 @@ class Channel(BasicChannel):
         return layer_stack and layer_stack.channels.get(self.name)
 
     @property
+    def _renormalize_default_val(self) -> bool:
+        """Default value for the channel's renormalize property."""
+        name = self.name.lower()
+        return ("normal" in name or "tangent" in name)
+
+    @property
     def _renormalize(self) -> bool:
         """Whether this channel should be renormalized. Always False if
         this channel is not a vector channel on the layer stack itself.
@@ -369,11 +375,13 @@ class Channel(BasicChannel):
             return False
 
         if not self.is_layer_channel:
-            return bool(self.get("renormalize", False))
+            value = self.get("renormalize")
+            if value is None:
+                value = self["renormalize"] = self._renormalize_default_val
+            return value
+
         layer_stack_ch = self.layer_stack_channel
-        if layer_stack_ch is None:
-            return False
-        return bool(layer_stack_ch.get("renormalize", False))
+        return False if layer_stack_ch is None else layer_stack_ch.renormalize
 
     @_renormalize.setter
     def _renormalize(self, value: bool):
