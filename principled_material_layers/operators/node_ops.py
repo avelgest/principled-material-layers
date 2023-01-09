@@ -93,13 +93,19 @@ class PML_OT_view_shader_node_group(Operator):
                 self.report({'INFO'}, "Node group is already open")
                 return {'CANCELLED'}
 
+        if context.area in node_editor_areas:
+            # Move the context's area to the front of the areas to check
+            node_editor_areas.remove(context.area)
+            node_editor_areas.insert(0, context.area)
+
         # Look for a shader editor without a pinned tree
         for area in node_editor_areas:
             space = area.spaces[0]  # The active space
 
-            if (space.type == 'NODE_EDITOR' and
-                    space.tree_type == 'ShaderNodeTree' and
-                    not space.pin):
+            if (space.type == 'NODE_EDITOR'
+                    and space.tree_type == 'ShaderNodeTree'
+                    and not space.pin
+                    and space.node_tree is not None):
 
                 if (space.edit_tree is not space.node_tree
                         and space.edit_tree.name.startswith(".")):
@@ -125,9 +131,9 @@ class PML_OT_view_shader_node_group(Operator):
         for area in node_editor_areas:
             space = area.spaces[0]  # The active space
 
-            if (space.type == 'NODE_EDITOR' and
-                    space.tree_type == 'ShaderNodeTree' and
-                    not space.pin):
+            if (space.type == 'NODE_EDITOR'
+                    and space.tree_type == 'ShaderNodeTree'
+                    and not space.pin):
                 return area
         return None
 
