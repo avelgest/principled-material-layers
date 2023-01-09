@@ -20,8 +20,18 @@ class NodeEdPanel(Panel):
     bl_region_type = 'UI'
     bl_category = "Material Layers"
 
+    @classmethod
+    def poll(cls, context):
+        shader_type = getattr(context.space_data, "shader_type", None)
 
-class PML_PT_layer_stack_ne(layer_stack_PT_base, NodeEdPanel):
+        if shader_type != 'OBJECT':
+            return False
+
+        # True if there is an active and initialized layer stack
+        return super().poll(context)
+
+
+class PML_PT_layer_stack_ne(NodeEdPanel, layer_stack_PT_base):
 
     _can_init_from = {"ShaderNodeBsdfPrincipled",
                       "ShaderNodeGroup",
@@ -29,7 +39,12 @@ class PML_PT_layer_stack_ne(layer_stack_PT_base, NodeEdPanel):
 
     @classmethod
     def poll(cls, context):
+        space = context.space_data
         layer_stack = get_layer_stack(context)
+
+        if getattr(space, "shader_type", None) != 'OBJECT':
+            return False
+
         if layer_stack is None:
             return False
 
@@ -41,8 +56,6 @@ class PML_PT_layer_stack_ne(layer_stack_PT_base, NodeEdPanel):
         obj = context.active_object
         if obj is None or obj.active_material is None:
             return False
-
-        space = context.space_data
 
         # Only allow initialization from certain nodes and only when
         # editing the active material's node tree.
@@ -64,24 +77,24 @@ class PML_PT_layer_stack_ne(layer_stack_PT_base, NodeEdPanel):
         layout.operator("node.pml_link_sockets_by_name")
 
 
-class PML_PT_layer_stack_channels_ne(layer_stack_channels_PT_base,
-                                     NodeEdPanel):
+class PML_PT_layer_stack_channels_ne(NodeEdPanel,
+                                     layer_stack_channels_PT_base):
     pass
 
 
-class PML_PT_active_layer_ne(active_layer_PT_base, NodeEdPanel):
+class PML_PT_active_layer_ne(NodeEdPanel, active_layer_PT_base):
     pass
 
 
-class PML_PT_udim_layout_ne(UDIM_PT_base, NodeEdPanel):
+class PML_PT_udim_layout_ne(NodeEdPanel, UDIM_PT_base):
     pass
 
 
-class PML_PT_layer_stack_settings_ne(settings_PT_base, NodeEdPanel):
+class PML_PT_layer_stack_settings_ne(NodeEdPanel, settings_PT_base):
     pass
 
 
-class PML_PT_debug_ne(debug_PT_base, NodeEdPanel):
+class PML_PT_debug_ne(NodeEdPanel, debug_PT_base):
 
     def draw(self, context):
         layout = self.layout
