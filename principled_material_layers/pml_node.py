@@ -119,9 +119,11 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
         layer_stack.remove_on_load_callback(self.get("on_load_id", ""))
         layer_stack.remove_msgbus_resub_callback(self.get("on_resub_id", ""))
 
-    def draw_buttons(self, context, layout):
+    def draw_buttons(self, _context, layout):
         if not self._is_valid:
             layout.label(icon='ERROR', text="Node is invalid")
+            return
+        layout.menu("PML_MT_open_layer_group")
 
     @pml_trusted_callback
     def _register_msgbus(self) -> None:

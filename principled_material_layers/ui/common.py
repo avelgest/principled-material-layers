@@ -214,6 +214,29 @@ class PML_UL_material_asset_list(UIList):
 
 # Menus
 
+class PML_MT_open_layer_group(Menu):
+    bl_label = "Layers"
+    bl_idname = "PML_MT_open_layer_group"
+    bl_description = "Edit a layer's node tree"
+
+    def draw(self, context):
+        layout = self.layout
+        prefs = get_addon_preferences()
+
+        layer_stack = get_layer_stack(context)
+
+        for layer in reversed(layer_stack.top_level_layers):
+            icon_value = layer.preview_icon if prefs.show_previews else 0
+
+            if layer.node_tree is None:
+                continue
+
+            op_props = layout.operator("node.pml_view_shader_node_group",
+                                       text=layer.name, icon_value=icon_value)
+            op_props.node_group = layer.node_tree.name
+            op_props.custom_description = "Edit this layer's node tree"
+
+
 class PML_MT_add_channel_layer(Menu):
     """Menu for adding a channel to the active layer. The menu is a
     list of all the layer stack's enabled layers that are not on the
@@ -822,6 +845,7 @@ classes = (
     PML_UL_layer_stack_channels_list,
     PML_UL_layer_channels_list,
     PML_UL_material_asset_list,
+    PML_MT_open_layer_group,
     PML_MT_add_channel_layer,
     PML_MT_channel_blend_mode,
     PML_MT_custom_blend_mode_select,
