@@ -220,7 +220,10 @@ class MaterialLayer(PropertyGroup):
 
     # Node names for nodes of the preview material node tree
     _PREVIEW_SHADER_NODE_NAME = "preview_shader"
+    # Group node
     _PREVIEW_MA_NODE_NAME = "ma_group"
+    # Material Output node
+    _PREVIEW_MA_OUT_NODE_NAME = "preview_ma_output"
 
     def __bool__(self):
         return self.is_initialized
@@ -636,7 +639,6 @@ class MaterialLayer(PropertyGroup):
         ma.use_nodes = True
 
         layer_stack = self.layer_stack
-        stack_channels = layer_stack.channels
 
         nodes = ma.node_tree.nodes
         links = ma.node_tree.links
@@ -655,18 +657,30 @@ class MaterialLayer(PropertyGroup):
         shader.name = self._PREVIEW_SHADER_NODE_NAME
         shader.location.x += 300
 
+        ma_out = nodes.new("ShaderNodeOutputMaterial")
+        ma_out.name = self._PREVIEW_MA_OUT_NODE_NAME
+        ma_out.location.x += 600
+        links.new(ma_out.inputs[0], shader.outputs[0])
+
+        self._link_preview_group(group_node, shader, ma_out)
+
+        ma.preview_ensure()
+
+    def _link_preview_group(self, group_node, shader_node, ma_out) -> None:
+        stack_channels = self.layer_stack.channels
+        links = self.preview_material.node_tree.links
+
         for output in group_node.outputs:
-            shader_input = shader.inputs.get(output.name)
+            shader_input = shader_node.inputs.get(output.name)
             if (shader_input is not None
                     and output.name in stack_channels
                     and stack_channels[output.name].enabled):
                 links.new(shader_input, output)
 
-        ma_out = nodes.new("ShaderNodeOutputMaterial")
-        ma_out.location.x += 600
-        links.new(ma_out.inputs[0], shader.outputs[0])
-
-        ma.preview_ensure()
+        group_disp = group_node.outputs.get("Displacement")
+        ma_out_disp = ma_out.inputs.get("Displacement")
+        if group_disp is not None and ma_out_disp is not None:
+            links.new(ma_out_disp, group_disp)
 
     def _refresh_preview_material(self):
         if self.preview_material is None:
@@ -677,6 +691,7 @@ class MaterialLayer(PropertyGroup):
         try:
             group_node = node_tree.nodes[self._PREVIEW_MA_NODE_NAME]
             shader = node_tree.nodes[self._PREVIEW_SHADER_NODE_NAME]
+            ma_out = node_tree.nodes[self._PREVIEW_MA_OUT_NODE_NAME]
         except KeyError as e:
             warnings.warn(f"Error refreshing preview material: {str(e)}\b"
                           "Recreating material node tree.")
@@ -685,11 +700,7 @@ class MaterialLayer(PropertyGroup):
 
         group_node.node_tree = self.node_tree
 
-        for output in group_node.outputs:
-            shader_input = shader.inputs.get(output.name)
-
-            if shader_input is not None:
-                node_tree.links.new(shader_input, output)
+        self._link_preview_group(group_node, shader, ma_out)
 
     def _delete_preview_material(self):
         if self.preview_material is not None:
