@@ -102,10 +102,7 @@ class PML_OT_view_shader_node_group(Operator):
         for area in node_editor_areas:
             space = area.spaces[0]  # The active space
 
-            if (space.type == 'NODE_EDITOR'
-                    and space.tree_type == 'ShaderNodeTree'
-                    and not space.pin
-                    and space.node_tree is not None):
+            if self.can_use_space(context, space):
 
                 if (space.edit_tree is not space.node_tree
                         and space.edit_tree.name.startswith(".")):
@@ -131,11 +128,17 @@ class PML_OT_view_shader_node_group(Operator):
         for area in node_editor_areas:
             space = area.spaces[0]  # The active space
 
-            if (space.type == 'NODE_EDITOR'
-                    and space.tree_type == 'ShaderNodeTree'
-                    and not space.pin):
-                return area
+            if cls.can_use_space(context, space):
+                return space
         return None
+
+    @classmethod
+    def can_use_space(cls, context, space) -> bool:
+        return (space.type == 'NODE_EDITOR'
+                and space.tree_type == 'ShaderNodeTree'
+                # Allow pinned spaces only for context's space
+                and (not space.pin or space == context.space_data)
+                and space.node_tree is not None)
 
     def _close_node_group(self, context, area):
         context = context.copy()

@@ -123,6 +123,7 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
         if not self._is_valid:
             layout.label(icon='ERROR', text="Node is invalid")
             return
+        layout.context_pointer_set("pml_layer_stack", self.layer_stack)
         layout.menu("PML_MT_open_layer_group")
 
     @pml_trusted_callback

@@ -223,7 +223,12 @@ class PML_MT_open_layer_group(Menu):
         layout = self.layout
         prefs = get_addon_preferences()
 
-        layer_stack = get_layer_stack(context)
+        # Can be set by context_pointer_set
+        layer_stack = getattr(context, "pml_layer_stack", None)
+        if layer_stack is None:
+            layer_stack = get_layer_stack(context)
+        if layer_stack is None:
+            return
 
         for layer in reversed(layer_stack.top_level_layers):
             icon_value = layer.preview_icon if prefs.show_previews else 0
