@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
+import warnings
+
 from contextlib import ExitStack
 from typing import (Any, Container, Dict, List, NamedTuple, Optional, Tuple,
                     Union)
@@ -117,8 +119,14 @@ def _duplicate_ma_node_tree(context,
         exit_stack.callback(lambda: delete_nodes_not_in(nodes, old_nodes))
 
         # N.B. Crashes in Blender 3.0.1
-        bpy.ops.node.duplicate()
-        bpy.ops.node.group_make()
+        try:
+            bpy.ops.node.duplicate()
+            bpy.ops.node.group_make()
+        except RuntimeError as e:
+            # May occur if called when blend data cannot be modified
+            warnings.warn(f"Error duplicating node tree: {e}")
+            # Fall back on non-op based function
+            return duplicate_node_tree(material.node_tree)
 
         space = bpy.context.space_data
         new_node_tree = space.edit_tree
