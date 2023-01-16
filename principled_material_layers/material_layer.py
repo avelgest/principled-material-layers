@@ -671,16 +671,17 @@ class MaterialLayer(PropertyGroup):
         links = self.preview_material.node_tree.links
 
         for output in group_node.outputs:
-            shader_input = shader_node.inputs.get(output.name)
-            if (shader_input is not None
-                    and output.name in stack_channels
-                    and stack_channels[output.name].enabled):
-                links.new(shader_input, output)
+            stack_ch = stack_channels.get(output.name)
+            if stack_ch is None or not stack_ch.enabled:
+                continue
 
-        group_disp = group_node.outputs.get("Displacement")
-        ma_out_disp = ma_out.inputs.get("Displacement")
-        if group_disp is not None and ma_out_disp is not None:
-            links.new(ma_out_disp, group_disp)
+            shader_input = shader_node.inputs.get(output.name)
+            if shader_input is not None:
+                links.new(shader_input, output)
+            elif output.name in ma_out.inputs:
+                ma_out_input = ma_out.inputs[output.name]
+                if ma_out_input.type != 'SHADER':
+                    links.new(ma_out_input, output)
 
     def _refresh_preview_material(self):
         if self.preview_material is None:
