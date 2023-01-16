@@ -501,6 +501,29 @@ class _CombineMaterialHelper(_ReplaceMaterialHelper):
         frame.location.y = bb.bottom - framebb.height/2 - 200
         frame.location.x = group_out.location.x - framebb.width/2 - 200
 
+    def position_group(self, group_node) -> None:
+        """Positions the Group node containing the added material's
+        node tree.
+        """
+        node_tree = group_node.id_data
+        nodes = node_tree.nodes
+
+        group_out = get_node_by_type(node_tree, "NodeGroupOutput")
+
+        group_node.location.x = group_out.location.x - 300
+        group_node.location.y = group_out.location.y + 400
+
+        # Ensure that the node is not directly on top of any other node
+        for _ in range(10):
+            for node in nodes:
+                if node == group_node:
+                    continue
+                if (node.location - group_node.location).length_squared < 2000:
+                    group_node.location.x -= 300
+                    break
+            else:
+                break
+
 
 def replace_layer_material(context,
                            layer,
@@ -554,12 +577,14 @@ def replace_layer_material(context,
 def combine_layer_material(context,
                            layer,
                            material: Material,
-                           channel_names: List[str]) -> None:
+                           channel_names: List[str],
+                           expand_group: bool = True) -> None:
     helper = _CombineMaterialHelper(layer, material)
     layer_nt = layer.node_tree
 
     # Duplicate the material's node tree as a node group
     node_tree = _duplicate_ma_node_tree(context, material)
+    node_tree.name = material.name
 
     helper.setup_combine_node_tree(node_tree)
 
@@ -568,6 +593,8 @@ def combine_layer_material(context,
 
     # Assumes the layer has only one group output node
     layer_output = get_node_by_type(layer_nt, "NodeGroupOutput")
+    if layer_output is None:
+        layer_output = layer_nt.nodes.new("NodeGroupOutput")
 
     if layer_output is not None:
         # Connect the requested channels from the group node to the
@@ -578,11 +605,14 @@ def combine_layer_material(context,
             if group_soc is not None and layer_soc is not None:
                 layer_nt.links.new(layer_soc, group_soc)
 
-    frame = helper.expand_group_node(group_node)
-    helper.position_frame(frame)
-    frame.label = material.name
+    if expand_group:
+        frame = helper.expand_group_node(group_node)
+        helper.position_frame(frame)
+        frame.label = material.name
 
-    bpy.data.node_groups.remove(node_tree)
+        bpy.data.node_groups.remove(node_tree)
+    else:
+        helper.position_group(group_node)
 
 
 class PML_UL_load_material_list(UIList):
@@ -1085,9 +1115,17 @@ class PML_OT_combine_material_ab(ReplaceLayerMaOpAssetBrowser, Operator):
         description="The channels of the imported material"
     )
 
+    keep_as_node_group: BoolProperty(
+        name="As Node Group",
+        description="Add the selected material as a group node",
+        default=False
+    )
+
     def draw(self, context):
         layout = self.layout
         layer_stack = get_layer_stack(context)
+
+        layout.prop(self, "keep_as_node_group")
 
         layout.label(text="Channels")
         flow = layout.grid_flow(columns=2, even_columns=True, align=True)
@@ -1113,7 +1151,8 @@ class PML_OT_combine_material_ab(ReplaceLayerMaOpAssetBrowser, Operator):
             combine_layer_material(context,
                                    layer_stack.active_layer,
                                    material,
-                                   channels_to_replace)
+                                   channels_to_replace,
+                                   expand_group=not self.keep_as_node_group)
 
         return {'FINISHED'}
 
