@@ -542,9 +542,10 @@ class NodeManager(bpy.types.PropertyGroup):
         sockets so they match the layer stack's channels.
         Does not rebuild the node tree.
         """
-
+        # Ignore shader sockets e.g Node Wrangler's tmp_viewer sockets
         ensure_outputs_match_channels(self.node_tree.outputs,
-                                      self.layer_stack.channels)
+                                      self.layer_stack.channels,
+                                      ignore_shader=True)
 
     def rebuild_node_tree(self, immediate=False):
         """Rebuild the layer stack's internal node tree. """

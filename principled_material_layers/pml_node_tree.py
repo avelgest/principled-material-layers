@@ -196,6 +196,9 @@ class NodeTreeBuilder:
         # Name of the active node (will restore later)
         active_node_name = getattr(node_tree.nodes.active, "name", "")
 
+        # Connections to restore later
+        pass_through_sockets = self._get_pass_through_sockets()
+
         if not layer_stack.is_initialized:
             return
 
@@ -248,6 +251,8 @@ class NodeTreeBuilder:
         # Try to keep the same active node as before the rebuild
         if active_node_name in node_tree.nodes:
             node_tree.nodes.active = node_tree.nodes[active_node_name]
+
+        self._restore_pass_through_sockets(pass_through_sockets)
 
     def _add_base_layer(self, layer) -> None:
         """Creates the nodes for the base layer of the layer stack."""
@@ -831,6 +836,38 @@ class NodeTreeBuilder:
         ma_group.parent = parent
 
         return ma_group
+
+    def _get_pass_through_sockets(self):
+        """Gets sockets that just pass from a node group straight to
+        the Group output e.g. the Node Wranglers tmp_viewer socket.
+        The value returned by this method should be passed to
+        _restore_pass_through_sockets after the tree is rebuilt.
+        """
+        group_out = self.nodes.get(NodeNames.output())
+        if not group_out:
+            return []
+        channels = self.layer_stack.channels
+
+        nodes_sockets = []
+
+        for socket in group_out.inputs:
+            if socket.name not in channels and socket.is_linked:
+                out_socket = socket.links[0].from_socket
+
+                nodes_sockets.append((out_socket.node.name,
+                                      out_socket.name,
+                                      socket.name))
+        return nodes_sockets
+
+    def _restore_pass_through_sockets(self, nodes_sockets) -> None:
+        group_out = self.nodes[NodeNames.output()]
+        for node_name, socket_name, group_soc_name in nodes_sockets:
+            group_soc = group_out.inputs.get(group_soc_name)
+            node = self.nodes.get(node_name)
+
+            if node is not None and group_soc is not None:
+                socket = node.outputs.get(socket_name)
+                self.links.new(group_soc, socket)
 
     @property
     def _one_const_socket(self):

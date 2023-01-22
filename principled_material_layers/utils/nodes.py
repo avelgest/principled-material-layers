@@ -225,13 +225,16 @@ def nodes_bounding_box(nodes: Collection[Node]) -> Rect:
 
 
 def ensure_outputs_match_channels(outputs: bpy.types.NodeTreeOutputs,
-                                  channels: Sequence["BasicChannel"]) -> None:
+                                  channels: Sequence["BasicChannel"],
+                                  ignore_shader: bool = True) -> None:
     """Adds, removes, sets the type of, and reorders the sockets in
     outputs so they match channels.
     Params:
         outputs: NodeTreeOutputs (a collection of NodeSocketInterface)
         channels: A sequence of BasicChannel instances, as found in
             LayerStack.channels or MaterialLayer.channels.
+        ignore_shader: Don't remove shader sockets. These will be moved
+            to the end of the socket collection.
     Returns:
         None
     """
@@ -264,6 +267,8 @@ def ensure_outputs_match_channels(outputs: bpy.types.NodeTreeOutputs,
     # any outputs that are not in channels will have been pushed to
     # the back of outputs
     for output in reversed(outputs):
+        if ignore_shader and output.type == 'SHADER':
+            continue
         # Delete if not in channels or is a duplicate channel
         if output.name not in channels or outputs[output.name] != output:
             outputs.remove(output)
