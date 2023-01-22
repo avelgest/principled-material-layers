@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 import itertools as it
+import typing
 
 from typing import Optional
 
 import bpy
 
-from bpy.types import Operator
+from bpy.types import Node, Operator
 
 from bpy.props import (BoolProperty,
                        StringProperty)
@@ -56,6 +57,14 @@ class PML_OT_view_shader_node_group(Operator):
     custom_description: StringProperty(
         name="Description",
         default=""
+    )
+
+    set_nodes_active: BoolProperty(
+        name="Set Nodes Active",
+        description="Try to find a path of Group nodes to Node Group and sets"
+                    "them as active. Needed for compatibility with the Node "
+                    "Wrangler's preview function",
+        default=True
     )
 
     @classmethod
@@ -168,6 +177,40 @@ class PML_OT_view_shader_node_group(Operator):
             context["active_node"] = group_node
 
             bpy.ops.node.group_edit(context)
+
+        if self.set_nodes_active:
+            self._set_path_nodes_active(space, node_group)
+
+    def _find_group_path(self, from_tree, to_tree, depth=0, max_depth=3
+                         ) -> Optional[typing.List[Node]]:
+        """Recursively finds a path of Group nodes between from_tree
+        and to_tree. Returns a List of Group nodes or None if no path
+        can be found or max_depth recursions are reached.
+        """
+        if depth == max_depth:
+            return None
+
+        for node in from_tree.nodes:
+            if hasattr(node, "node_tree") and node.node_tree is not None:
+                if node.node_tree == to_tree:
+                    return [node]
+                path = self._find_group_path(node.node_tree, to_tree, depth+1)
+                if path is not None:
+                    return [node] + path
+        return None
+
+    def _set_path_nodes_active(self, space, node_group) -> None:
+        """Finds a path between the base node tree and node_group
+        setting each group node to be the active node of their
+        respective tree. Needed for compatibility with the Node
+        Wrangler's preview op.
+        """
+        base_tree = space.node_tree
+
+        path = self._find_group_path(base_tree, node_group)
+        if path is not None:
+            for node in path:
+                node.id_data.nodes.active = node
 
 
 class NewCustomHardnessBlendBase:
