@@ -193,6 +193,9 @@ class NodeTreeBuilder:
         layer_stack = self.layer_stack
         node_tree = self.node_tree
 
+        # Name of the active node (will restore later)
+        active_node_name = getattr(node_tree.nodes.active, "name", "")
+
         if not layer_stack.is_initialized:
             return
 
@@ -241,6 +244,10 @@ class NodeTreeBuilder:
         self.node_manager.connect_output_layer()
 
         self.node_manager.set_active_layer(layer_stack.active_layer)
+
+        # Try to keep the same active node as before the rebuild
+        if active_node_name in node_tree.nodes:
+            node_tree.nodes.active = node_tree.nodes[active_node_name]
 
     def _add_base_layer(self, layer) -> None:
         """Creates the nodes for the base layer of the layer stack."""
