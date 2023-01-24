@@ -78,9 +78,28 @@ class PML_PT_asset_browser_panel(bpy.types.Panel):
         return active_file
 
 
+def asset_context_menu_func(self, context):
+    if (not get_layer_stack(context)
+            or not getattr(context, "active_file", None)
+            or context.active_file.id_type != 'MATERIAL'):
+        return
+
+    layout = self.layout
+    layout.separator()
+    col = layout.column(align=True)
+    col.operator_context = 'INVOKE_DEFAULT'
+    col.operator("material.pml_new_layer_material_ab")
+    col.operator("material.pml_replace_layer_material_ab")
+    col.operator("material.pml_combine_material_ab")
+
+
 def register():
     bpy.utils.register_class(PML_PT_asset_browser_panel)
+
+    bpy.types.ASSETBROWSER_MT_context_menu.append(asset_context_menu_func)
 
 
 def unregister():
     bpy.utils.unregister_class(PML_PT_asset_browser_panel)
+
+    bpy.types.ASSETBROWSER_MT_context_menu.remove(asset_context_menu_func)
