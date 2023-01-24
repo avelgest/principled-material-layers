@@ -14,6 +14,7 @@ from bpy.props import (BoolProperty,
 
 from .. import blending
 from .. import hardness
+from .. import utils
 from ..utils.layer_stack_utils import get_layer_stack
 from ..utils.nodes import ensure_outputs_match_channels
 from ..utils.ops import pml_op_poll
@@ -447,6 +448,53 @@ class PML_OT_link_sockets_by_name(Operator):
         return {'FINISHED'}
 
 
+class PML_OT_connect_to_group_output(Operator):
+    bl_idname = "node.pml_connect_to_group_output"
+    bl_label = "Link to Group Output"
+    bl_description = ("Connects the output sockets of the selected nodes to "
+                      "their corresponding sockets on the Group Output node")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    replace_links: BoolProperty(
+        name="Replace Links",
+        description="",
+        default=False
+    )
+
+    @classmethod
+    def poll(cls, context):
+        if getattr(context.space_data, "type", "") != 'NODE_EDITOR':
+            return False
+        edit_tree = context.space_data.edit_tree
+        if edit_tree is None or not context.selected_nodes:
+            return False
+        # Check if edit_tree is a node group
+        return not edit_tree.is_embedded_data
+
+    def execute(self, context):
+        node_tree = context.space_data.edit_tree
+
+        output = utils.nodes.get_node_by_type(node_tree, "NodeGroupOutput")
+        if output is None:
+            self.report({'WARNING'}, "Cannot find a Group Output node")
+            return {'CANCELLED'}
+
+        group_out_socs = {x.name.casefold(): x for x in output.inputs}
+
+        for node in context.selected_nodes:
+            for out_socket in node.outputs:
+                in_socket = group_out_socs.get(out_socket.name.casefold())
+                if (in_socket is not None
+                        and in_socket.type == out_socket.type
+                        and (not in_socket.is_linked or self.replace_links)):
+                    node_tree.links.new(in_socket, out_socket)
+
+        return {'FINISHED'}
+
+    def invoke(self, context, _event):
+        return self.execute(context)
+
+
 def add_pml_node_menu_func(self, context):
     layout = self.layout
     if PML_OT_add_pml_node.poll(context):
@@ -456,6 +504,21 @@ def add_pml_node_menu_func(self, context):
         op_props.use_transform = True
 
 
+def node_ops_menu_func(self, context):
+    layout = self.layout
+
+    edit_tree = getattr(context.space_data, "edit_tree", None)
+    if (edit_tree is not None
+            and edit_tree.type == 'SHADER'
+            and not edit_tree.is_embedded_data):
+        layout.separator()
+        op_label = "Link to Group Output"
+        layout.operator("node.pml_connect_to_group_output",
+                        text=op_label).replace_links = False
+        layout.operator("node.pml_connect_to_group_output",
+                        text=f"{op_label} (Replace)").replace_links = True
+
+
 classes = (PML_OT_view_shader_node_group,
            PML_OT_rebuild_pml_stack_node_tree,
            PML_OT_new_blending_node_group,
@@ -463,7 +526,8 @@ classes = (PML_OT_view_shader_node_group,
            PML_OT_rename_node_group,
            PML_OT_add_pml_node,
            PML_OT_verify_layer_outputs,
-           PML_OT_link_sockets_by_name)
+           PML_OT_link_sockets_by_name,
+           PML_OT_connect_to_group_output)
 
 _register, _unregister = bpy.utils.register_classes_factory(classes)
 
@@ -471,8 +535,10 @@ _register, _unregister = bpy.utils.register_classes_factory(classes)
 def register():
     _register()
     bpy.types.NODE_MT_add.append(add_pml_node_menu_func)
+    bpy.types.NODE_MT_node.append(node_ops_menu_func)
 
 
 def unregister():
     _unregister()
     bpy.types.NODE_MT_add.remove(add_pml_node_menu_func)
+    bpy.types.NODE_MT_node.remove(node_ops_menu_func)

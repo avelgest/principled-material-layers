@@ -120,7 +120,7 @@ def is_socket_simple(socket: NodeSocket,
     return _get_node_simplicity(node, threshold) <= threshold
 
 
-def get_output_node(node_tree: ShaderNodeTree):
+def get_output_node(node_tree: ShaderNodeTree) -> Node:
     for x in ('ALL', 'EEVEE', 'CYCLES'):
         output = node_tree.get_output_node(x)
         if output is not None:
@@ -159,14 +159,16 @@ def get_closest_node_of_type(closest_to: Node,
     else:
         nodes = get_nodes_by_type(node_tree, node_type)
 
-    closest_to_loc = closest_to.location
-    return min(nodes, key=lambda x: x.location - closest_to_loc, default=None)
+    node_loc = closest_to.location
+    return min(nodes, key=lambda x: (x.location - node_loc).length_squared,
+               default=None)
 
 
 def delete_nodes_not_in(nodes: bpy.types.Nodes,
                         container: Container[Node]) -> None:
     """Delete any nodes not in container"""
-    container = set(container)
+    if isinstance(container, typing.Iterable):
+        container = set(container)
     to_remove = [x for x in nodes if x not in container]
 
     for node in to_remove:
