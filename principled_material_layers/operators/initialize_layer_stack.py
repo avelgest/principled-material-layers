@@ -364,7 +364,7 @@ class PML_OT_initialize_layer_stack(Operator):
                 # the first
                 continue
 
-            if is_socket_supported(_input):
+            if _input.enabled and is_socket_supported(_input):
                 ch = self.channels.add()
                 ch.init_from_socket(_input)
 

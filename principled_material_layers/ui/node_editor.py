@@ -105,6 +105,37 @@ class PML_PT_debug_ne(NodeEdPanel, debug_PT_base):
         super().draw(context)
 
 
+def add_pml_node_menu_func(self, context):
+    # Appends to NODE_MT_add
+    layout = self.layout
+    layer_stack = get_layer_stack(context)
+    edit_tree = context.space_data.edit_tree
+
+    if not layer_stack or edit_tree is not layer_stack.material.node_tree:
+        return
+
+    op_props = layout.operator("node.add_node",
+                               text="Material Layers")
+    op_props.type = "ShaderNodePMLStack"
+    op_props.use_transform = True
+
+
+def node_ops_menu_func(self, context):
+    # Appends to NODE_MT_node
+    layout = self.layout
+
+    edit_tree = getattr(context.space_data, "edit_tree", None)
+    if (edit_tree is not None
+            and edit_tree.type == 'SHADER'
+            and not edit_tree.is_embedded_data):
+        layout.separator()
+        op_label = "Link to Group Output"
+        layout.operator("node.pml_connect_to_group_output",
+                        text=op_label).replace_links = False
+        layout.operator("node.pml_connect_to_group_output",
+                        text=f"{op_label} (Replace)").replace_links = True
+
+
 classes = (PML_PT_layer_stack_ne,
            PML_PT_active_layer_ne,
            PML_PT_layer_stack_channels_ne,
@@ -113,7 +144,7 @@ classes = (PML_PT_layer_stack_ne,
            PML_PT_debug_ne
            )
 
-_register, unregister = bpy.utils.register_classes_factory(classes)
+_register, _unregister = bpy.utils.register_classes_factory(classes)
 
 
 def register():
@@ -121,4 +152,15 @@ def register():
         # New sidebar categories may not appear if not running as a
         # proper addon
         NodeEdPanel.bl_category = "Node"
+
     _register()
+
+    bpy.types.NODE_MT_add.append(add_pml_node_menu_func)
+    bpy.types.NODE_MT_node.append(node_ops_menu_func)
+
+
+def unregister():
+    _unregister()
+
+    bpy.types.NODE_MT_add.remove(add_pml_node_menu_func)
+    bpy.types.NODE_MT_node.remove(node_ops_menu_func)
