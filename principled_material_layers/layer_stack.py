@@ -1056,6 +1056,16 @@ class LayerStack(bpy.types.PropertyGroup):
         self.bake_groups.clear()
         self.image_manager.update_tiled_storage()
 
+    def is_channel_previewed(self, ch: Channel) -> bool:
+        """Returns whether Channel ch is the current preview channel.
+        More efficient than doing ch == layer_stack.preview_channel
+        """
+        ch_name = self.get("preview_channel_name", "")
+        if not ch_name:
+            return False
+        layer_id = self.get("preview_layer_id", "")
+        return ch_name == ch.name and layer_id == ch.layer_identifier
+
     @property
     def active_layer(self) -> Optional[MaterialLayer]:
         """The active layer or None if active_layer_index is out of
@@ -1164,6 +1174,29 @@ class LayerStack(bpy.types.PropertyGroup):
     @property
     def _msgbus_owner(self) -> object:
         return _UndoInvariant.get(self.identifier).msgbus_owner
+
+    @property
+    def preview_channel(self) -> Optional[Channel]:
+        """The layer or layer stack channel currently being previewed.
+           May be None.
+        """
+        ch_name = self.get("preview_channel_name", "")
+        layer_id = self.get("preview_layer_id", "")
+        if ch_name:
+            if layer_id:
+                layer = self.get_layer_by_id(layer_id)
+                return layer.channels.get(ch_name)
+            return self.channels.get(ch_name)
+        return None
+
+    @preview_channel.setter
+    def preview_channel(self, ch: Optional[Channel]):
+        if ch is None:
+            self["preview_layer_id"] = self["preview_channel_name"] = ""
+            return
+        layer = ch.layer
+        self["preview_layer_id"] = "" if layer is None else layer.identifier
+        self["preview_channel_name"] = ch.name
 
     @property
     def _rna_resub_callbacks(self):

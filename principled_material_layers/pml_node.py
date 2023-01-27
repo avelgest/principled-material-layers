@@ -38,7 +38,7 @@ def _get_node(layer_stack_id: str, node_id: str) -> ShaderNodePMLStack:
         return found
 
     # Search in any group nodes
-    for node in layer_stack.material.node_tree.nodes:
+    for node in ma.node_tree.nodes:
         if (not isinstance(node, bpy.types.ShaderNodeGroup)
                 or node.node_tree is None):
             continue
@@ -249,12 +249,25 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
         return self._msgbus_owners_cls[self.identifier]
 
 
+def get_pml_nodes(layer_stack,
+                  check_groups: bool = False) -> List[ShaderNodePMLStack]:
+    """Returns a list of all Layer Stack nodes in the layer_stack's
+    material that use layer_stack. If check_groups is True then Group
+    nodes are also checked.
+    """
+    node_tree = layer_stack.material.node_tree
+    if node_tree is None:
+        return []
+    return get_pml_nodes_from(node_tree, layer_stack, check_groups)
+
+
 def get_pml_nodes_from(node_tree: ShaderNodeTree,
                        layer_stack,
                        check_groups: bool = False) -> List[ShaderNodePMLStack]:
     """Gets all Layer Stack nodes in node_tree that use layer_stack.
     If check_groups is True then also check the node trees of any Group
-    Nodes in node_tree."""
+    Nodes in node_tree.
+    """
     pml_id_name = ShaderNodePMLStack.bl_idname
 
     if not layer_stack.is_initialized:

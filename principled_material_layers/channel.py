@@ -344,6 +344,9 @@ class Channel(BasicChannel):
 
     @property
     def layer(self):
+        """The layer that this channel belongs to. May be None if e.g.
+        this channel is on the layer stack itself.
+        """
         if not self.layer_identifier:
             return None
         return self.layer_stack.get_layer_by_id(self.layer_identifier)

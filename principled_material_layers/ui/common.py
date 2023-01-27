@@ -113,6 +113,17 @@ class PML_UL_material_layers_list(UIList):
         return flags, order
 
 
+def draw_ch_preview_btn(layout, layer_stack, *, layer, channel) -> None:
+    if layer_stack.is_channel_previewed(channel):
+        layout.operator("nodes.pml_clear_preview_channel", text="",
+                        emboss=True, depress=True, icon="SHADING_TEXTURE")
+    else:
+        op_props = layout.operator("nodes.pml_preview_channel", text="",
+                                   emboss=False, icon="SHADING_TEXTURE")
+        op_props.channel_name = channel.name
+        op_props.layer_name = "" if layer is None else layer.name
+
+
 class PML_UL_layer_stack_channels_list(UIList):
     """UIList for displaying the layer stack's channels."""
 
@@ -125,10 +136,13 @@ class PML_UL_layer_stack_channels_list(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data,
                   active_property, index=0, flt_flag=0):
 
+        layer_stack = data
         channel = item
         row = layout.row(align=True)
         row.prop(channel, "enabled", text="")
         row.label(text=channel.name)
+
+        draw_ch_preview_btn(row, layer_stack, layer=None, channel=channel)
 
     def draw_filter(self, context, layout):
         layout.prop(self, "sort_enabled")
@@ -162,25 +176,29 @@ class PML_UL_layer_channels_list(UIList):
 
         layer = data
         channel = item
+        layer_stack = layer.layer_stack
 
-        is_base_layer = (layer == layer.layer_stack.base_layer)
+        is_base_layer = (layer == layer_stack.base_layer)
 
         if is_base_layer:
             # Only show label for base layer channels
             row = layout.row()
             row.separator(factor=2.0)
             row.label(text=channel.name)
-            return
 
-        split = layout.split(factor=0.65)
-        row = split.row(align=True)
+        else:
+            split = layout.split(factor=0.55, align=True)
+            row = split.row(align=True)
 
-        row.prop(channel, "enabled", text="")
-        row.label(text=channel.name)
+            row.prop(channel, "enabled", text="")
+            row.label(text=channel.name)
 
-        blend_mode_name = blending.blend_mode_display_name(channel.blend_mode)
-        split.context_pointer_set(name="pml_channel", data=channel)
-        split.menu("PML_MT_channel_blend_mode", text=blend_mode_name)
+            row = split.row(align=True)
+            blend_name = blending.blend_mode_display_name(channel.blend_mode)
+            row.context_pointer_set(name="pml_channel", data=channel)
+            row.menu("PML_MT_channel_blend_mode", text=blend_name)
+
+        draw_ch_preview_btn(row, layer_stack, layer=layer, channel=channel)
 
     def filter_items(self, context, data, propname):
         # Sort the channels by their order in layer_stack.channels
