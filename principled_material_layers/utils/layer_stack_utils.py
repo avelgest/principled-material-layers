@@ -6,6 +6,8 @@ from typing import Dict
 
 import bpy
 
+from .nodes import get_nodes_by_type
+
 
 def get_layer_stack(context):
     """Returns the active layer stack of context (may be uninitialized)
@@ -63,3 +65,14 @@ def get_layer_stack_from_prop(prop: bpy.types.bpy_struct):
 
 def is_layer_stack_initialized(context):
     return bool(get_layer_stack(context))
+
+
+def delete_layer_stack_nodes(layer_stack):
+    """Deletes all Material Layers nodes that use layer_stack."""
+    node_tree = layer_stack.material.node_tree
+    if node_tree is None:
+        return
+
+    for x in list(get_nodes_by_type(node_tree, "ShaderNodePMLStack")):
+        node_tree.nodes.remove(x)
+    # TODO Also search in node groups

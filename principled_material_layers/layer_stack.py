@@ -19,6 +19,7 @@ from bpy.props import (BoolProperty,
                        StringProperty)
 
 from . import bl_info
+from . import utils
 from .utils.naming import unique_name, unique_name_in
 from .utils.nodes import reference_inputs_from_type
 from .utils.layer_stack_utils import get_layer_stack_by_id
@@ -332,6 +333,8 @@ class LayerStack(bpy.types.PropertyGroup):
             return
 
         self._unregister_msgbus()
+
+        utils.layer_stack_utils.delete_layer_stack_nodes(self)
 
         self.free_bake()
         for layer in list(self.layers):
