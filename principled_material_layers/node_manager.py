@@ -287,7 +287,7 @@ class NodeManager(bpy.types.PropertyGroup):
             out_socket = self.get_layer_output_socket(layer, ch, nodes)
             links.new(in_socket, out_socket)
 
-        if layer == layer_stack.base_layer:
+        if layer.is_base_layer:
             output_node.location.x = 400
         else:
             layer_frame = nodes[NodeNames.layer_frame(layer)]

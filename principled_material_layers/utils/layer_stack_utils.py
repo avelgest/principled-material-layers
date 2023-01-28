@@ -58,8 +58,6 @@ def get_layer_stack_from_ma(ma: bpy.types.Material):
 
 
 def get_layer_stack_from_prop(prop: bpy.types.bpy_struct):
-    if prop.id_data is None:
-        return None
     return getattr(prop.id_data, "pml_layer_stack", None)
 
 

@@ -178,9 +178,7 @@ class PML_UL_layer_channels_list(UIList):
         channel = item
         layer_stack = layer.layer_stack
 
-        is_base_layer = (layer == layer_stack.base_layer)
-
-        if is_base_layer:
+        if layer.is_base_layer:
             # Only show label for base layer channels
             row = layout.row()
             row.separator(factor=2.0)
@@ -451,7 +449,7 @@ class layer_stack_PT_base:
             opacity_row = col.row()
             opacity_row.prop(active_layer, "opacity", slider=True)
 
-            if active_layer == layer_stack.base_layer:
+            if active_layer.is_base_layer:
                 # Cannot change opacity of the base layer
                 opacity_row.enabled = False
 
@@ -687,7 +685,7 @@ class active_layer_channels_PT_base:
                           "channels", active_layer, "active_channel_index",
                           maxrows=8, sort_lock=False)
 
-        if active_layer == layer_stack.base_layer:
+        if active_layer.is_base_layer:
             col.label(text="Base layer channels are always enabled.")
 
         else:
@@ -759,7 +757,7 @@ class active_layer_node_mask_PT_base:
             return
 
         row = layout.row(align=True)
-        row.enabled = (active_layer != layer_stack.base_layer)
+        row.enabled = not active_layer.is_base_layer
         row.template_ID(active_layer, "node_mask",
                         new="material.pml_new_node_mask")
         op_props = row.operator("node.pml_view_shader_node_group",

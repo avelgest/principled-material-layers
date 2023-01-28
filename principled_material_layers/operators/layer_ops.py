@@ -104,9 +104,27 @@ class PML_OT_remove_layer(Operator):
 
 class MoveLayerBase(Operator):
 
+    direction = ""
+
     @classmethod
     def poll(cls, context):
-        return pml_op_poll(context)
+        if not pml_op_poll(context):
+            return False
+        layer_stack = get_layer_stack(context)
+        active_layer = layer_stack.active_layer
+
+        if active_layer is None:
+            return False
+        if active_layer.is_base_layer:
+            cls.poll_message_set("Cannot move the base layer")
+            return False
+        if cls.direction == 'UP' and active_layer == layer_stack.top_layer:
+            return False
+        if cls.direction == 'DOWN':
+            layer_below = active_layer.get_layer_below()
+            if not layer_below or layer_below.is_base_layer:
+                return False
+        return True
 
     def execute(self, context):
         layer_stack = get_layer_stack(context)
@@ -148,15 +166,19 @@ class PML_OT_new_node_mask(Operator):
 
     @classmethod
     def poll(cls, context):
-        return pml_op_poll(context) and get_layer_stack(context).active_layer
+        if not pml_op_poll(context):
+            return False
+        active_layer = get_layer_stack(context).active_layer
+        if not active_layer:
+            return False
+        if active_layer.is_base_layer:
+            cls.poll_message_set("Cannot add a node mask to the base layer")
+            return False
+        return True
 
     def execute(self, context):
         layer_stack = get_layer_stack(context)
         active_layer = layer_stack.active_layer
-
-        if active_layer == layer_stack.base_layer:
-            self.report("Masks are not supported for the base layer")
-            return {'CANCELLED'}
 
         group_name = f"{active_layer.name} Node Mask"
 

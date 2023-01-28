@@ -761,7 +761,9 @@ class MaterialLayer(PropertyGroup):
     @property
     def is_base_layer(self) -> bool:
         """Same as layer == layer.layer_stack.base_layer"""
-        return self == self.layer_stack.base_layer
+        if not self.identifier:
+            return False
+        return self.identifier == self.layer_stack.base_layer_id
 
     @property
     def is_top_level(self) -> bool:

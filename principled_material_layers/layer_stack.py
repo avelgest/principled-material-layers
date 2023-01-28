@@ -914,9 +914,9 @@ class LayerStack(bpy.types.PropertyGroup):
         new_idx = max(min(layer_idx+steps, n_top_level-1), 0)
 
         # TODO allow moving base_layer
-        if new_idx == 0 and layer != self.base_layer:
+        if new_idx == 0 and not layer.is_base_layer:
             raise ValueError("Cannot replace base layer")
-        if layer == self.base_layer:
+        if layer.is_base_layer:
             raise ValueError("Cannot move base layer")
 
         self.top_level_layers_ref.move(layer_idx, new_idx)
@@ -1119,6 +1119,14 @@ class LayerStack(bpy.types.PropertyGroup):
         if not self.top_level_layers_ref:
             return None
         return self.top_level_layers_ref[0].resolve()
+
+    @property
+    def base_layer_id(self) -> str:
+        """Returns the identifier of base_layer or "" if there are no
+        layers. More efficient than layer_stack.base_layer.identifier
+        """
+        return ("" if not self.top_level_layers_ref
+                else self.top_level_layers_ref[0].identifier)
 
     @property
     def shader_node_type(self) -> type:
