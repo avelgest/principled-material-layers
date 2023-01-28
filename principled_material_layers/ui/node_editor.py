@@ -6,6 +6,8 @@ from bpy.types import Panel
 from .common import (layer_stack_PT_base,
                      layer_stack_channels_PT_base,
                      active_layer_PT_base,
+                     active_layer_channels_PT_base,
+                     active_layer_node_mask_PT_base,
                      settings_PT_base,
                      UDIM_PT_base,
                      debug_PT_base
@@ -27,8 +29,9 @@ class NodeEdPanel(Panel):
         if shader_type != 'OBJECT':
             return False
 
-        # True if there is an active and initialized layer stack
-        return super().poll(context)
+        poll = getattr(super(), "poll", None)
+
+        return poll(context) if poll is not None else True
 
 
 class PML_PT_layer_stack_ne(NodeEdPanel, layer_stack_PT_base):
@@ -86,6 +89,16 @@ class PML_PT_active_layer_ne(NodeEdPanel, active_layer_PT_base):
     pass
 
 
+class PML_PT_active_layer_node_mask_ne(active_layer_node_mask_PT_base,
+                                       NodeEdPanel):
+    bl_parent_id = "PML_PT_active_layer_ne"
+
+
+class PML_PT_active_layer_channels_ne(active_layer_channels_PT_base,
+                                      NodeEdPanel):
+    bl_parent_id = "PML_PT_active_layer_ne"
+
+
 class PML_PT_udim_layout_ne(NodeEdPanel, UDIM_PT_base):
     pass
 
@@ -138,6 +151,8 @@ def node_ops_menu_func(self, context):
 
 classes = (PML_PT_layer_stack_ne,
            PML_PT_active_layer_ne,
+           PML_PT_active_layer_node_mask_ne,
+           PML_PT_active_layer_channels_ne,
            PML_PT_layer_stack_channels_ne,
            PML_PT_udim_layout_ne,
            PML_PT_layer_stack_settings_ne,

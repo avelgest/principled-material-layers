@@ -554,10 +554,8 @@ class layer_stack_channels_PT_base:
         layout.separator()
         layout.label(text="Default Blend Mode")
         layout.prop(active_channel, "blend_mode", text="")
-        if active_channel.blend_mode == 'CUSTOM':
-            # Same UI as for material layers' channels
-            active_layer_PT_base.draw_custom_blending_props(layout,
-                                                            active_channel)
+
+        self.draw_custom_blending_props(layout, active_channel)
 
         # Effective value of hardness for layers with 'DEFAULT' hardness
         layout.separator()
@@ -591,111 +589,7 @@ class layer_stack_channels_PT_base:
 
         if channel.hardness_supports_threshold:
             col.prop(channel, "hardness_threshold")
-        if channel.hardness == 'CUSTOM':
-            active_layer_PT_base.draw_custom_hardness_props(col, channel)
-
-
-class active_layer_PT_base:
-    bl_label = "Active Layer"
-    bl_options = set()
-
-    @classmethod
-    def poll(cls, context):
-        layer_stack = get_layer_stack(context)
-        return layer_stack is not None and layer_stack.is_initialized
-
-    def draw(self, context):
-        layout = self.layout
-
-        layer_stack = get_layer_stack(context)
-        active_layer = layer_stack.active_layer
-        if active_layer is None:
-            return
-
-        active_channel = active_layer.active_channel
-
-        is_base_layer = active_layer == layer_stack.base_layer
-
-        # Layer baking operators
-        if active_layer.is_baked:
-            op_props = layout.operator("material.pml_free_layer_bake")
-        else:
-            op_props = layout.operator("material.pml_bake_layer")
-        op_props.layer_name = active_layer.name
-
-        # Node Mask
-        layout.label(text="Node Mask")
-        row = layout.row(align=True)
-        row.enabled = not is_base_layer
-        row.template_ID(active_layer, "node_mask",
-                        new="material.pml_new_node_mask")
-        op_props = row.operator("node.pml_view_shader_node_group",
-                                text="", icon='NODETREE')
-        op_props.custom_description = "Edit this layer's node mask"
-        op_props.node_group = getattr(active_layer.node_mask, "name", "")
-
-        if active_layer.node_mask is not None:
-            col = layout.column(align=True)
-            col.operator("material.pml_apply_node_mask")
-            col.operator("material.pml_node_mask_to_stencil")
-
-        # Channels
-        layout.label(text="Channels")
-
-        col = layout.column(align=True)
-
-        col.template_list("PML_UL_layer_channels_list", "", active_layer,
-                          "channels", active_layer, "active_channel_index",
-                          maxrows=8, sort_lock=False)
-
-        if is_base_layer:
-            col.label(text="Base layer channels are always enabled.")
-
-        else:
-            # Add/remove layer channel buttons
-            row = col.row(align=True)
-            row.menu("PML_MT_add_channel_layer", icon='ADD', text="")
-            if active_channel is not None:
-                op_props = row.operator("material.pml_layer_remove_channel",
-                                        icon='REMOVE', text="")
-                op_props.channel_name = active_channel.name
-
-                # Custom blend mode
-                if active_channel.blend_mode == 'CUSTOM':
-                    self.draw_custom_blending_props(layout, active_channel)
-                    layout.separator()
-
-                # Hardness
-                self.draw_hardness(layout, active_channel)
-                layout.separator()
-
-        node_tree = active_layer.node_tree
-        if node_tree is None or active_channel is None:
-            return
-
-        output_node = next((x for x in node_tree.nodes
-                           if isinstance(x, NodeGroupOutput)), None)
-        socket = output_node.inputs.get(active_channel.name)
-
-        if output_node is not None and socket is not None:
-            layout.template_node_view(node_tree, output_node, socket)
-
-    @classmethod
-    def draw_hardness(cls, layout, channel) -> None:
-        col = layout.column(align=True)
-        col.label(text="Hardness")
-
-        row = col.row(align=True)
-        row.prop(channel, "hardness", text="")
-        row.operator("material.pml_copy_hardness_to_all",
-                     text="", icon='DUPLICATE')
-
-        if (channel.hardness != 'DEFAULT'
-                and channel.hardness_supports_threshold):
-            col.prop(channel, "hardness_threshold")
-
-        if channel.hardness == 'CUSTOM':
-            cls.draw_custom_hardness_props(col, channel)
+        self.draw_custom_hardness_props(col, channel)
 
     @staticmethod
     def draw_custom_ch_node_group(layout, channel, prop, menu, compat):
@@ -727,18 +621,156 @@ class active_layer_PT_base:
         op_props.node_group_str = group_name
 
     @classmethod
-    def draw_custom_blending_props(cls, layout, channel):
+    def draw_custom_blending_props(cls, layout, channel) -> None:
+        if channel.blend_mode != 'CUSTOM':
+            return
         cls.draw_custom_ch_node_group(layout, channel,
                                       "blend_mode_custom",
                                       menu="PML_MT_custom_blend_mode_select",
                                       compat=blending.is_group_blending_compat)
 
     @classmethod
-    def draw_custom_hardness_props(cls, layout, channel):
+    def draw_custom_hardness_props(cls, layout, channel) -> None:
+        if channel.hardness != 'CUSTOM':
+            return
         cls.draw_custom_ch_node_group(layout, channel,
                                       "hardness_custom",
                                       menu="PML_MT_custom_hardness_select",
                                       compat=hardness.is_group_hardness_compat)
+
+
+class active_layer_PT_base:
+    bl_label = "Active Layer"
+    bl_options = set()
+
+    @classmethod
+    def poll(cls, context):
+        layer_stack = get_layer_stack(context)
+        return layer_stack is not None and layer_stack.is_initialized
+
+    def draw(self, context):
+        layout = self.layout
+
+        layer_stack = get_layer_stack(context)
+        active_layer = layer_stack.active_layer
+        if active_layer is None:
+            return
+
+        # Layer baking operators
+        if active_layer.is_baked:
+            op_props = layout.operator("material.pml_free_layer_bake")
+        else:
+            op_props = layout.operator("material.pml_bake_layer")
+        op_props.layer_name = active_layer.name
+
+
+class active_layer_channels_PT_base:
+    """Base class for Channels subpanel of the active layer panel"""
+    bl_label = "Channels"
+    bl_options = set()
+
+    def draw(self, context):
+        layout = self.layout
+        layer_stack = get_layer_stack(context)
+
+        active_layer = layer_stack.active_layer
+        if active_layer is None:
+            return
+
+        active_channel = active_layer.active_channel
+        if active_channel is None:
+            return
+
+        col = layout.column(align=True)
+
+        col.template_list("PML_UL_layer_channels_list", "", active_layer,
+                          "channels", active_layer, "active_channel_index",
+                          maxrows=8, sort_lock=False)
+
+        if active_layer == layer_stack.base_layer:
+            col.label(text="Base layer channels are always enabled.")
+
+        else:
+            # Add/remove layer channel buttons
+            row = col.row(align=True)
+            row.menu("PML_MT_add_channel_layer", icon='ADD', text="")
+            if active_channel is not None:
+                op_props = row.operator("material.pml_layer_remove_channel",
+                                        icon='REMOVE', text="")
+                op_props.channel_name = active_channel.name
+
+                # Custom blend mode
+                # Same UI as for layer stack channels
+                self.draw_custom_blending_props(layout, active_channel)
+                layout.separator()
+
+                # Hardness
+                self.draw_hardness(layout, active_channel)
+                layout.separator()
+
+        node_tree = active_layer.node_tree
+        if node_tree is None or active_channel is None:
+            return
+
+        output_node = next((x for x in node_tree.nodes
+                           if isinstance(x, NodeGroupOutput)), None)
+        socket = output_node.inputs.get(active_channel.name)
+
+        if output_node is not None and socket is not None:
+            layout.template_node_view(node_tree, output_node, socket)
+
+    @classmethod
+    def draw_custom_blending_props(cls, layout, ch) -> None:
+        # Same UI as for layer stack channels
+        layer_stack_channels_PT_base.draw_custom_blending_props(layout, ch)
+
+    @classmethod
+    def draw_custom_hardness_props(cls, layout, ch) -> None:
+        # Same UI as for layer stack channels
+        layer_stack_channels_PT_base.draw_custom_hardness_props(layout, ch)
+
+    @classmethod
+    def draw_hardness(cls, layout, channel) -> None:
+        col = layout.column(align=True)
+        col.label(text="Hardness")
+
+        row = col.row(align=True)
+        row.prop(channel, "hardness", text="")
+        row.operator("material.pml_copy_hardness_to_all",
+                     text="", icon='DUPLICATE')
+
+        if (channel.hardness != 'DEFAULT'
+                and channel.hardness_supports_threshold):
+            col.prop(channel, "hardness_threshold")
+
+        cls.draw_custom_hardness_props(col, channel)
+
+
+class active_layer_node_mask_PT_base:
+    bl_label = "Node Mask"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+        layer_stack = get_layer_stack(context)
+
+        active_layer = layer_stack.active_layer
+        if active_layer is None:
+            return
+
+        row = layout.row(align=True)
+        row.enabled = (active_layer != layer_stack.base_layer)
+        row.template_ID(active_layer, "node_mask",
+                        new="material.pml_new_node_mask")
+        op_props = row.operator("node.pml_view_shader_node_group",
+                                text="", icon='NODETREE')
+        op_props.custom_description = "Edit this layer's node mask"
+        op_props.node_group = getattr(active_layer.node_mask, "name", "")
+
+        if active_layer.node_mask is not None:
+            col = layout.column(align=True)
+            col.operator("material.pml_apply_node_mask")
+            col.operator("material.pml_node_mask_to_stencil")
 
 
 class settings_PT_base:

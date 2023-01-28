@@ -6,6 +6,8 @@ from bpy.types import Panel
 from .common import (layer_stack_PT_base,
                      layer_stack_channels_PT_base,
                      active_layer_PT_base,
+                     active_layer_channels_PT_base,
+                     active_layer_node_mask_PT_base,
                      settings_PT_base,
                      UDIM_PT_base,
                      debug_PT_base
@@ -34,6 +36,16 @@ class PML_PT_layer_stack_channels_ip(ImgPaintPanel,
 
 class PML_PT_active_layer_ip(active_layer_PT_base, ImgPaintPanel):
     pass
+
+
+class PML_PT_active_layer_node_mask_ip(active_layer_node_mask_PT_base,
+                                       ImgPaintPanel):
+    bl_parent_id = "PML_PT_active_layer_ip"
+
+
+class PML_PT_active_layer_channels_ip(active_layer_channels_PT_base,
+                                      ImgPaintPanel):
+    bl_parent_id = "PML_PT_active_layer_ip"
 
 
 class PML_PT_layer_stack_settings_ip(ImgPaintPanel, settings_PT_base):
@@ -75,6 +87,8 @@ class PML_PT_layer_stack_popover_ip(ImgPaintPanel, layer_stack_PT_base):
 classes = (PML_PT_layer_stack_ip,
            PML_PT_active_layer_ip,
            PML_PT_layer_stack_channels_ip,
+           PML_PT_active_layer_node_mask_ip,
+           PML_PT_active_layer_channels_ip,
            PML_PT_udim_layout_ip,
            PML_PT_layer_stack_settings_ip,
            PML_PT_debug_ip,
