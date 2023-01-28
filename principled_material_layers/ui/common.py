@@ -10,6 +10,8 @@ from bpy.types import Menu, NodeGroupOutput, UIList, UI_UL_list
 from .. import bake_group
 from .. import blending
 from .. import hardness
+from .. import utils
+
 from ..asset_helper import file_entry_from_handle
 from ..preferences import get_addon_preferences
 
@@ -760,15 +762,26 @@ class active_layer_node_mask_PT_base:
         row.enabled = not active_layer.is_base_layer
         row.template_ID(active_layer, "node_mask",
                         new="material.pml_new_node_mask")
-        op_props = row.operator("node.pml_view_shader_node_group",
-                                text="", icon='NODETREE')
-        op_props.custom_description = "Edit this layer's node mask"
-        op_props.node_group = getattr(active_layer.node_mask, "name", "")
 
         if active_layer.node_mask is not None:
+            op_props = row.operator("node.pml_view_shader_node_group",
+                                    text="", icon='NODETREE')
+            op_props.custom_description = "Edit this layer's node mask"
+            op_props.node_group = getattr(active_layer.node_mask, "name", "")
+
             col = layout.column(align=True)
             col.operator("material.pml_apply_node_mask")
             col.operator("material.pml_node_mask_to_stencil")
+
+            layout.separator()
+            self.draw_node_view(layout, active_layer.node_mask)
+
+    @classmethod
+    def draw_node_view(cls, layout, node_mask) -> None:
+        group_out = utils.nodes.get_node_by_type(node_mask, "NodeGroupOutput")
+        if group_out is not None and group_out.inputs:
+            layout.template_node_view(node_mask, group_out,
+                                      group_out.inputs[0])
 
 
 class settings_PT_base:
