@@ -642,7 +642,7 @@ class NodeTreeBuilder:
                                        alpha_x_opacity.outputs[0],
                                        parent=frame)
 
-        frame.location = (850*(position-1) + 300, -100)
+        frame.location = (1000*(position-1) + 300, -100)
         return frame
 
     def _insert_layer_shared(self, layer, parent):

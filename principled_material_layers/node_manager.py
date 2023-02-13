@@ -291,7 +291,7 @@ class NodeManager(bpy.types.PropertyGroup):
             output_node.location.x = 400
         else:
             layer_frame = nodes[NodeNames.layer_frame(layer)]
-            output_node.location.x = layer_frame.location.x + 900
+            output_node.location.x = layer_frame.location.x + 1000
 
         if layer_stack.is_baked:
             self._connect_output_baked()
