@@ -10,6 +10,7 @@ from bpy.props import (BoolProperty,
                        IntVectorProperty,
                        StringProperty)
 
+from .. import image_mapping
 from ..bake import apply_node_mask_bake, bake_node_mask_to_image
 from ..channel import SOCKET_TYPES
 from ..material_layer import LAYER_TYPES
@@ -407,6 +408,39 @@ class PML_OT_convert_layer(Operator):
         return ""
 
 
+class PML_OT_layer_img_projection(Operator):
+    bl_idname = "material.pml_set_layer_img_proj"
+    bl_label = "Set Image Projection"
+    bl_description = ("Changes the projection of any Image Texture nodes "
+                      "in the active layer's material")
+    bl_options = {'INTERNAL', 'REGISTER'}
+
+    proj_mode: EnumProperty(
+        items=image_mapping.IMG_PROJ_MODES,
+        name="Projection",
+        default='FLAT',
+    )
+
+    @classmethod
+    def poll(cls, context):
+        return (pml_op_poll(context)
+                and get_layer_stack(context).active_layer is not None)
+
+    def execute(self, context):
+        active_layer = get_layer_stack(context).active_layer
+        node_tree = active_layer.node_tree
+
+        if not any(get_nodes_by_type(node_tree, "ShaderNodeTexImage")):
+            self.report({'INFO'}, "No Image nodes in layer's node tree")
+            return {'CANCELLED'}
+        if active_layer.img_proj_mode == self.proj_mode == 'ORIGINAL':
+            return {'CANCELLED'}
+
+        image_mapping.set_layer_projection(active_layer, self.proj_mode)
+
+        return {'FINISHED'}
+
+
 class PML_OT_layer_add_channel(Operator):
     bl_idname = "material.pml_layer_add_channel"
     bl_label = "Add Layer Channel"
@@ -693,6 +727,7 @@ classes = (PML_OT_set_active_layer_index,
            PML_OT_apply_node_mask,
            PML_OT_node_mask_to_stencil,
            PML_OT_convert_layer,
+           PML_OT_layer_img_projection,
            PML_OT_layer_add_channel,
            PML_OT_layer_remove_channel,
            PML_OT_stack_add_channel,

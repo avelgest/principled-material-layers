@@ -20,7 +20,7 @@ from bpy.props import (BoolProperty,
 
 from bpy.types import PropertyGroup
 
-
+from . import image_mapping
 from .channel import BasicChannel, Channel
 from .preferences import get_addon_preferences
 
@@ -207,6 +207,19 @@ class MaterialLayer(PropertyGroup):
         name="Is Baked",
         default=False,
     )
+    img_proj_mode: EnumProperty(
+        items=image_mapping.IMG_PROJ_MODES,
+        name="Image Projection",
+        description="The projection mode used by image nodes in this"
+                    "layer's material"
+    )
+    img_proj_blend: FloatProperty(
+        name="Blend",
+        description="The blend factor used for box projection",
+        default=0.0, min=0.0, max=1.0,
+        subtype='FACTOR'
+    )
+
     # Parent/child layers are not currently supported
     parent: PointerProperty(
         type=MaterialLayerRef,
@@ -627,6 +640,8 @@ class MaterialLayer(PropertyGroup):
 
         self._refresh_preview_material()
 
+        self.img_proj_mode = 'ORIGINAL'
+
     def _create_preview_material(self) -> None:
         if self.node_tree is None:
             return
@@ -712,7 +727,7 @@ class MaterialLayer(PropertyGroup):
             return
         layer_stack = self.layer_stack
         if layer_stack.is_initialized:
-            self.layer_stack.node_manager.rebuild_node_tree()
+            layer_stack.node_manager.rebuild_node_tree()
 
     def _update_name(self) -> None:
         unique_name = self._get_unique_name()

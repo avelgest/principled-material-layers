@@ -175,6 +175,48 @@ def delete_nodes_not_in(nodes: bpy.types.Nodes,
         nodes.remove(node)
 
 
+def link_to_string(link: Optional[bpy.types.NodeLink]) -> str:
+    """Stores a link as a string using the names of the nodes/sockets.
+    The returned value can be used by make_link_from_string. link may
+    be None.
+    """
+    delim = "\n\n"
+    if link is None:
+        return ""
+    return (f"{link.from_node.name}{delim}{link.from_socket.name}{delim}"
+            f"{link.to_node.name}{delim}{link.to_socket.name}")
+
+
+def make_link_from_string(node_tree: NodeTree,
+                          string: str,
+                          from_socket: Optional[NodeSocket] = None,
+                          to_socket: Optional[NodeSocket] = None,
+                          ) -> Optional[bpy.types.NodeLink]:
+    """Creates and returns a link using a string returned by
+    link_to_string. Returns None if making the link failed (e.g if a
+    node has been deleted since string was made) or string is "".
+    """
+    delim = "\n\n"
+
+    if not string:
+        return None
+
+    try:
+        from_node_s, from_soc_s, to_node_s, to_soc_s = string.split(delim)
+    except ValueError as e:
+        raise ValueError("Expected string to be a value returned from "
+                         "link_to_string") from e
+
+    if from_socket is None and from_node_s in node_tree.nodes:
+        from_socket = node_tree.nodes[from_node_s].outputs.get(from_soc_s)
+    if to_socket is None and to_node_s in node_tree.nodes:
+        to_socket = node_tree.nodes[to_node_s].inputs.get(to_soc_s)
+
+    if from_socket is None or to_socket is None:
+        return None
+    return node_tree.links.new(to_socket, from_socket)
+
+
 @dataclass
 class Rect:
     left: float
@@ -197,6 +239,10 @@ class Rect:
     @bottom.setter
     def bottom(self, value) -> None:
         self.height = self.top - value
+
+    @property
+    def center(self) -> typing.Tuple[float, float]:
+        return (self.left + self.width / 2, self.top - self.height/2)
 
 
 def nodes_bounding_box(nodes: Collection[Node]) -> Rect:

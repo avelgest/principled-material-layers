@@ -10,6 +10,7 @@ from bpy.types import Menu, NodeGroupOutput, UIList, UI_UL_list
 from .. import bake_group
 from .. import blending
 from .. import hardness
+from .. import image_mapping
 from .. import utils
 
 from ..asset_helper import file_entry_from_handle
@@ -418,6 +419,23 @@ class PML_MT_custom_hardness_select(CustomHardnessBlendSelectBase, Menu):
                        set_op="material.pml_channel_set_custom_hardness",
                        compat=hardness.is_group_hardness_compat)
 
+
+class PML_MT_set_image_proj(Menu):
+    """Menu for setting the projection of all image nodes in a layer's
+    material. Used in the Image Mapping subpanel.
+    """
+    bl_idname = "PML_MT_set_image_proj"
+    bl_label = "Set Image Projection"
+    bl_description = ("Sets the projection of all image nodes in a layer's "
+                      "material")
+
+    def draw(self, context):
+        layout = self.layout
+        for val, name, descr, *_ in image_mapping.IMG_PROJ_MODES:
+
+            layout.operator("material.pml_set_layer_img_proj",
+                            text=name).proj_mode = val
+
 # Panels
 
 
@@ -784,6 +802,33 @@ class active_layer_node_mask_PT_base:
                                       group_out.inputs[0])
 
 
+class active_layer_image_map_PT_base:
+    bl_label = "Image Mapping"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        layer = get_layer_stack(context).active_layer
+        if layer is None:
+            return
+
+        current_mode = layout.enum_item_name(layer, "img_proj_mode",
+                                             layer.img_proj_mode)
+        layout.menu("PML_MT_set_image_proj", text=current_mode)
+
+        if layer.img_proj_mode == 'BOX':
+            layout.prop(layer, "img_proj_blend")
+
+        node_tree = layer.node_tree
+        coord_map_node = node_tree.nodes.get(image_mapping.COORD_MAP_NODE_NAME)
+        if coord_map_node is not None:
+            col = layout.column(align=True)
+            for socket in coord_map_node.inputs:
+                if not socket.is_linked:
+                    col.prop(socket, "default_value", text=socket.name)
+
+
 class settings_PT_base:
     bl_label = "Settings"
     bl_options = {'DEFAULT_CLOSED'}
@@ -916,6 +961,7 @@ classes = (
     PML_MT_channel_blend_mode,
     PML_MT_custom_blend_mode_select,
     PML_MT_custom_hardness_select,
+    PML_MT_set_image_proj,
     )
 
 register, unregister = bpy.utils.register_classes_factory(classes)
