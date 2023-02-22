@@ -717,6 +717,8 @@ class active_layer_channels_PT_base:
                                         icon='REMOVE', text="")
                 op_props.channel_name = active_channel.name
 
+                layout.prop(active_channel, "opacity")
+
                 # Custom blend mode
                 # Same UI as for layer stack channels
                 self.draw_custom_blending_props(layout, active_channel)

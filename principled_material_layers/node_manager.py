@@ -8,7 +8,7 @@ from typing import Optional
 
 import bpy
 
-from bpy.types import NodeReroute, NodeSocket, ShaderNode
+from bpy.types import NodeReroute, NodeSocket
 
 from .on_load_manager import pml_trusted_callback
 from .pml_node_tree import NodeNames, rebuild_node_tree
@@ -163,16 +163,18 @@ class NodeManager(bpy.types.PropertyGroup):
         """
         return NodeNames.hardness_threshold(layer, channel) in self.nodes
 
-    def update_blend_node(self, layer, channel) -> Optional[ShaderNode]:
+    def has_channel_opacity(self, layer, channel) -> bool:
+        """Returns true if a opacity node exists for channel of layer."""
+        return NodeNames.channel_opactity(layer, channel) in self.nodes
+
+    def update_blend_node(self, layer, channel) -> None:
         # Since child nodes are not yet supported ignore any layer that
         # is not top level in the stack (also ignore any unintialized
         # layer).
         if not layer or not layer.is_top_level:
-            return None
+            return
 
-        layer_stack = self.layer_stack
-        nodes = layer_stack.node_tree.nodes
-        links = layer_stack.node_tree.links
+        nodes = self.layer_stack.node_tree.nodes
 
         making_info = channel.blend_node_make_info
 
@@ -180,63 +182,15 @@ class NodeManager(bpy.types.PropertyGroup):
         node = nodes.get(node_name)
 
         if node is None:
-            return None
+            return
+        if not channel.enabled and isinstance(node, NodeReroute):
+            return
 
-        if not channel.enabled:
-            if isinstance(node, NodeReroute):
-                # No changes needed
-                return node
-
-            new_node = nodes.new("NodeReroute")
-
-        elif node.bl_idname == making_info.bl_idname:
-            # No need to make a new node just update the existing one
+        if node.bl_idname == making_info.bl_idname:
+            # Just update the options of the existing node
             making_info.update_node(node, channel)
-            return node
         else:
-            new_node = making_info.make(layer_stack.node_tree, channel)
-            new_node.hide = True
-
-        # Prevent naming collisions
-        node.name = node.name + "_old"
-
-        new_node.name = node_name
-        new_node.label = f"{channel.name} Blend"
-        new_node.location = node.parent.location + node.location
-        new_node.parent = node.parent
-
-        # Copy links from the old node's first output
-        for link in node.outputs[0].links:
-            links.new(link.to_socket, new_node.outputs[0])
-
-        # Get prev_layer_ch_out from the old layer
-        if isinstance(node, NodeReroute):
-            # The output socket of this channel on the previous layer
-            prev_layer_ch_out = node.inputs[0].links[0].from_socket
-        else:
-            prev_layer_ch_out = node.inputs[1].links[0].from_socket
-
-        # Delete the old node
-        nodes.remove(node)
-        del node
-
-        # Connect the new node's inputs
-
-        if isinstance(new_node, NodeReroute):
-            links.new(new_node.inputs[0], prev_layer_ch_out)
-            return new_node
-
-        alpha_socket = self.get_layer_final_alpha_socket(layer, nodes)
-
-        # The ShaderNodeGroup of layer
-        ma_group_output = self.get_ma_group_output_socket(layer, channel)
-
-        links.new(new_node.inputs[0], alpha_socket)
-        links.new(new_node.inputs[1], prev_layer_ch_out)
-        links.new(new_node.inputs[2], ma_group_output)
-
-        assert new_node.name == node_name
-        return new_node
+            self.rebuild_node_tree()
 
     def _connect_output_baked(self):
         """Connects the sockets of the group output node when the layer

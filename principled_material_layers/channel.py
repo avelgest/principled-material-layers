@@ -188,6 +188,15 @@ class Channel(BasicChannel):
                     "is baked",
         min=-1, max=3, default=-1
     )
+
+    opacity: FloatProperty(
+        name="Opacity",
+        description="The opacity of this channel for this layer",
+        min=0.0, max=1.0, default=1.0,
+        subtype='FACTOR',
+        update=lambda self, _: self._opacity_update()
+    )
+
     # renormalize is only used by the layer stack, not individual layers
     renormalize: BoolProperty(
         name="Renormalize",
@@ -244,6 +253,15 @@ class Channel(BasicChannel):
     def set_bake_image(self, image, channel: int = -1):
         self.bake_image = image
         self.bake_image_channel = channel
+
+    def _opacity_update(self):
+        if self.opacity > 1.0-1e-3 and self.opacity < 1.0:
+            self.opacity = 1.0
+            return
+        if self.opacity < 1.0 and self.is_layer_channel:
+            nm = self.layer_stack.node_manager
+            if not nm.has_channel_opacity(self.layer, self):
+                nm.rebuild_node_tree()
 
     @property
     def effective_hardness(self) -> str:

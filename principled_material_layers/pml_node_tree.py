@@ -3,6 +3,8 @@
 import itertools as it
 import warnings
 
+from typing import Optional
+
 import bpy
 from bpy.types import NodeReroute, NodeSocket, ShaderNode
 from mathutils import Vector
@@ -51,6 +53,13 @@ class NodeNames:
         a custom blending function otherwise a MixRGB node.
         """
         return f"{layer.identifier}.blend.{channel.name}"
+
+    @staticmethod
+    def channel_opactity(layer, channel):
+        """Math node that affects the opacity of an individual channel
+        for layer.
+        """
+        return f"{layer.identifier}.{channel.name}.opacity"
 
     @staticmethod
     def one_const():
@@ -286,6 +295,25 @@ class NodeTreeBuilder:
             split_rgb_node.name = NodeNames.bake_image_rgb(image)
             split_rgb_node.hide = True
 
+    def _add_ch_opacity_node(self, layer, layer_ch,
+                             blend_node, alpha_socket) -> ShaderNode:
+        """Adds node that multiplies alpha_socket by layer_ch's opacity
+        property. layer_ch should be a channel of layer.
+        """
+        ch_opacity = self.nodes.new("ShaderNodeMath")
+        ch_opacity.name = NodeNames.channel_opactity(layer, layer_ch)
+        ch_opacity.label = f"{layer_ch.name} Opacity"
+        ch_opacity.operation = 'MULTIPLY'
+        ch_opacity.parent = blend_node.parent
+        ch_opacity.hide = True
+        ch_opacity.width = 100
+        ch_opacity.location = blend_node.location - Vector((225, -60))
+
+        self.links.new(ch_opacity.inputs[0], alpha_socket)
+        self._add_socket_driver(ch_opacity.inputs[1],
+                                layer_ch, "opacity")
+        return ch_opacity
+
     def _add_disabled_layers_ma_nodes(self) -> None:
         """Adds Group nodes with the layers' node trees for layers
         where layer.enabled == False. Done so that baking works even
@@ -299,6 +327,37 @@ class NodeTreeBuilder:
             ma_group.label = f"{ma_group.label} (disabled)"
             ma_group.hide = True
             ma_group.location = (-800, idx * -100)
+
+    def _add_hardness_node(self, layer, ch, alpha_soc) -> Optional[ShaderNode]:
+        """Adds and returns a node for a layer channel's hardness
+        linked to socket alpha_soc. If no node is needed (e.g the
+        channel's hardness is LINEAR) then returns None.
+        """
+        node_make = ch.hardness_node_make_info
+
+        if node_make is None:
+            return None
+
+        blend_node = self.nodes[NodeNames.blend_node(layer, ch)]
+
+        hardness_node = node_make.make(self.node_tree, ch)
+        hardness_node.name = NodeNames.hardness_node(layer, ch)
+        hardness_node.label = f"Hardness: {ch.name}"
+        hardness_node.hide = True
+        hardness_node.width = 100
+        hardness_node.parent = blend_node.parent
+        hardness_node.location = blend_node.location + Vector((-120, 25))
+
+        # Add and link a threshold node if supported
+        self._add_hardness_threshold_node(hardness_node, layer, ch)
+
+        # Show only the first input/output
+        for x in it.chain(hardness_node.inputs[1:], hardness_node.outputs[1:]):
+            x.hide = True
+
+        # Connect to the layer's final alpha (i.e. layer_alpha_x_opacity)
+        self.links.new(hardness_node.inputs[0], alpha_soc)
+        return hardness_node
 
     def _add_hardness_threshold_node(self, hardness_node, layer, ch):
         """If hardness_node has an input socket named 'threshold' then
@@ -314,7 +373,7 @@ class NodeTreeBuilder:
         threshold_node.parent = hardness_node.parent
         threshold_node.width = 100
         threshold_node.hide = True
-        threshold_node.location = hardness_node.location + Vector((-120, 30))
+        threshold_node.location = hardness_node.location - Vector((120, -15))
 
         self.links.new(hardness_node.inputs[1], threshold_node.outputs[0])
 
@@ -719,18 +778,16 @@ class NodeTreeBuilder:
 
     def _insert_layer_blend_nodes(self, layer, previous_layer, alpha_socket,
                                   parent=None) -> None:
-        layer_stack = self.layer_stack
-        nodes = self.nodes
         links = self.links
 
         ch_count = it.count()
-        for ch in layer_stack.channels:
+        for ch in self.layer_stack.channels:
             if not ch.enabled:
                 continue
 
             layer_ch = layer.channels.get(ch.name)
             if layer_ch is None or not layer_ch.enabled:
-                ch_blend = nodes.new("NodeReroute")
+                ch_blend = self.nodes.new("NodeReroute")
 
             else:
                 ch_blend = layer_ch.make_blend_node(self.node_tree)
@@ -741,6 +798,7 @@ class NodeTreeBuilder:
             ch_blend.parent = parent
             ch_blend.location = (640, next(ch_count) * -50 + 150)
 
+            # Previous layer's output for this channel
             prev_layer_ch_out = self._get_layer_output_socket(previous_layer,
                                                               ch)
 
@@ -748,46 +806,35 @@ class NodeTreeBuilder:
                 links.new(ch_blend.inputs[0], prev_layer_ch_out)
                 continue
 
-            ma_group_output = self._get_ma_group_output_socket(layer, layer_ch)
-
-            links.new(ch_blend.inputs[0], alpha_socket)
+            # Link the second input to the previous layer's output
             links.new(ch_blend.inputs[1], prev_layer_ch_out)
-            links.new(ch_blend.inputs[2], ma_group_output)
 
-            self._insert_layer_hardness_nodes(layer, layer_ch, parent)
+            # Link the third input to this layer's material node group
+            links.new(ch_blend.inputs[2],
+                      self._get_ma_group_output_socket(layer, layer_ch))
+
+            # Socket giving the alpha value for this channel
+            ch_alpha_soc = alpha_socket
+
+            # If needed insert a multiply node for layer_ch's opacity
+            # and use its output for the alpha
+            if layer_ch.opacity < 1.0:
+                ch_alpha_soc = self._add_ch_opacity_node(
+                                    layer, layer_ch,
+                                    ch_blend, ch_alpha_soc).outputs[0]
+
+            # If needed insert a multiply node for layer_ch's hardness
+            # and use its output for the alpha
+            hardness = self._add_hardness_node(layer, layer_ch, ch_alpha_soc)
+            if hardness is not None:
+                ch_alpha_soc = hardness.outputs[0]
+
+            # Link the first input to the alpha for this channel
+            links.new(ch_blend.inputs[0], ch_alpha_soc)
 
             if ch.renormalize:
                 renorm = self._add_renorm_node(ch_blend.outputs[0])
                 renorm.name = NodeNames.renormalize(layer, ch)
-
-    def _insert_layer_hardness_nodes(self, layer, ch, parent) -> None:
-        node_make = ch.hardness_node_make_info
-
-        if node_make is None:
-            return
-
-        final_alpha_soc = self._get_layer_final_alpha_socket(layer)
-        blend_node = self.nodes[NodeNames.blend_node(layer, ch)]
-
-        hardness_node = node_make.make(self.node_tree, ch)
-        hardness_node.name = NodeNames.hardness_node(layer, ch)
-        hardness_node.label = f"Hardness: {ch.name}"
-        hardness_node.hide = True
-        hardness_node.width = 100
-        hardness_node.parent = parent
-        hardness_node.location = blend_node.location + Vector((-120, 30))
-
-        # Add and link a threshold node if supported
-        self._add_hardness_threshold_node(hardness_node, layer, ch)
-
-        # Show only the first input/output
-        for x in it.chain(hardness_node.inputs[1:], hardness_node.outputs[1:]):
-            x.hide = True
-
-        # Insert the node into the link between the blend node and
-        # the layer's final alpha (i.e. layer_alpha_x_opacity)
-        self.links.new(hardness_node.inputs[0], final_alpha_soc)
-        self.links.new(blend_node.inputs[0], hardness_node.outputs[0])
 
     def _insert_layer_mask_node(self, layer) -> None:
         nodes = self.nodes
