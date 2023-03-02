@@ -145,7 +145,10 @@ class PML_UL_layer_stack_channels_list(UIList):
         row.prop(channel, "enabled", text="")
         row.label(text=channel.name)
 
-        draw_ch_preview_btn(row, layer_stack, layer=None, channel=channel)
+        if channel.enabled:
+            draw_ch_preview_btn(row, layer_stack, layer=None, channel=channel)
+        else:
+            row.label(text="", icon='BLANK1')
 
     def draw_filter(self, context, layout):
         layout.prop(self, "sort_enabled")
