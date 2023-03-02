@@ -97,7 +97,7 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
 
         for output in self.outputs:
             pml_channel = layer_stack.channels[output.name]
-            output.hide = not pml_channel.enabled
+            output.enabled = pml_channel.enabled
 
         self._register_msgbus()
 
@@ -180,7 +180,7 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
         links = self.id_tree.links
 
         for output in self.outputs:
-            if output.hide:
+            if output.hide or not output.enabled:
                 continue
 
             to_input = node.inputs.get(output.name)
@@ -196,16 +196,10 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
         stack_ch = layer_stack.channels.get(name)
 
         if out_socket is not None and stack_ch is not None:
-            # If the output should be hidden then delete all its links
-            if not stack_ch.enabled and out_socket.is_linked:
-                for link in out_socket.links:
-                    node_tree.links.remove(link)
-            # TODO use dict to store and recover removed links
-
-            out_socket.hide = not stack_ch.enabled
+            out_socket.enabled = stack_ch.enabled
 
             if (layer_stack.auto_connect_shader
-                    and not out_socket.hide
+                    and out_socket.enabled
                     and not out_socket.is_linked):
                 in_socket = self._find_socket_to_link_to(name)
 

@@ -165,7 +165,7 @@ class LayerStack(bpy.types.PropertyGroup):
                     "group node set to this node group."
     )
     auto_connect_shader: BoolProperty(
-        name="Auto-Connect New Sockets",
+        name="Auto-Connect Sockets",
         description="Automatically connect sockets of this layer stack's "
                     "Material Layer node to the shader node whenever a "
                     "channel is added/enabled",

@@ -438,7 +438,8 @@ class PML_OT_link_sockets_by_name(Operator):
         input_sockets = it.chain(*[x.inputs for x in context.selected_nodes
                                    if x is not active_node])
 
-        output_names = {x.name for x in active_node.outputs if not x.hide}
+        output_names = {x.name for x in active_node.outputs
+                        if x.enabled and not x.hide}
 
         for in_socket in input_sockets:
             if in_socket.name in output_names and not in_socket.is_linked:
