@@ -100,12 +100,16 @@ def _import_material_asset_path(name: str,
                                 link: bool) -> Material:
 
     if not hasattr(bpy.data.libraries, "load"):
-        return _import_material_asset_path2(name, library_path, link)
-
-    with bpy.data.libraries.load(library_path, link=link, assets_only=True)\
-            as (_data_from, data_to):
-        data_to.materials = [name]
-    return data_to.materials[0]
+        ma = _import_material_asset_path2(name, library_path, link)
+    else:
+        with bpy.data.libraries.load(library_path,
+                                     link=link,
+                                     assets_only=True) as (_, data_to):
+            data_to.materials = [name]
+        ma = data_to.materials[0]
+    if not link:
+        ma.asset_clear()
+    return ma
 
 
 def _import_material_asset_path2(name: str,
