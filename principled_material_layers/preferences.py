@@ -1,9 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-import inspect
-
-from types import SimpleNamespace
-from typing import Any, Optional, Union
+from typing import Optional
 
 import bpy
 
@@ -13,15 +10,15 @@ from bpy.props import (BoolProperty,
                        FloatProperty)
 
 
+if "_is_proper_addon" not in globals():
+    _is_proper_addon: Optional[bool] = None
+
+
 class PMLPreferences(AddonPreferences):
     bl_idname = __package__
 
     # Cached value for preferences.
-    # Will be either a PMLPreferences or SimpleNamespace instance.
-    _prefs: Union[AddonPreferences, SimpleNamespace] = None
-
-    # Preferences to use when PMLPreferences cannot be found
-    _mock_prefs: Optional[SimpleNamespace] = None
+    _prefs: AddonPreferences = None
 
     default_values = {
                       "debug": False,
@@ -139,31 +136,7 @@ class PMLPreferences(AddonPreferences):
         """Clear the cached value of get_prefs."""
         cls._prefs = None
 
-    @classmethod
-    def _init_mock_prefs(cls) -> SimpleNamespace:
-        """Returns an SimpleNamespace containing the bpy properties of
-        PMLPreferences as python variables initialized to their default
-        values. For use when this addons preferences are missing from
-        bpy.context (e.g. if the addon was enabled by the command line).
-
-        Sets the _mock_prefs class variable to the return value.
-        """
-        mock_prefs = SimpleNamespace()
-
-        for attr_name, prop in _get_annotations(cls).items():
-            # Check the class variable 'default_values' first
-            default = cls.default_values.get(attr_name)
-
-            # TODO may need to use eval(prop) if all annotations are
-            # stored as strings in later Python versions
-            if default is None and hasattr(prop, "keywords"):
-                default = prop.keywords.get("default", None)
-
-            setattr(mock_prefs, attr_name, default)
-        cls._mock_prefs = mock_prefs
-        return mock_prefs
-
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         col = layout.column(align=True)
@@ -185,7 +158,7 @@ class PMLPreferences(AddonPreferences):
         col.prop(self, "use_op_based_ma_copy")
 
     @classmethod
-    def get_prefs(cls) -> Union[AddonPreferences, SimpleNamespace]:
+    def get_prefs(cls) -> AddonPreferences:
         """Gets the preferences for this addon. If the AddonPreferences
         instance cannot be found (e.g. if the addon was enabled by the
         command line) then a SimpleNamespace with the preferences
@@ -195,27 +168,25 @@ class PMLPreferences(AddonPreferences):
         if cls._prefs is not None:
             return cls._prefs
 
-        addon = bpy.context.preferences.addons.get(__package__)
-        if addon is None:
-            if not cls._mock_prefs:
-                cls._init_mock_prefs()
-            prefs = cls._mock_prefs
-        else:
-            prefs = addon.preferences
+        global _is_proper_addon
 
+        addon = bpy.context.preferences.addons.get(__package__)
+
+        if addon is None:
+            # E.g. if addon is loaded from the command line
+            addon = bpy.context.preferences.addons.new()
+            addon.module = __package__
+
+            _is_proper_addon = False
+        elif _is_proper_addon is None:
+            _is_proper_addon = True
+
+        prefs = addon.preferences
         cls._prefs = prefs
         return prefs
 
 
-def _get_annotations(obj: Any) -> dict:
-    if hasattr(inspect, "get_annotations"):
-        return inspect.get_annotations(obj)
-    if isinstance(obj, type):
-        return getattr(obj.__dict__, "__annotations__", {})
-    return getattr(obj, "__annotations__", {})
-
-
-def get_addon_preferences() -> Union[PMLPreferences, SimpleNamespace]:
+def get_addon_preferences() -> PMLPreferences:
     """Gets the preferences for this addon. If the AddonPreferences
     instance cannot be found (e.g. if the addon was enabled by the
     command line) then a SimpleNamespace with the preferences
@@ -226,9 +197,12 @@ def get_addon_preferences() -> Union[PMLPreferences, SimpleNamespace]:
 
 
 def running_as_proper_addon() -> bool:
-    """Returns True if the addon has its preferences in
-    bpy.context.addons"""
-    return isinstance(get_addon_preferences(), AddonPreferences)
+    """Returns True if running as a normal addon (rather than specified
+    on the command line).
+    """
+    if _is_proper_addon is None:
+        get_addon_preferences()
+    return bool(_is_proper_addon)
 
 
 def register():
