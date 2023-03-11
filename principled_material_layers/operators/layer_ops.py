@@ -690,9 +690,10 @@ class PML_OT_reload_active_layer(Operator):
     bl_idname = "material.pml_reload_active_layer"
     bl_label = "Reload Active Layer"
     bl_description = (
-        "Reload the canvas image from the image that stores "
-        "the layer data. This is only for layers that pack their data in "
-        "images shared with other layers")
+        "Reload the canvas image from the image that stores the layer's "
+        "data, discarding all changes since the last time the layer was "
+        "active. This is only for layers that pack their data in images "
+        "shared with other layers")
     bl_options = {'INTERNAL', 'REGISTER'}
 
     @classmethod
@@ -713,7 +714,7 @@ class PML_OT_reload_active_layer(Operator):
                                      "image")
             return {'CANCELLED'}
 
-        layer_stack.image_manager.reload_active_layer()
+        layer_stack.image_manager.reload_tmp_active_image()
 
         return {'FINISHED'}
 

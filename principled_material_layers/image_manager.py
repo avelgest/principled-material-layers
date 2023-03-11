@@ -612,7 +612,7 @@ class ImageManager(bpy.types.PropertyGroup):
     def reload_tmp_active_image(self) -> None:
         """If a temporary active image is being used instead of the
         active layer's 'image' property then this loads the active
-        layer's alpha into all the RGB channels of theactive image.
+        layer's data into all the RGB channels of the active image.
 
         Any changes made to the active image but not written back
         to the layer will be lost.
