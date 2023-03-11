@@ -10,6 +10,7 @@ import bpy
 from bpy.props import PointerProperty
 from bpy.types import Image
 
+from . import utils
 from .utils.image import save_image_copy
 from .utils.layer_stack_utils import get_layer_stack_from_prop
 
@@ -227,8 +228,7 @@ class TiledStorage(bpy.types.PropertyGroup):
                         image_format=fmt)
 
     def _gen_default_first_tile(self, number=1001) -> None:
-        context = bpy.context.copy()
-        context["edit_image"] = self.udim_image
+        op_caller = utils.ops.OpCaller(bpy.context, edit_image=self.udim_image)
 
         op_kwargs = {"width": 32,
                      "height": 32,
@@ -237,12 +237,10 @@ class TiledStorage(bpy.types.PropertyGroup):
 
         tile = self.udim_image.tiles.get(number)
         if tile is None:
-            if bpy.ops.image.tile_add.poll(context):
-                bpy.ops.image.tile_add(context, number=number, **op_kwargs)
+            op_caller.call(bpy.ops.image.tile_add, number=number, **op_kwargs)
         else:
             self.udim_image.tiles.active = tile
-            if bpy.ops.image.tile_fill.poll(context):
-                bpy.ops.image.tile_fill(context, **op_kwargs)
+            op_caller.call(bpy.ops.image.tile_fill, **op_kwargs)
 
     @property
     def is_data(self) -> bool:

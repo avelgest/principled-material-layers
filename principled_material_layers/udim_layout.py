@@ -14,16 +14,15 @@ from bpy.props import (BoolProperty,
                        StringProperty)
 from bpy.types import Image, PropertyGroup
 
+from . import utils
 from .utils.image import can_pack_udims
 from .utils.layer_stack_utils import get_layer_stack_from_prop
 from .utils.ops import save_image
 
 
 def save_tiled_image(image: Image) -> None:
-    context = bpy.context.copy()
-    context["edit_image"] = image
-
-    bpy.ops.image.save(context)
+    op_caller = utils.ops.OpCaller(bpy.context, edit_image=image)
+    op_caller.call(bpy.ops.image.save)
 
 
 def _pack_image(image: Image) -> None:
@@ -251,14 +250,13 @@ class UDIMLayout(PropertyGroup):
             if tile is None:
                 raise KeyError(f"No tile with number {number}.")
 
-        context = bpy.context.copy()
-        context["edit_image"] = image
+        op_caller = utils.ops.OpCaller(bpy.context, edit_image=image)
 
-        bpy.ops.image.tile_add(context, number=tile.number,
-                               width=tile.width,
-                               height=tile.height,
-                               float=tile.is_float,
-                               alpha=tile.has_alpha)
+        op_caller.call(bpy.ops.image.tile_add, number=tile.number,
+                       width=tile.width,
+                       height=tile.height,
+                       float=tile.is_float,
+                       alpha=tile.has_alpha)
 
     def _remove_image_tile(self, image, number) -> None:
         for tile in image.tiles:

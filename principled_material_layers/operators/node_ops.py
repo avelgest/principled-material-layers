@@ -151,21 +151,18 @@ class PML_OT_view_shader_node_group(Operator):
                 and space.node_tree is not None)
 
     def _close_node_group(self, context, area):
-        context = context.copy()
-        context["area"] = area
-        context["space_data"] = area.spaces[0]
-        context["region"] = area.regions[0]
+        op_caller = utils.ops.OpCaller(context, area=area,
+                                       space_data=area.spaces[0],
+                                       region=area.regions[0])
 
-        bpy.ops.node.group_edit(context)
+        op_caller.call(bpy.ops.node.group_edit)
 
     def _open_node_group(self, node_group, context, area):
         space = area.spaces[0]
 
-        # TODO Use temp_override in versions targeting only Blender 3.2+
-        context = context.copy()
-        context["area"] = area
-        context["space_data"] = space
-        context["region"] = area.regions[0]
+        op_caller = utils.ops.OpCaller(context, area=area,
+                                       space_data=space,
+                                       region=area.regions[0])
 
         with TempNodes(space.edit_tree) as nodes:
             group_node = nodes.new("ShaderNodeGroup")
@@ -174,10 +171,10 @@ class PML_OT_view_shader_node_group(Operator):
 
             nodes.active = group_node
 
-            context["selected_nodes"] = [group_node]
-            context["active_node"] = group_node
+            op_caller.keywords["selected_nodes"] = [group_node]
+            op_caller.keywords["active_node"] = group_node
 
-            bpy.ops.node.group_edit(context)
+            op_caller.call(bpy.ops.node.group_edit)
 
         if self.set_nodes_active:
             self._set_path_nodes_active(space, node_group)

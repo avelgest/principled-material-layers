@@ -3,6 +3,7 @@
 import contextlib
 import io
 import sys
+import typing
 
 import bpy
 
@@ -32,22 +33,21 @@ def save_all_modified() -> None:
     if im.active_image is not None:
         images.add(im.active_image)
 
-    op_ctx = bpy.context.copy()
+    op_caller = OpCaller(bpy.context)
     with filter_stdstream(prefix="Info:", stdout=True):
         for img in images:
             if not img.is_dirty:
                 continue
-            op_ctx["edit_image"] = img
-            bpy.ops.image.save(op_ctx)
+            op_caller["edit_image"] = img
+            op_caller.call(bpy.ops.image.save)
 
 
 def save_image(image: bpy.types.Image, dirty_only=True) -> None:
     if dirty_only and not image.is_dirty:
         return
-    op_ctx = bpy.context.copy()
-    op_ctx["edit_image"] = image
+    op_caller = OpCaller(bpy.context, edit_image=image)
     with filter_stdstream(prefix="Info:", stdout=True):
-        bpy.ops.image.save(op_ctx)
+        op_caller.call(bpy.ops.image.save)
 
 
 def pml_is_supported_editor(context: Context) -> bool:
@@ -123,6 +123,45 @@ def filter_stdstream(*strings: str, prefix=None,
                 if line in to_filter or (prefix and line.startswith(prefix)):
                     continue
                 print(line, file=stream)
+
+
+class OpCaller:
+    """Class that can call operators using the provided context and
+    context override keyword args. Uses Context.temp_override when
+    available and falls back on passing a dict.
+    """
+    def __init__(self, context, **keywords):
+        self._context = context
+        self.keywords = keywords
+
+    def __getitem__(self, key):
+        return self.keywords[key]
+
+    def __setitem__(self, key, value):
+        self.keywords[key] = value
+
+    def call(self, op: typing.Union[str, callable],
+             exec_ctx: str = 'EXEC_DEFAULT',
+             undo: typing.Optional[bool] = None, **props
+             ) -> typing.Set[str]:
+        """Calls operator op using this OpCaller's context and the
+        props provided. op may be either a callable operator or
+        the bl_idname of an operator. Accepts exec_ctx and undo as
+        arguments. Returns the result of the operator call as a set.
+        """
+        if isinstance(op, str):
+            submod, name = op.split(".", 1)
+            op = getattr(getattr(bpy.ops, submod), name)
+
+        args = [exec_ctx] if undo is None else [exec_ctx, undo]
+
+        if hasattr(self._context, "temp_override"):
+            with self._context.temp_override(**self.keywords):
+                return op(*args, **props)
+        else:
+            ctx_dict = self._context.copy()
+            ctx_dict.update(self.keywords)
+            return op(ctx_dict, *args, **props)
 
 
 class WMProgress:
