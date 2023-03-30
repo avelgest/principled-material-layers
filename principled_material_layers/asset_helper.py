@@ -87,7 +87,8 @@ def import_material_asset(asset: Union[AssetHandle, FileSelectEntry],
         file_data = file_entry_from_handle(asset)
 
     # Path to the blend file containing the asset
-    library_path = AssetHandle.get_full_library_path(file_data, library)
+    library_path = AssetHandle.get_full_library_path(file_data,
+                                                     asset_library_ref=library)
 
     if delayed:
         return DelayedMaterialImport(file_data.name, library_path, link)
