@@ -139,6 +139,32 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
         layout.context_pointer_set("pml_layer_stack", self.layer_stack)
         layout.menu("PML_MT_open_layer_group")
 
+    def _delayed_refresh_disabled_outputs(self):
+        """Registers a timer that disables outputs of this node
+        to match the disabled channels of the layer stack.
+        """
+        layer_stack_id = self.layer_stack.identifier
+        node_id = self.identifier
+
+        def set_outputs_enabled():
+            self = _get_node(layer_stack_id, node_id)
+            if self is None:
+                return
+
+            disabled_channels = {x.name for x in self.layer_stack.channels
+                                 if not x.enabled}
+            for x in self.outputs:
+                if x.name in disabled_channels:
+                    x.enabled = False
+        bpy.app.timers.register(set_outputs_enabled)
+
+    def update(self):
+        # Bug in Blender version 3.5.0 where sockets are re-enabled on
+        # node graph updates. So refresh the enabled state of sockets
+        # after a small delay
+        if bpy.app.version >= (3, 5, 0):
+            self._delayed_refresh_disabled_outputs()
+
     @pml_trusted_callback
     def _register_msgbus(self) -> None:
         layer_stack = self.layer_stack
