@@ -19,6 +19,10 @@ from .utils.naming import unique_name_in
 from .utils.nodes import get_closest_node_of_type, get_output_node
 
 
+# Cache of node names to identifiers
+_node_id_name_cache: dict[str, str] = {}
+
+
 def _get_node(layer_stack_id: str, node_id: str) -> ShaderNodePMLStack:
     """Gets a node with the given identifier from the node tree of
     a layer stack's material.
@@ -32,9 +36,18 @@ def _get_node(layer_stack_id: str, node_id: str) -> ShaderNodePMLStack:
     if not ma.node_tree:
         return None
 
-    # TODO cache node name to optimize
+    # Check the cache first
+    cached_name = _node_id_name_cache.get(node_id)
+    if cached_name is not None:
+        found = ma.node_tree.nodes.get(cached_name)
+        if found is not None and getattr(found, "identifier") == node_id:
+            return found
+
+        del _node_id_name_cache[node_id]
+
     found = _get_node_by_id(ma.node_tree, node_id)
     if found is not None:
+        _node_id_name_cache[node_id] = found.name
         return found
 
     # Search in any group nodes
