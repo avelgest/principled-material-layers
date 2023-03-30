@@ -177,10 +177,13 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
                 replace: If True replace existing links, otherwise only
                     create links to unlinked sockets.
         """
+        layer_stack_chs = self.layer_stack.channels
         links = self.id_tree.links
 
         for output in self.outputs:
-            if output.hide or not output.enabled:
+            if (not output.enabled
+                    or output.name not in layer_stack_chs
+                    or not layer_stack_chs[output.name].enabled):
                 continue
 
             to_input = node.inputs.get(output.name)
