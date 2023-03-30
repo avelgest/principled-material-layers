@@ -801,6 +801,11 @@ class PML_OT_replace_layer_material(ReplaceLayerMaOpBase, Operator):
         if layer_stack.image_manager.uses_tiled_storage:
             col.prop(self, "tiled_storage_add")
 
+        col = layout.column(align=True)
+        col.label(text="Use the Asset Browser context menu or sidebar ",
+                  icon='INFO')
+        col.label(text="to add asset materials to layers.", icon='BLANK1')
+
         # TODO live update property? (replace layer's material on
         # selection change)
 
