@@ -299,6 +299,7 @@ def add_tiled_helper_nodes(img_node: bpy.types.ShaderNodeTexImage,
     uv_shift.name = f".pml_tiled_storage.{uv_shift.name}"
     uv_shift.label = f"{img_node.label} Map UVs"
     uv_shift.operation = 'ADD'
+    uv_shift.parent = img_node.parent
     uv_shift.location = (img_node.location.x - 200, img_node.location.y)
     uv_shift.width = 120
     uv_shift.hide = True
@@ -310,11 +311,10 @@ def add_tiled_helper_nodes(img_node: bpy.types.ShaderNodeTexImage,
 
     uv_map = node_tree.nodes.new("ShaderNodeUVMap")
     uv_map.name = f".pml_tiled_storage.{uv_map.name}"
+    uv_map.parent = img_node.parent
     uv_map.location = (uv_shift.location.x - 200, uv_shift.location.y)
     uv_map.uv_map = uv_map_name
     uv_map.hide = True
-
-    uv_shift.parent = uv_map.parent = img_node.parent
 
     node_tree.links.new(img_node.inputs[0], uv_shift.outputs[0])
     node_tree.links.new(uv_shift.inputs[0], uv_map.outputs[0])

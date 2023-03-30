@@ -7,6 +7,7 @@ from typing import Optional
 
 from bpy.types import ShaderNodeTree, ShaderNode
 
+from . import tiled_storage
 from . import utils
 
 # The projection used by any image nodes in the material
@@ -137,7 +138,9 @@ def _set_layer_projection_flat(layer) -> None:
 
 
 def _get_img_nodes(node_tree: ShaderNodeTree) -> typing.List[ShaderNode]:
-    return list(utils.nodes.get_nodes_by_type(node_tree, "ShaderNodeTexImage"))
+    return [x for x in utils.nodes.get_nodes_by_type(node_tree,
+                                                     "ShaderNodeTexImage")
+            if not tiled_storage.is_tiled_storage_node(x)]
 
 
 def _store_orig_values(node_tree: ShaderNodeTree) -> None:
