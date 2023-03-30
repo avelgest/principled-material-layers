@@ -13,7 +13,6 @@ from .. import hardness
 from .. import image_mapping
 from .. import utils
 
-from ..asset_helper import file_entry_from_handle
 from ..preferences import get_addon_preferences
 
 from ..utils.image import can_pack_udims
@@ -220,18 +219,6 @@ class PML_UL_layer_channels_list(UIList):
 
     def draw_filter(self, context, layout):
         pass
-
-
-class PML_UL_material_asset_list(UIList):
-    """Simple UIList used as a fallback when there are too many assets
-    for template_asset_view to display well
-    """
-    def draw_item(self, context, layout, data, item, icon, active_data,
-                  active_property, index=0, flt_flag=0):
-        asset_handle = item
-        file_entry = file_entry_from_handle(asset_handle)
-
-        layout.label(text=file_entry.name)
 
 
 # Menus
@@ -960,7 +947,6 @@ classes = (
     PML_UL_material_layers_list,
     PML_UL_layer_stack_channels_list,
     PML_UL_layer_channels_list,
-    PML_UL_material_asset_list,
     PML_MT_open_layer_group,
     PML_MT_add_channel_layer,
     PML_MT_channel_blend_mode,

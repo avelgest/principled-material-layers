@@ -33,9 +33,7 @@ from ..channel import BasicChannel
 
 from ..utils.duplicate_node_tree import duplicate_node_tree
 from ..utils.layer_stack_utils import get_layer_stack
-from ..utils.materials import (IsMaterialCompat,
-                               check_material_compat,
-                               check_material_asset_compat,
+from ..utils.materials import (check_material_compat,
                                remove_appended_material)
 from ..utils.nodes import (delete_nodes_not_in,
                            get_node_by_type,
@@ -781,24 +779,6 @@ class PML_OT_replace_layer_material(ReplaceLayerMaOpBase, Operator):
         default=-1
     )
 
-    ma_asset_index: IntProperty(
-        name="Material Index (Asset)",
-        description="The selected material's index in the asset view",
-        default=0
-    )
-
-    ma_select_mode: EnumProperty(
-        name="Material Selection",
-        items=(('LOCAL', "Local", "A material contained or linked by the "
-                                  "current .blend file", 'NONE', 0),
-               ('ASSET', "Asset", "A material from an asset library",
-                'EXPERIMENTAL', 1)
-               ),
-        default='LOCAL'
-    )
-
-    displayed_asset_lib = None
-
     @classmethod
     def poll(cls, context):
         return pml_op_poll(context)
@@ -821,20 +801,14 @@ class PML_OT_replace_layer_material(ReplaceLayerMaOpBase, Operator):
         if layer_stack.image_manager.uses_tiled_storage:
             col.prop(self, "tiled_storage_add")
 
-        layout.prop(self, "ma_select_mode", expand=True)
-
         # TODO live update property? (replace layer's material on
         # selection change)
 
-        if self.ma_select_mode == 'LOCAL':
-            row = layout.row()
-            row.scale_y = 2.0
-            row.template_list("PML_UL_load_material_list", "",
-                              bpy.data, "materials", self, "ma_index",
-                              type='GRID', rows=4, columns=2)
-
-        elif self.ma_select_mode == 'ASSET':
-            self.draw_ma_asset_list(context, layout)
+        row = layout.row()
+        row.scale_y = 2.0
+        row.template_list("PML_UL_load_material_list", "",
+                          bpy.data, "materials", self, "ma_index",
+                          type='GRID', rows=4, columns=2)
 
     def execute(self, context):
         layer_stack = get_layer_stack(context)
@@ -860,37 +834,6 @@ class PML_OT_replace_layer_material(ReplaceLayerMaOpBase, Operator):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
 
-    def _check_asset_compat(self, context) -> Optional[IsMaterialCompat]:
-        layer_stack = get_layer_stack(context)
-        asset = self.selected_asset
-        if asset is None:
-            return None
-        asset_lib = bpy.context.asset_library_ref
-
-        return check_material_asset_compat(asset, asset_lib,
-                                           layer_stack, delayed=True)
-
-    def _temp_append_material_asset(self) -> Optional[Material]:
-        """Temporarily append the selected asset to the file and tell
-        the exit stack to delete it on exit. If the file has a local_id
-        then the local_id is just returned and will not deleted."""
-        asset = self.selected_asset
-
-        if getattr(asset, "local_id", None) is not None:
-            return asset.local_id
-
-        try:
-            ma = append_material_asset(asset, bpy.context.asset_library_ref)
-        except NotImplementedError:
-            self.report({'ERROR'}, "Replacing the layer material with asset is"
-                                   "not supported for this version.")
-            return None
-
-        if self.exit_stack is not None:
-            self.exit_stack.callback(lambda: remove_appended_material(ma))
-
-        return ma
-
     def _get_material(self, layer_stack) -> Optional[Material]:
 
         if self.material_name:
@@ -900,11 +843,9 @@ class PML_OT_replace_layer_material(ReplaceLayerMaOpBase, Operator):
                             f"Material '{self.material_name}' not found.")
                 return None
 
-        elif self.ma_select_mode == 'LOCAL' and self.ma_index >= 0:
+        elif self.ma_index >= 0:
             material = bpy.data.materials[self.ma_index]
 
-        elif self.ma_select_mode == 'ASSET' and self.ma_asset_index >= 0:
-            material = self._temp_append_material_asset()
         else:
             self.report({'WARNING'}, "No material specified.")
             return None
@@ -913,68 +854,6 @@ class PML_OT_replace_layer_material(ReplaceLayerMaOpBase, Operator):
             return None
 
         return material
-
-    def draw_asset_compat(self, context, layout):
-        prefs = get_addon_preferences()
-
-        row = layout.row()
-        if isinstance(prefs, bpy.types.AddonPreferences):
-            row.prop(prefs, "check_assets_compat", text="Check Compatible")
-
-        if prefs.check_assets_compat:
-            is_compat = self._check_asset_compat(context)
-            if is_compat is not None:
-                row.label(text=is_compat.label_text_short,
-                          icon=is_compat.label_icon)
-
-    def draw_ma_asset_list(self, context, layout):
-        wm = context.window_manager
-        ws = context.workspace
-        cls = type(self)
-
-        if (len(wm.pml_ma_assets) > 24
-                and cls.displayed_asset_lib == str(ws.asset_library_ref)):
-
-            # template_asset_view doesn't seem to work very well with
-            # large asset libraries fall back on a simpler UIList
-            col = layout.column(align=True)
-            col.label(text="Material assets can also be loaded via the ",
-                           icon='INFO')
-            col.label(text="sidebar of the Asset Browser.", icon='BLANK1')
-
-            self.draw_asset_compat(context, col)
-
-            col.prop(ws, "asset_library_ref")
-            col.template_list("PML_UL_material_asset_list", "",
-                              wm, "pml_ma_assets",
-                              self, "ma_asset_index",
-                              type='GRID', columns=3)
-        else:
-            self.draw_asset_compat(context, layout)
-
-            # FIXME Can only select with the arrow keys
-            layout.label(text="The selection can be changed using the arrow "
-                              "keys")
-            layout.template_asset_view(
-                "pml_ma_asset_list",
-                ws, "asset_library_ref",
-                wm, "pml_ma_assets",
-                self, "ma_asset_index",
-                filter_id_types={"filter_material"}
-            )
-            if self.ma_asset_index >= len(wm.pml_ma_assets):
-                self.ma_asset_index = 0
-        # Even when falling back on a UIList need to display asset_view
-        # once per-library to fill pml_ma_assets do this by comparing
-        # displayed_asset_lib with asset_library_ref
-        cls.displayed_asset_lib = str(ws.asset_library_ref)
-
-    @property
-    def selected_asset(self) -> Optional[bpy.types.AssetHandle]:
-        wm = bpy.context.window_manager
-        if not wm.pml_ma_assets:
-            return None
-        return wm.pml_ma_assets[self.ma_asset_index]
 
 
 class ReplaceLayerMaOpAssetBrowser(ReplaceLayerMaOpBase):
