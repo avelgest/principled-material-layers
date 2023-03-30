@@ -343,7 +343,7 @@ def add_nodes_to_tiled_storage(layer_stack,
     nodes = [x for x in nodes
              if isinstance(x, bpy.types.ShaderNodeTexImage)
              and x.image is not None
-             and x.image.source == 'FILE']
+             and x.image.source in ('FILE', 'GENERATED')]
 
     im = layer_stack.image_manager
 
@@ -386,6 +386,11 @@ def is_tiled_storage_node(node: bpy.types.ShaderNodeTexImage) -> bool:
     of a TiledStorage instance.
     """
     return "pml_tiled_storage_old_image" in node
+
+
+def tiled_storage_enabled(layer_stack) -> bool:
+    """Returns True if layer_stack currently uses tiled storage."""
+    return layer_stack.image_manager.uses_tiled_storage
 
 
 def register():

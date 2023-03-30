@@ -14,6 +14,7 @@ from .common import (layer_stack_PT_base,
                      debug_PT_base
                      )
 
+from .. import tiled_storage
 from ..preferences import running_as_proper_addon
 from ..utils.layer_stack_utils import get_layer_stack
 
@@ -144,15 +145,22 @@ def node_ops_menu_func(self, context):
     layout = self.layout
 
     edit_tree = getattr(context.space_data, "edit_tree", None)
-    if (edit_tree is not None
-            and edit_tree.type == 'SHADER'
-            and not edit_tree.is_embedded_data):
-        layout.separator()
-        op_label = "Link to Group Output"
-        layout.operator("node.pml_connect_to_group_output",
-                        text=op_label).replace_links = False
-        layout.operator("node.pml_connect_to_group_output",
-                        text=f"{op_label} (Replace)").replace_links = True
+    if (edit_tree is not None and edit_tree.type == 'SHADER'):
+        if not edit_tree.is_embedded_data:
+            layout.separator()
+            op_label = "Link to Group Output"
+            layout.operator("node.pml_connect_to_group_output",
+                            text=op_label).replace_links = False
+            layout.operator("node.pml_connect_to_group_output",
+                            text=f"{op_label} (Replace)").replace_links = True
+
+        layer_stack = get_layer_stack(context)
+        if (tiled_storage.tiled_storage_enabled(layer_stack)
+                and any(x.bl_idname == "ShaderNodeTexImage"
+                        for x in context.selected_nodes)):
+            layout.separator()
+            layout.operator("node.pml_add_to_tiled_storage")
+            layout.operator("node.pml_remove_from_tiled_storage")
 
 
 classes = (PML_PT_layer_stack_ne,

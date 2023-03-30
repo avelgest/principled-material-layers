@@ -14,6 +14,7 @@ from bpy.props import (BoolProperty,
 
 from .. import blending
 from .. import hardness
+from .. import tiled_storage
 from .. import utils
 from ..utils.layer_stack_utils import get_layer_stack
 from ..utils.nodes import ensure_outputs_match_channels
@@ -493,6 +494,57 @@ class PML_OT_connect_to_group_output(Operator):
         return self.execute(context)
 
 
+class PML_OT_add_to_tiled_storage(Operator):
+    bl_idname = "node.pml_add_to_tiled_storage"
+    bl_label = "Add to Tiled Storage"
+    bl_description = ("Adds the images of the selected Image Texture nodes to "
+                      "the layer stack's tiled storage")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        if (not pml_op_poll(context)
+                or not getattr(context, "selected_nodes", None)):
+            return False
+
+        return tiled_storage.tiled_storage_enabled(get_layer_stack(context))
+
+    def execute(self, context):
+        img_nodes = [x for x in context.selected_nodes
+                     if x.bl_idname == "ShaderNodeTexImage"]
+        if not img_nodes:
+            self.report({'WARNING'}, "No Image Texture nodes selected")
+            return {'CANCELLED'}
+
+        layer_stack = get_layer_stack(context)
+        tiled_storage.add_nodes_to_tiled_storage(layer_stack, *img_nodes)
+        return {'FINISHED'}
+
+
+class PML_OT_remove_from_tiled_storage(Operator):
+    bl_idname = "node.pml_remove_from_tiled_storage"
+    bl_label = "Remove from Tiled Storage"
+    bl_description = ("Removes the images of the selected Image Texture nodes "
+                      "from the layer stack's tiled storage")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        if not pml_op_poll(context) or not hasattr(context, "selected_nodes"):
+            return False
+        return any(x for x in context.selected_nodes
+                   if x.bl_idname == "ShaderNodeTexImage"
+                   and tiled_storage.is_tiled_storage_node(x))
+
+    def execute(self, context):
+        layer_stack = get_layer_stack(context)
+        img_nodes = [x for x in context.selected_nodes
+                     if x.bl_idname == "ShaderNodeTexImage"]
+
+        tiled_storage.remove_from_tiled_storage(layer_stack, *img_nodes)
+        return {'FINISHED'}
+
+
 classes = (PML_OT_view_shader_node_group,
            PML_OT_rebuild_pml_stack_node_tree,
            PML_OT_new_blending_node_group,
@@ -501,6 +553,8 @@ classes = (PML_OT_view_shader_node_group,
            PML_OT_add_pml_node,
            PML_OT_verify_layer_outputs,
            PML_OT_link_sockets_by_name,
-           PML_OT_connect_to_group_output)
+           PML_OT_connect_to_group_output,
+           PML_OT_add_to_tiled_storage,
+           PML_OT_remove_from_tiled_storage)
 
 register, unregister = bpy.utils.register_classes_factory(classes)

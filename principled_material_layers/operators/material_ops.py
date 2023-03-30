@@ -748,7 +748,7 @@ class ReplaceLayerMaOpBase:
             self.enable_stack_channels(layer_stack, layer)
 
         if (self.tiled_storage_add
-                and layer_stack.image_manager.uses_tiled_storage):
+                and tiled_storage.tiled_storage_enabled(layer_stack)):
             tiled_storage.add_nodes_to_tiled_storage(layer_stack,
                                                      *layer.node_tree.nodes)
 
