@@ -9,7 +9,9 @@ submodule_names = ("naming",
                    "nodes",
                    "duplicate_node_tree",
                    "materials",
-                   "temp_changes")
+                   "temp_changes",
+                   "node_tree_import"
+                   )
 
 _submodules = import_all(submodule_names, __name__)
 
