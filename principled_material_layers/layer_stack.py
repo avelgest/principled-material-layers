@@ -1189,8 +1189,8 @@ class LayerStack(bpy.types.PropertyGroup):
            May be None.
         """
         ch_name = self.get("preview_channel_name", "")
-        layer_id = self.get("preview_layer_id", "")
         if ch_name:
+            layer_id = self.get("preview_layer_id", "")
             if layer_id:
                 layer = self.get_layer_by_id(layer_id)
                 return layer.channels.get(ch_name)

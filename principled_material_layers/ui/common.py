@@ -117,10 +117,10 @@ class PML_UL_material_layers_list(UIList):
 
 def draw_ch_preview_btn(layout, layer_stack, *, layer, channel) -> None:
     if layer_stack.is_channel_previewed(channel):
-        layout.operator("nodes.pml_clear_preview_channel", text="",
+        layout.operator("node.pml_clear_preview_channel", text="",
                         emboss=True, depress=True, icon="SHADING_TEXTURE")
     else:
-        op_props = layout.operator("nodes.pml_preview_channel", text="",
+        op_props = layout.operator("node.pml_preview_channel", text="",
                                    emboss=False, icon="SHADING_TEXTURE")
         op_props.channel_name = channel.name
         op_props.layer_name = "" if layer is None else layer.name

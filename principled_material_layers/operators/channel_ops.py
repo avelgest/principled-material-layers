@@ -246,7 +246,7 @@ def restore_old_link(node_tree) -> None:
 
 
 class PML_OT_preview_channel(Operator):
-    bl_idname = "nodes.pml_preview_channel"
+    bl_idname = "node.pml_preview_channel"
     bl_label = "Preview Channel"
     bl_description = ("Connects the output of this channel directly to the "
                       "Material Output node")
@@ -366,7 +366,7 @@ class PML_OT_preview_channel(Operator):
 
 
 class PML_OT_clear_preview_channel(Operator):
-    bl_idname = "nodes.pml_clear_preview_channel"
+    bl_idname = "node.pml_clear_preview_channel"
     bl_label = "Clear Preview Channel"
     bl_description = ("Stop previewing a channel and restore the Material "
                       "Output node's previous connection")
