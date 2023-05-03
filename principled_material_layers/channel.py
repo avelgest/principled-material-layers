@@ -443,14 +443,36 @@ class Channel(BasicChannel):
 
 
 class PreviewModifier(NamedTuple):
-    """A preview modifier is a node group """
+    """A preview modifier is a node group placed between the socket of
+    a channel being sampled and the material output.
+    Attributes:
+        enum: String that should be used as an identifier in an
+            EnumProperty.
+        name: The name of this preview modifier in the interface.
+        description: An optional description that can be shown in a
+            tooltip.
+        node_group_name: The name of the node group to use. Should
+            match a file in the node_groups directory of the add-on.
+            If None then the preview will shown unmodified.
+        channel_types: Should be a container or None. If a container
+            the preview modifier will only be available for channels
+            with a socket_type contained in channel_types.
+        condition: If not None should be a callable that takes a
+            channel as its only argument and returns a bool. This
+            preview modifier will only be available for a channel
+            if condition is None or returns True for the channel.
+    """
     enum: str
     name: str
     description: str = ""
     node_group_name: Optional[str] = None
+    channel_types: Optional[set[str]] = None
     condition: Optional[Callable[[Channel], bool]] = None
 
     def load_node_group(self) -> Optional[bpy.types.ShaderNodeTree]:
+        """Loads this PreviewModifier's node group from its file and
+        returns it. Will return None if node_group_name is None.
+        """
         if not self.node_group_name:
             return None
         node_group = load_addon_node_group(self.node_group_name)
@@ -462,6 +484,13 @@ class PreviewModifier(NamedTuple):
         return (self.enum, self.name, self.description)
 
     def should_show_for(self, channel: Channel) -> bool:
+        """Returns True if this PreviewModifier should be available
+        for channel.
+        """
+        if (self.channel_types is not None
+                and channel.socket_type not in self.channel_types):
+            return False
+
         return True if self.condition is None else self.condition(channel)
 
 
@@ -471,12 +500,10 @@ PREVIEW_MODIFIERS = (
                     "helpful for some channels e.g. normals)"),
     PreviewModifier('GRAYSCALE', "Grayscale",
                     "Preview the luminance of a color",
-                    "PML Preview Grayscale",
-                    condition=lambda ch: ch.socket_type == 'COLOR'),
+                    "PML Preview Grayscale", channel_types={'COLOR'}),
     PreviewModifier('OBJECT_TO_TANGENT', "Tangent Space",
                     "Preview a vector channel in tangent space",
-                    "PML Object to Tangent Space",
-                    condition=lambda ch: ch.socket_type == 'VECTOR'),
+                    "PML Object to Tangent Space", channel_types={'VECTOR'}),
 )
 PREVIEW_MODIFIERS_ENUM = [x.to_enum_tuple() for x in PREVIEW_MODIFIERS]
 
