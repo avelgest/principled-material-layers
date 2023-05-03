@@ -13,6 +13,7 @@ from .. import hardness
 from .. import image_mapping
 from .. import utils
 
+from ..channel import PREVIEW_MODIFIERS
 from ..preferences import get_addon_preferences
 
 from ..utils.image import can_pack_udims
@@ -426,6 +427,33 @@ class PML_MT_set_image_proj(Menu):
             layout.operator("material.pml_set_layer_img_proj",
                             text=name).proj_mode = val
 
+
+class PML_MT_set_preview_modifier(Menu):
+    """Menu for setting the preview modifier of the channel given by
+    context.pml_channel.
+    """
+    bl_idname = "PML_MT_set_preview_modifier"
+    bl_label = "Set Preview Type"
+    bl_description = "Sets the preview type of the channel"
+
+    def draw(self, context):
+        channel = getattr(context, "pml_channel", None)
+        if channel is None:
+            return
+
+        layer_name = "" if not channel.is_layer_channel else channel.layer.name
+        channel_name = channel.name
+
+        layout = self.layout
+        for preview_modifier in PREVIEW_MODIFIERS:
+            if not preview_modifier.should_show_for(channel):
+                continue
+            op_props = layout.operator("node.pml_set_preview_modifier",
+                                       text=preview_modifier.name)
+            op_props.preview_modifier = preview_modifier.enum
+            op_props.layer_name = layer_name
+            op_props.channel_name = channel_name
+
 # Panels
 
 
@@ -539,6 +567,22 @@ class layer_stack_channels_PT_base:
         layer_stack = get_layer_stack(context)
         return layer_stack is not None and layer_stack.is_initialized
 
+    @classmethod
+    def draw_ch_preview_options(cls, layout, layer_stack, channel) -> None:
+        """Draws the preview type menu / preview button for channel."""
+        row = layout.row(align=True)
+        row.context_pointer_set("pml_channel", channel)
+
+        row.label(text="Preview:")
+
+        menu_text = row.enum_item_name(channel, "preview_modifier",
+                                       channel.preview_modifier)
+        row.menu("PML_MT_set_preview_modifier", text=menu_text)
+
+        draw_ch_preview_btn(row, layer_stack,
+                            layer=channel.layer,
+                            channel=channel)
+
     def draw(self, context):
         layout = self.layout
 
@@ -553,6 +597,9 @@ class layer_stack_channels_PT_base:
         row = layout.row()
         row.enabled = False
         row.prop(active_channel, "socket_type", text="Type")
+
+        # Draw the preview type menu / preview button
+        self.draw_ch_preview_options(layout, layer_stack, active_channel)
 
         if active_channel.socket_type == 'VECTOR':
             layout.prop(active_channel, "renormalize")
@@ -695,14 +742,22 @@ class active_layer_channels_PT_base:
                           "channels", active_layer, "active_channel_index",
                           maxrows=8, sort_lock=False)
 
-        if active_layer.is_base_layer:
-            col.label(text="Base layer channels are always enabled.")
+        is_base_layer = active_layer.is_base_layer
 
+        if is_base_layer:
+            col.label(text="Base layer channels are always enabled.")
         else:
             # Add/remove layer channel buttons
             row = col.row(align=True)
             row.menu("PML_MT_add_channel_layer", icon='ADD', text="")
-            if active_channel is not None:
+
+        if active_channel is not None:
+            # Preview type menu / preview button
+            layer_stack_channels_PT_base.draw_ch_preview_options(
+                    col, layer_stack, active_channel
+                )
+
+            if not is_base_layer:
                 op_props = row.operator("material.pml_layer_remove_channel",
                                         icon='REMOVE', text="")
                 op_props.channel_name = active_channel.name
@@ -953,6 +1008,7 @@ classes = (
     PML_MT_custom_blend_mode_select,
     PML_MT_custom_hardness_select,
     PML_MT_set_image_proj,
+    PML_MT_set_preview_modifier,
     )
 
 register, unregister = bpy.utils.register_classes_factory(classes)

@@ -1,11 +1,14 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
+from typing import Optional
+
 import bpy
 
 from bpy.props import StringProperty
 from bpy.types import Operator
 
 from ..blending import blend_mode_description, blend_mode_display_name
+from ..channel import PREVIEW_MODIFIERS_ENUM, preview_modifier_from_enum
 
 from .. import utils
 from ..pml_node import get_pml_nodes
@@ -14,6 +17,9 @@ from ..utils.ops import pml_op_poll
 
 # The name of the Group node used for previewing layer channels
 PREVIEW_GROUP_NODE_NAME = "pml_preview_group_node"
+
+# The name of the Group node between the preview and the material output
+PREVIEW_MOD_NODE_NAME = "pml_preview_modifier_node"
 
 
 class ChannelSetHardnessBlend:
@@ -266,6 +272,39 @@ class PML_OT_preview_channel(Operator):
     def poll(cls, context):
         return pml_op_poll(context)
 
+    @classmethod
+    def insert_preview_modifier(cls, channel, from_socket, to_socket) -> None:
+        """Adds or removes the preview modifier group node based on
+        channel's preview_modifier prop. preview_socket should be the
+        socket that the preview node is linked to.
+        """
+        preview_modifier = preview_modifier_from_enum(channel.preview_modifier)
+        node_tree = from_socket.id_data
+
+        modifier_group = preview_modifier.load_node_group()
+
+        modifier_node = node_tree.nodes.get(PREVIEW_MOD_NODE_NAME)
+        if modifier_group is None:
+            # If the preview modifier does not have a valid node group
+            # (e.g. 'NONE') then just delete the preview modifier node
+            if modifier_node is not None:
+                node_tree.nodes.remove(modifier_node)
+            return
+
+        if modifier_node is None:
+            modifier_node = node_tree.nodes.new("ShaderNodeGroup")
+            modifier_node.name = PREVIEW_MOD_NODE_NAME
+            modifier_node.label = "Preview Modifier"
+
+        modifier_node.node_tree = modifier_group
+        modifier_node.location = from_socket.node.location
+        modifier_node.location.x += from_socket.node.width + 30
+
+        if modifier_node.inputs:
+            node_tree.links.new(modifier_node.inputs[0], from_socket)
+        if modifier_node.outputs:
+            node_tree.links.new(to_socket, modifier_node.outputs[0])
+
     def __init__(self):
         self.layer_stack = None
         self.node_tree = None
@@ -297,7 +336,7 @@ class PML_OT_preview_channel(Operator):
             group_node = self.node_tree.nodes.new("ShaderNodeGroup")
             group_node.name = PREVIEW_GROUP_NODE_NAME
             group_node.hide = True
-            group_node.location = (self.ma_output.location.x - 300,
+            group_node.location = (self.ma_output.location.x - 360,
                                    self.ma_output.location.y + 100)
         return group_node
 
@@ -325,9 +364,11 @@ class PML_OT_preview_channel(Operator):
 
         store_output_link(self.node_tree, self.ma_output)
 
-        self.node_tree.links.new(self.ma_output.inputs[0], socket)
+        self.node_tree.links.new(self._ma_output_socket, socket)
 
         self.layer_stack.preview_channel = ch
+
+        self.insert_preview_modifier(ch, socket, self._ma_output_socket)
 
         return {'FINISHED'}
 
@@ -347,14 +388,14 @@ class PML_OT_preview_channel(Operator):
 
         group_node.label = f"{layer.name} Preview"
         group_node.node_tree = layer.node_tree
-        socket = group_node.outputs.get(self.channel_name)
+        out_socket = group_node.outputs.get(self.channel_name)
 
-        if socket is None:
+        if out_socket is None:
             self.node_tree.remove(group_node)
             return {'CANCELLED'}
 
         store_output_link(self.node_tree, self.ma_output)
-        self.node_tree.links.new(self.ma_output.inputs[0], socket)
+        self.node_tree.links.new(self._ma_output_socket, out_socket)
 
         # Hide all other sockets on the group node
         for socket in group_node.outputs:
@@ -362,7 +403,13 @@ class PML_OT_preview_channel(Operator):
 
         self.layer_stack.preview_channel = ch
 
+        self.insert_preview_modifier(ch, out_socket, self._ma_output_socket)
+
         return {'FINISHED'}
+
+    @property
+    def _ma_output_socket(self) -> bpy.types.NodeSocket:
+        return self.ma_output.inputs[0]
 
 
 class PML_OT_clear_preview_channel(Operator):
@@ -385,12 +432,101 @@ class PML_OT_clear_preview_channel(Operator):
         if node_tree is None:
             return {'CANCELLED'}
 
-        # Delete the layer preview group node
-        group_node = node_tree.nodes.get(PREVIEW_GROUP_NODE_NAME)
-        if group_node is not None:
-            node_tree.nodes.remove(group_node)
+        # Delete the layer preview and the preview modifier nodes
+        for node_name in (PREVIEW_GROUP_NODE_NAME, PREVIEW_MOD_NODE_NAME):
+            node = node_tree.nodes.get(node_name)
+            if node is not None:
+                node_tree.nodes.remove(node)
 
         restore_old_link(node_tree)
+
+        return {'FINISHED'}
+
+
+class PML_OT_set_preview_modifier(Operator):
+    bl_idname = "node.pml_set_preview_modifier"
+    bl_label = "Set Preview Modifier"
+    bl_description = "Sets a channel's preview type"
+    bl_options = {'INTERNAL', 'REGISTER'}
+
+    preview_modifier: bpy.props.EnumProperty(
+        items=PREVIEW_MODIFIERS_ENUM,
+        name="Preview Type",
+        default='NONE'
+    )
+    layer_name: StringProperty(
+        name="Layer Name",
+        description="The name of the layer containing the channel to be "
+                    "previewed"
+    )
+    channel_name: StringProperty(
+        name="Channel Name",
+        description="The name of the channel to be previewed"
+    )
+
+    @classmethod
+    def description(cls, _context, properties):
+        preview_mod = preview_modifier_from_enum(properties.preview_modifier)
+        return preview_mod.description
+
+    @classmethod
+    def poll(cls, context):
+        return pml_op_poll(context)
+
+    @staticmethod
+    def _get_preview_socket(node_tree,
+                            channel) -> Optional[bpy.types.NodeSocket]:
+        if channel.is_layer_channel:
+            preview_node = node_tree.nodes.get(PREVIEW_GROUP_NODE_NAME)
+            if preview_node:
+                return preview_node.outputs.get(channel.name)
+            return None
+
+        pml_node = get_pml_nodes(channel.layer_stack)[0]
+        return pml_node.outputs.get(channel.name)
+
+    def _get_channel(self, layer_stack) -> Optional:
+        if self.layer_name:
+            layer = layer_stack.layers.get(self.layer_name)
+            if layer:
+                return layer.channels.get(self.channel_name)
+            return None
+        return layer_stack.channels.get(self.channel_name)
+
+    def execute(self, context):
+        layer_stack = get_layer_stack(context)
+        node_tree = layer_stack.material.node_tree
+
+        if not self.channel_name:
+            self.report({'WARNING'}, "channel_name prop not given or is empty")
+
+        channel = self._get_channel(layer_stack)
+        if channel is None:
+            return {'CANCELLED'}
+
+        channel.preview_modifier = self.preview_modifier
+
+        # Replace or add the preview modifier group node only if
+        # channel is currently being previewed
+        if node_tree is None or not layer_stack.is_channel_previewed(channel):
+            return {'FINISHED'}
+
+        preview_socket = self._get_preview_socket(node_tree, channel)
+        if preview_socket is None:
+            return {'FINISHED'}
+
+        ma_output = utils.nodes.get_output_node(node_tree)
+        if ma_output is None:
+            self.report({'WARNING'}, "Cannot find a Material Output node")
+            return {'FINISHED'}
+
+        ma_output_soc = ma_output.inputs[0]
+        PML_OT_preview_channel.insert_preview_modifier(channel, preview_socket,
+                                                       ma_output_soc)
+        if not ma_output_soc.is_linked:
+            # If the preview modifier node was just deleted
+            # E.g. If changing to 'NONE' preview_modifier
+            node_tree.links.new(ma_output_soc, preview_socket)
 
         return {'FINISHED'}
 
@@ -401,7 +537,8 @@ classes = (PML_OT_channel_set_blend_mode,
            PML_OT_copy_hardness_to_all,
            PML_OT_copy_hardness_to_all_ls,
            PML_OT_preview_channel,
-           PML_OT_clear_preview_channel)
+           PML_OT_clear_preview_channel,
+           PML_OT_set_preview_modifier)
 
 
 register, unregister = bpy.utils.register_classes_factory(classes)

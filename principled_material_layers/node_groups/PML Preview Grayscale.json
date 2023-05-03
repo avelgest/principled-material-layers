@@ -1,0 +1,60 @@
+{
+    "name": "PML Preview Grayscale",
+    "bl_idname": "ShaderNodeTree",
+    "nodes": [
+        {
+            "bl_idname": "NodeGroupInput",
+            "props": {
+                "location": [-200.0, -0.0],
+                "name": "Group Input"
+            }
+        },
+        {
+            "bl_idname": "NodeGroupOutput",
+            "props": {
+                "location": [190.0, -0.0],
+                "name": "Group Output"
+            }
+        },
+        {
+            "bl_idname": "ShaderNodeRGBToBW",
+            "props": {
+                "name": "RGB to BW"
+            }
+        }
+    ],
+    "links": [
+        {
+            "from_node": "Group Input",
+            "from_socket": "Input_0",
+            "to_node": "RGB to BW",
+            "to_socket": "Color"
+        },
+        {
+            "from_node": "RGB to BW",
+            "from_socket": "Val",
+            "to_node": "Group Output",
+            "to_socket": "Output_1"
+        }
+    ],
+    "inputs": [
+        {
+            "name": "Color",
+            "default_value": [0.5, 0.5, 0.5, 1.0],
+            "description": "",
+            "hide_value": false,
+            "bl_socket_idname": "NodeSocketColor"
+        }
+    ],
+    "outputs": [
+        {
+            "name": "Val",
+            "default_value": 0.0,
+            "description": "",
+            "hide_value": false,
+            "max_value": 3.4028234663852886e+38,
+            "min_value": -3.4028234663852886e+38,
+            "bl_socket_idname": "NodeSocketFloat"
+        }
+    ]
+}

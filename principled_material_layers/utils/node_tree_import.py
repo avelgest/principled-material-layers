@@ -408,7 +408,7 @@ def load_addon_node_group(name: str, hide: bool = True) -> bpy.types.NodeTree:
     node_tree = load_tree_json(filename)
     node_tree.name = name
 
-    if not hide and node_tree.name.startswith("."):
+    if hide and not node_tree.name.startswith("."):
         node_tree.name = f".{name}"
 
     return node_tree

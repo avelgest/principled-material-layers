@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Callable, NamedTuple, Optional
 
 import bpy
 
@@ -17,7 +17,9 @@ from bpy.types import NodeSocket, ShaderNodeTree
 
 from . import blending
 from . import hardness
+
 from .utils.layer_stack_utils import get_layer_stack_from_prop
+from .utils.node_tree_import import load_addon_node_group
 
 SOCKET_TYPES = (('FLOAT', "Float", "Float in [-inf, inf]"),
                 ('FLOAT_FACTOR', "Float Factor", "Float in [0, 1]"),
@@ -205,6 +207,16 @@ class Channel(BasicChannel):
         set=lambda self, value: setattr(self, "_renormalize", value),
     )
 
+    # When a channel is previewed a node group may be used to modify
+    # the channel's output before it is displayed
+    preview_modifier: EnumProperty(
+        items=PREVIEW_MODIFIERS_ENUM,
+        name="Preview As",
+        description="How this channel should be previewed",
+        default='NONE',
+        update=lambda self, _: self._preview_modifier_update()
+    )
+
     # The identifier of the layer this channel belongs to. May be "" if
     # this channel instance is in LayerStack.channels rather than on a
     # layer
@@ -262,6 +274,26 @@ class Channel(BasicChannel):
             nm = self.layer_stack.node_manager
             if not nm.has_channel_opacity(self.layer, self):
                 nm.rebuild_node_tree()
+
+    def _preview_modifier_update(self) -> None:
+        # The preview_modifier of this channel on every layer should
+        # match the same channel on the layer stack itself.
+
+        preview_mod = self.preview_modifier
+        if self.is_layer_channel:
+            # For layer channels set the layer stack channel's value
+            # as well.
+            layer_stack_ch = self.layer_stack_channel
+            if layer_stack_ch.preview_modifier != preview_mod:
+                layer_stack_ch.preview_modifier = preview_mod
+        else:
+            # For layer stack channels set the value on the matching
+            # channel for each layer.
+            for layer in self.layer_stack.layers:
+                layer_ch = layer.channels.get(self.name)
+                if (layer_ch is not None
+                        and layer_ch.preview_modifier != preview_mod):
+                    layer_ch.preview_modifier = preview_mod
 
     @property
     def effective_hardness(self) -> str:
@@ -379,7 +411,7 @@ class Channel(BasicChannel):
         channel.
         """
         layer_stack = self.layer_stack
-        return layer_stack and layer_stack.channels.get(self.name)
+        return None if not layer_stack else layer_stack.channels.get(self.name)
 
     @property
     def _renormalize_default_val(self) -> bool:
@@ -408,6 +440,49 @@ class Channel(BasicChannel):
     def _renormalize(self, value: bool):
         if not self.is_layer_channel:
             self["renormalize"] = bool(value)
+
+
+class PreviewModifier(NamedTuple):
+    """A preview modifier is a node group """
+    enum: str
+    name: str
+    description: str = ""
+    node_group_name: Optional[str] = None
+    condition: Optional[Callable[[Channel], bool]] = None
+
+    def load_node_group(self) -> Optional[bpy.types.ShaderNodeTree]:
+        if not self.node_group_name:
+            return None
+        node_group = load_addon_node_group(self.node_group_name)
+        if node_group.type != 'SHADER':
+            return None
+        return node_group
+
+    def to_enum_tuple(self) -> tuple[str, str, str]:
+        return (self.enum, self.name, self.description)
+
+    def should_show_for(self, channel: Channel) -> bool:
+        return True if self.condition is None else self.condition(channel)
+
+
+PREVIEW_MODIFIERS = (
+    PreviewModifier('NONE', "Unmodified",
+                    "Preview the channel's actual value (may not be very "
+                    "helpful for some channels e.g. normals)"),
+    PreviewModifier('GRAYSCALE', "Grayscale", 
+                    "Preview the luminance of a color",
+                    "PML Preview Grayscale",
+                    condition=lambda ch: ch.socket_type == 'COLOR'),
+)
+PREVIEW_MODIFIERS_ENUM = [x.to_enum_tuple() for x in PREVIEW_MODIFIERS]
+
+
+def preview_modifier_from_enum(enum: str) -> PreviewModifier:
+    """Returns the PreviewModifier instance with the given enum string."""
+    for x in PREVIEW_MODIFIERS:
+        if x.enum == enum:
+            return x
+    raise KeyError(f"Unknown preview modifier enum '{enum}'")
 
 
 classes = (Channel, BasicChannel,)
