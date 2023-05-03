@@ -19,7 +19,8 @@ _STRUCT_IGNORE_PROPS = {"bl_rna", "id_data", "rna_type"}
 
 # Props to ignore when saving nodes
 _NODE_IGNORE_PROPS = {"dimensions", "internal_links", "inputs", "outputs",
-                      "select", "type", "width_hidden"} | _STRUCT_IGNORE_PROPS
+                      "interface", "select", "type", "width_hidden"
+                      } | _STRUCT_IGNORE_PROPS
 
 
 # References to nodes and bpy.types.ID instances are stored as strings
@@ -257,8 +258,10 @@ def _set_node_values_from_py(node: bpy.types.Node,
             # Needed for e.g. Float Curve node
             prop.update()
 
-    _socket_values_from_dict(node.inputs, node_dict["inputs"])
-    _socket_values_from_dict(node.outputs, node_dict["outputs"])
+    if "inputs" in node_dict:
+        _socket_values_from_dict(node.inputs, node_dict["inputs"])
+    if "outputs" in node_dict:
+        _socket_values_from_dict(node.outputs, node_dict["outputs"])
 
 
 def _nodes_from_py(node_tree: bpy.types.NodeTree,
@@ -388,12 +391,14 @@ def get_addon_node_group_dir() -> str:
     return os.path.join(base_dir, "node_groups")
 
 
-def load_addon_node_group(name: str) -> bpy.types.NodeTree:
+def load_addon_node_group(name: str, hide: bool = True) -> bpy.types.NodeTree:
     """Loads a node group named 'name' from this addons node_groups
     directory. If a node_group with this name already exists then it is
-    returned instead.
+    returned instead. If hide is True then the node group will have '.'
+    prepended to its name.
     """
-    existing = bpy.data.node_groups.get(name)
+    existing = (bpy.data.node_groups.get(name)
+                or bpy.data.node_groups.get(f".{name}"))
     if existing is not None:
         return existing
 
@@ -402,4 +407,8 @@ def load_addon_node_group(name: str) -> bpy.types.NodeTree:
 
     node_tree = load_tree_json(filename)
     node_tree.name = name
+
+    if not hide and node_tree.name.startswith("."):
+        node_tree.name = f".{name}"
+
     return node_tree
