@@ -469,10 +469,14 @@ PREVIEW_MODIFIERS = (
     PreviewModifier('NONE', "Unmodified",
                     "Preview the channel's actual value (may not be very "
                     "helpful for some channels e.g. normals)"),
-    PreviewModifier('GRAYSCALE', "Grayscale", 
+    PreviewModifier('GRAYSCALE', "Grayscale",
                     "Preview the luminance of a color",
                     "PML Preview Grayscale",
                     condition=lambda ch: ch.socket_type == 'COLOR'),
+    PreviewModifier('OBJECT_TO_TANGENT', "Tangent Space",
+                    "Preview a vector channel in tangent space",
+                    "PML Object to Tangent Space",
+                    condition=lambda ch: ch.socket_type == 'VECTOR'),
 )
 PREVIEW_MODIFIERS_ENUM = [x.to_enum_tuple() for x in PREVIEW_MODIFIERS]
 

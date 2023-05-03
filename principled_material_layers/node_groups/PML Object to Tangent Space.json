@@ -1,0 +1,217 @@
+{
+    "name": "PML Object to Tangent Space",
+    "bl_idname": "ShaderNodeTree",
+    "nodes": [{
+        "bl_idname": "ShaderNodeTangent",
+        "props": {
+            "location": [-200.0, 0.0],
+            "width": 150.0,
+            "height": 100.0,
+            "name": "Tangent",
+            "direction_type": "UV_MAP",
+            "axis": "Z"
+        }
+    }, {
+        "bl_idname": "ShaderNodeTexCoord",
+        "outputs": {
+            "Generated": {
+                "hide": true
+            },
+            "UV": {
+                "hide": true
+            },
+            "Object": {
+                "hide": true
+            },
+            "Camera": {
+                "hide": true
+            },
+            "Window": {
+                "hide": true
+            },
+            "Reflection": {
+                "hide": true
+            }
+        },
+        "props": {
+            "location": [-200.0, -90.0],
+            "width": 140.0,
+            "height": 100.0,
+            "name": "Texture Coordinate.001",
+            "label": "Normal",
+            "object": null
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "props": {
+            "location": [-20.0, -50.0],
+            "width": 140.0,
+            "height": 100.0,
+            "name": "Vector Math.001",
+            "label": "Bitangent",
+            "operation": "CROSS_PRODUCT"
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "props": {
+            "location": [200.0, 30.0],
+            "width": 140.0,
+            "height": 100.0,
+            "name": "Vector Math.003",
+            "label": "B . N_os",
+            "hide": true,
+            "operation": "DOT_PRODUCT"
+        }
+    }, {
+        "bl_idname": "NodeGroupInput",
+        "props": {
+            "location": [-180.0, 220.0],
+            "width": 140.0,
+            "height": 100.0,
+            "name": "Group Input",
+            "label": "Normal (N_os)"
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "props": {
+            "location": [200.0, 90.0],
+            "width": 140.0,
+            "height": 100.0,
+            "name": "Vector Math.002",
+            "label": "T . N_os",
+            "hide": true,
+            "operation": "DOT_PRODUCT"
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "props": {
+            "location": [200.0, -30.0],
+            "width": 140.0,
+            "height": 100.0,
+            "name": "Vector Math.004",
+            "label": "N . N_os",
+            "hide": true,
+            "operation": "DOT_PRODUCT"
+        }
+    }, {
+        "bl_idname": "ShaderNodeCombineXYZ",
+        "props": {
+            "location": [400.0, 30.0],
+            "width": 140.0,
+            "height": 100.0,
+            "name": "Combine XYZ",
+            "hide": true
+        }
+    }, {
+        "bl_idname": "NodeGroupOutput",
+        "props": {
+            "location": [810.0, 120.0],
+            "width": 140.0,
+            "height": 100.0,
+            "name": "Group Output",
+            "is_active_output": true
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "inputs": {
+            "Vector_001": {
+                "default_value": [0.5, 0.5, 0.5]
+            },
+            "Vector_002": {
+                "default_value": [0.5, 0.5, 0.5]
+            }
+        },
+        "outputs": {},
+        "props": {
+            "location": [590.0, 120.0],
+            "width": 140.0,
+            "height": 100.0,
+            "name": "Vector Math",
+            "operation": "MULTIPLY_ADD"
+        }
+    }],
+    "links": [{
+        "from_node": "Tangent",
+        "from_socket": "Tangent",
+        "to_node": "Vector Math.001",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Texture Coordinate.001",
+        "from_socket": "Normal",
+        "to_node": "Vector Math.001",
+        "to_socket": "Vector_001"
+    }, {
+        "from_node": "Vector Math.002",
+        "from_socket": "Value",
+        "to_node": "Combine XYZ",
+        "to_socket": "X"
+    }, {
+        "from_node": "Vector Math.003",
+        "from_socket": "Value",
+        "to_node": "Combine XYZ",
+        "to_socket": "Y"
+    }, {
+        "from_node": "Vector Math.004",
+        "from_socket": "Value",
+        "to_node": "Combine XYZ",
+        "to_socket": "Z"
+    }, {
+        "from_node": "Vector Math",
+        "from_socket": "Vector",
+        "to_node": "Group Output",
+        "to_socket": "Output_1"
+    }, {
+        "from_node": "Combine XYZ",
+        "from_socket": "Vector",
+        "to_node": "Vector Math",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Tangent",
+        "from_socket": "Tangent",
+        "to_node": "Vector Math.002",
+        "to_socket": "Vector_001"
+    }, {
+        "from_node": "Vector Math.001",
+        "from_socket": "Vector",
+        "to_node": "Vector Math.003",
+        "to_socket": "Vector_001"
+    }, {
+        "from_node": "Texture Coordinate.001",
+        "from_socket": "Normal",
+        "to_node": "Vector Math.004",
+        "to_socket": "Vector_001"
+    }, {
+        "from_node": "Group Input",
+        "from_socket": "Input_0",
+        "to_node": "Vector Math.002",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Group Input",
+        "from_socket": "Input_0",
+        "to_node": "Vector Math.003",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Group Input",
+        "from_socket": "Input_0",
+        "to_node": "Vector Math.004",
+        "to_socket": "Vector"
+    }],
+    "inputs": [{
+        "name": "Normal (OS)",
+        "default_value": [0.0, 0.0, 0.0],
+        "description": "",
+        "hide_value": false,
+        "max_value": 10000.0,
+        "min_value": -10000.0,
+        "bl_socket_idname": "NodeSocketVector"
+    }],
+    "outputs": [{
+        "name": "Normal (TS)",
+        "default_value": [0.0, 0.0, 0.0],
+        "description": "",
+        "hide_value": false,
+        "max_value": 3.4028234663852886e+38,
+        "min_value": -3.4028234663852886e+38,
+        "bl_socket_idname": "NodeSocketVector"
+    }]
+}
