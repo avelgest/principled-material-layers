@@ -207,48 +207,81 @@ class PML_OT_copy_hardness_to_all_ls(Operator):
         return {'FINISHED'}
 
 
-_PREVIEW_OLD_LINK_NODE_PROP = "pml_preview_old_link_node"
-_PREVIEW_OLD_LINK_SOCKET_PROP = "pml_preview_old_link_socket"
+# Prefix for id_props that store the old links of a material output
+# node before a channel is previewed
+_PREVIEW_OLD_LINK_PREFIX = "pml_preview_old_link"
 
 
-def store_output_link(node_tree, ma_output) -> None:
-    """Store the names of the node and socket currently connected
-    to the surface socket socket of the Material Output node ma_output
-    as properties on the layer stack.
-    These can be restored by restore_old_link.
+def _preview_old_link_props(socket) -> tuple[str, str]:
+    """id_prop names used to store the old links of a material output
+    socket before a channel is previewed. Returns a tuple of two
+    strings: the first is the property name that stores the name of the
+    linked node and the other stores the name of the linked socket.
     """
-    nt = node_tree
-    # If this operator is run twice or more without calling
-    # restore_old_link then only the first call stores a link.
-    if _PREVIEW_OLD_LINK_NODE_PROP in nt:
-        return
-
-    to_soc = ma_output.inputs[0]
-    if to_soc.is_linked:
-        from_soc = to_soc.links[0].from_socket
-        nt[_PREVIEW_OLD_LINK_NODE_PROP] = from_soc.node.name
-        nt[_PREVIEW_OLD_LINK_SOCKET_PROP] = from_soc.name
-    else:
-        nt[_PREVIEW_OLD_LINK_NODE_PROP] = ""
-        nt[_PREVIEW_OLD_LINK_SOCKET_PROP] = ""
+    return (f"{_PREVIEW_OLD_LINK_PREFIX}_node_{socket.name}",
+            f"{_PREVIEW_OLD_LINK_PREFIX}_socket_{socket.name}")
 
 
-def restore_old_link(node_tree) -> None:
-    """Restores the link of the surface socket of the Material Output
-    node that was stored by store_output_link. Does nothing
-    if the linked socket/node has been deleted/renamed or
-    store_output_link has not been called.
+def store_output_links(node_tree, ma_output) -> None:
+    """Store the names of the nodes and sockets currently connected
+    to the input sockets of the Material Output node ma_output
+    as properties on the node_tree.
+    These can be restored by restore_old_links.
     """
-    node_name = node_tree.pop(_PREVIEW_OLD_LINK_NODE_PROP, "")
-    socket_name = node_tree.pop(_PREVIEW_OLD_LINK_SOCKET_PROP, "")
+    # TODO Remove node_tree parameter and access node tree through
+    # ma_output.id_data?
 
-    if node_name and socket_name:
-        node = node_tree.nodes.get(node_name)
-        if node is not None:
-            socket = node.outputs.get(socket_name)
-            if socket is not None:
-                ma_output = utils.nodes.get_output_node(node_tree)
-                node_tree.links.new(ma_output.inputs[0], socket)
+    input_sockets = [x for x in ma_output.inputs if x.enabled]
+
+    for socket in input_sockets:
+        node_prop, socket_prop = _preview_old_link_props(socket)
+
+        # If this operator is run twice or more without calling
+        # restore_old_links then only the first call stores a link.
+        if node_prop in node_tree:
+            continue
+
+        if socket.is_linked:
+            from_soc = socket.links[0].from_socket
+            node_tree[node_prop] = from_soc.node.name
+            node_tree[socket_prop] = from_soc.name
+        else:
+            node_tree[node_prop] = ""
+            node_tree[socket_prop] = ""
+
+
+def restore_old_links(node_tree) -> None:
+    """Restores the links of the input sockets of the Material Output
+    node that were stored by store_output_links. Does nothing
+    if the linked sockets/nodes have been deleted/renamed or
+    store_output_links has not been called.
+    """
+
+    ma_output = utils.nodes.get_output_node(node_tree)
+    input_sockets = [x for x in ma_output.inputs if x.enabled]
+
+    # For backwards compatibility with old save files
+    # TODO Remove in later version
+    if ("pml_preview_old_link_node" in node_tree
+            and "pml_preview_old_link_socket" in node_tree):
+        node_prop, socket_prop = _preview_old_link_props(ma_output.inputs[0])
+        node_tree[node_prop] = node_tree["pml_preview_old_link_node"]
+        node_tree[socket_prop] = node_tree["pml_preview_old_link_socket"]
+        del node_tree["pml_preview_old_link_node"]
+        del node_tree["pml_preview_old_link_socket"]
+
+    for socket in input_sockets:
+        node_prop, socket_prop = _preview_old_link_props(socket)
+
+        node_name = node_tree.pop(node_prop, "")
+        socket_name = node_tree.pop(socket_prop, "")
+
+        if node_name and socket_name:
+            node = node_tree.nodes.get(node_name)
+            if node is not None:
+                from_soc = node.outputs.get(socket_name)
+                if from_soc is not None:
+                    node_tree.links.new(socket, from_soc)
 
 
 class PML_OT_preview_channel(Operator):
@@ -297,8 +330,10 @@ class PML_OT_preview_channel(Operator):
             modifier_node.label = "Preview Modifier"
 
         modifier_node.node_tree = modifier_group
+
         modifier_node.location = from_socket.node.location
         modifier_node.location.x += from_socket.node.width + 30
+        modifier_node.location.y += 140
 
         if modifier_node.inputs:
             node_tree.links.new(modifier_node.inputs[0], from_socket)
@@ -340,6 +375,17 @@ class PML_OT_preview_channel(Operator):
                                    self.ma_output.location.y + 100)
         return group_node
 
+    def _save_and_delete_ma_output_links(self) -> None:
+        node_tree = self.node_tree
+        ma_output = self.ma_output
+
+        store_output_links(self.node_tree, ma_output)
+
+        # TODO Move to store_output_links?
+        for socket in ma_output.inputs:
+            if socket.is_linked:
+                node_tree.links.remove(socket.links[0])
+
     def _delete_layer_group_node(self) -> None:
         """Deletes the preview layer group node if it exists,"""
         group_node = self.node_tree.nodes.get(PREVIEW_GROUP_NODE_NAME)
@@ -362,7 +408,7 @@ class PML_OT_preview_channel(Operator):
 
         self._delete_layer_group_node()
 
-        store_output_link(self.node_tree, self.ma_output)
+        self._save_and_delete_ma_output_links()
 
         self.node_tree.links.new(self._ma_output_socket, socket)
 
@@ -394,7 +440,7 @@ class PML_OT_preview_channel(Operator):
             self.node_tree.remove(group_node)
             return {'CANCELLED'}
 
-        store_output_link(self.node_tree, self.ma_output)
+        self._save_and_delete_ma_output_links()
         self.node_tree.links.new(self._ma_output_socket, out_socket)
 
         # Hide all other sockets on the group node
@@ -438,7 +484,7 @@ class PML_OT_clear_preview_channel(Operator):
             if node is not None:
                 node_tree.nodes.remove(node)
 
-        restore_old_link(node_tree)
+        restore_old_links(node_tree)
 
         return {'FINISHED'}
 
