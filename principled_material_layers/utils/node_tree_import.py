@@ -254,7 +254,17 @@ def _node_to_dict(node: bpy.types.Node) -> dict[str, None]:
 
 def _set_node_values_from_py(node: bpy.types.Node,
                              node_dict: dict[str, Any]) -> None:
-    for prop_name, value in node_dict["props"].items():
+    props_dict = node_dict["props"]
+
+    # Ensure that the parent is set before the location property
+    parent_str = props_dict.get("parent")
+    if parent_str is not None:
+        _set_prop_from(node, "parent", parent_str)
+
+    for prop_name, value in props_dict.items():
+        if prop_name == "parent":
+            # Should have been set before this loop
+            continue
         try:
             _set_prop_from(node, prop_name, value)
         except AttributeError as e:
