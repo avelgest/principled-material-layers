@@ -183,10 +183,13 @@ class NodeManager(bpy.types.PropertyGroup):
 
         if node is None:
             return
-        if not channel.enabled and isinstance(node, NodeReroute):
-            return
 
-        if node.bl_idname == making_info.bl_idname:
+        if not channel.enabled:
+            # Just ensure that node is a reroute node
+            if not isinstance(node, NodeReroute):
+                self.rebuild_node_tree()
+
+        elif node.bl_idname == making_info.bl_idname:
             # Just update the options of the existing node
             making_info.update_node(node, channel)
         else:
