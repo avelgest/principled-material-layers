@@ -1,0 +1,589 @@
+{
+    "name": "PML Normal (RNM)",
+    "bl_idname": "ShaderNodeTree",
+    "nodes": [{
+        "bl_idname": "NodeFrame",
+        "props": {
+            "location": [0.0, 220.0],
+            "name": "Frame",
+            "label": "Shortest Arc Quaternion"
+        }
+    }, {
+        "bl_idname": "NodeFrame",
+        "props": {
+            "location": [190.0, 80.0],
+            "name": "Frame.001",
+            "label": "u(q_w^2 - q_v . q_v)"
+        }
+    }, {
+        "bl_idname": "NodeFrame",
+        "props": {
+            "location": [80.0, -20.0],
+            "name": "Frame.002",
+            "label": "2q_v * (q_v . u)"
+        }
+    }, {
+        "bl_idname": "NodeFrame",
+        "props": {
+            "location": [10.0, -20.0],
+            "name": "Frame.003",
+            "label": "2q_w * (q_v x u)"
+        }
+    }, {
+        "bl_idname": "ShaderNodeMath",
+        "inputs": {
+            "Value_001": {
+                "default_value": 2.0
+            }
+        },
+        "props": {
+            "location": [230.0, 90.0],
+            "name": "Math.001",
+            "label": "2 * (s . t + 1)",
+            "parent": "#NODE_IO_NODE:Frame",
+            "operation": "MULTIPLY"
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "props": {
+            "location": [-80.0, 90.0],
+            "name": "Vector Math",
+            "label": "s . t",
+            "parent": "#NODE_IO_NODE:Frame",
+            "operation": "DOT_PRODUCT"
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "props": {
+            "location": [300.0, -120.0],
+            "name": "Vector Math.001",
+            "label": "s x t",
+            "parent": "#NODE_IO_NODE:Frame",
+            "operation": "CROSS_PRODUCT"
+        }
+    }, {
+        "bl_idname": "ShaderNodeMath",
+        "props": {
+            "location": [390.0, 90.0],
+            "name": "Math.002",
+            "label": "sqrt(2 * (s . t + 1))",
+            "parent": "#NODE_IO_NODE:Frame",
+            "operation": "SQRT"
+        }
+    }, {
+        "bl_idname": "NodeReroute",
+        "props": {
+            "location": [240.0, -370.0],
+            "name": "Reroute",
+            "parent": "#NODE_IO_NODE:Frame"
+        }
+    }, {
+        "bl_idname": "ShaderNodeMath",
+        "inputs": {
+            "Value_001": {
+                "default_value": 1.0
+            }
+        },
+        "props": {
+            "location": [70.0, 90.0],
+            "name": "Math",
+            "label": "s . t + 1",
+            "parent": "#NODE_IO_NODE:Frame"
+        }
+    }, {
+        "bl_idname": "ShaderNodeMath",
+        "inputs": {
+            "Value": {
+                "default_value": 1.0
+            }
+        },
+        "props": {
+            "location": [550.0, 80.0],
+            "name": "Math.003",
+            "label": "1 / sqrt(2 * (s . t + 1))",
+            "parent": "#NODE_IO_NODE:Frame",
+            "operation": "DIVIDE"
+        }
+    }, {
+        "bl_idname": "NodeGroupInput",
+        "props": {
+            "location": [-420.0, -60.0],
+            "name": "Group Input"
+        }
+    }, {
+        "bl_idname": "ShaderNodeMath",
+        "props": {
+            "location": [770.0, -270.0],
+            "name": "Math.004",
+            "label": "q_w",
+            "parent": "#NODE_IO_NODE:Frame",
+            "operation": "MULTIPLY"
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "props": {
+            "location": [770.0, -120.0],
+            "name": "Vector Math.002",
+            "label": "q_v",
+            "parent": "#NODE_IO_NODE:Frame",
+            "operation": "SCALE"
+        }
+    }, {
+        "bl_idname": "NodeReroute",
+        "props": {
+            "location": [1100.0, -320.0],
+            "name": "Reroute.002"
+        }
+    }, {
+        "bl_idname": "ShaderNodeTexCoord",
+        "outputs": {
+            "Generated": {
+                "hide": true
+            },
+            "UV": {
+                "hide": true
+            },
+            "Object": {
+                "hide": true
+            },
+            "Camera": {
+                "hide": true
+            },
+            "Window": {
+                "hide": true
+            },
+            "Reflection": {
+                "hide": true
+            }
+        },
+        "props": {
+            "location": [-340.0, 190.0],
+            "name": "Texture Coordinate",
+            "label": "s (geometric normal)"
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "props": {
+            "location": [1960.0, 170.0],
+            "name": "Vector Math.005"
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "props": {
+            "location": [2130.0, 80.0],
+            "name": "Vector Math.006"
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "props": {
+            "location": [1510.0, 270.0],
+            "name": "Vector Math.004",
+            "parent": "#NODE_IO_NODE:Frame.001",
+            "operation": "SCALE"
+        }
+    }, {
+        "bl_idname": "NodeReroute",
+        "props": {
+            "location": [1190.0, 280.0],
+            "name": "Reroute.001",
+            "label": "u",
+            "parent": "#NODE_IO_NODE:Frame.001"
+        }
+    }, {
+        "bl_idname": "ShaderNodeMath",
+        "props": {
+            "location": [1310.0, 150.0],
+            "name": "Math.006",
+            "label": "q_w^2 - q_v . q_v",
+            "parent": "#NODE_IO_NODE:Frame.001",
+            "operation": "SUBTRACT"
+        }
+    }, {
+        "bl_idname": "ShaderNodeMath",
+        "props": {
+            "location": [1130.0, 60.0],
+            "name": "Math.005",
+            "label": "q_w^2",
+            "parent": "#NODE_IO_NODE:Frame.001",
+            "operation": "MULTIPLY"
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "props": {
+            "location": [1130.0, 210.0],
+            "name": "Vector Math.003",
+            "label": "q_v . q_v",
+            "parent": "#NODE_IO_NODE:Frame.001",
+            "operation": "DOT_PRODUCT"
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "props": {
+            "location": [1430.0, -130.0],
+            "name": "Vector Math.009",
+            "label": "2q_v * (q_v . u)",
+            "parent": "#NODE_IO_NODE:Frame.002",
+            "operation": "SCALE"
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "inputs": {
+            "Scale": {
+                "default_value": 2.0
+            }
+        },
+        "props": {
+            "location": [1240.0, -80.0],
+            "name": "Vector Math.008",
+            "label": "2q_v",
+            "parent": "#NODE_IO_NODE:Frame.002",
+            "operation": "SCALE"
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "props": {
+            "location": [1240.0, -210.0],
+            "name": "Vector Math.007",
+            "label": "q_v . u",
+            "parent": "#NODE_IO_NODE:Frame.002",
+            "operation": "DOT_PRODUCT"
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "props": {
+            "location": [1310.0, -410.0],
+            "name": "Vector Math.010",
+            "label": "q_v x u",
+            "parent": "#NODE_IO_NODE:Frame.003",
+            "operation": "CROSS_PRODUCT"
+        }
+    }, {
+        "bl_idname": "ShaderNodeMath",
+        "inputs": {
+            "Value_001": {
+                "default_value": 2.0
+            }
+        },
+        "props": {
+            "location": [1310.0, -550.0],
+            "name": "Math.007",
+            "label": "2q_w",
+            "parent": "#NODE_IO_NODE:Frame.003",
+            "operation": "MULTIPLY"
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "props": {
+            "location": [1510.0, -480.0],
+            "name": "Vector Math.011",
+            "label": "2q_w * (q_v x u)",
+            "parent": "#NODE_IO_NODE:Frame.003",
+            "operation": "SCALE"
+        }
+    }, {
+        "bl_idname": "NodeGroupOutput",
+        "props": {
+            "location": [2350.0, 70.0],
+            "name": "Group Output",
+            "is_active_output": true
+        }
+    }, {
+        "bl_idname": "NodeGroupInput",
+        "props": {
+            "location": [320.0, -320.0],
+            "name": "Group Input.001"
+        }
+    }, {
+        "bl_idname": "ShaderNodeTexCoord",
+        "outputs": {
+            "Generated": {
+                "hide": true
+            },
+            "UV": {
+                "hide": true
+            },
+            "Object": {
+                "hide": true
+            },
+            "Camera": {
+                "hide": true
+            },
+            "Window": {
+                "hide": true
+            },
+            "Reflection": {
+                "hide": true
+            }
+        },
+        "props": {
+            "location": [320.0, -460.0],
+            "name": "Texture Coordinate.001",
+            "label": "s (geometric normal)",
+            "object": null
+        }
+    }, {
+        "bl_idname": "ShaderNodeVectorMath",
+        "props": {
+            "location": [760.0, -290.0],
+            "name": "Vector Math.012",
+            "label": "u",
+            "operation": "NORMALIZE"
+        }
+    }, {
+        "bl_idname": "ShaderNodeMixRGB",
+        "props": {
+            "location": [540.0, -330.0],
+            "name": "Mix"
+        }
+    }],
+    "links": [{
+        "from_node": "Vector Math",
+        "from_socket": "Value",
+        "to_node": "Math",
+        "to_socket": "Value"
+    }, {
+        "from_node": "Math",
+        "from_socket": "Value",
+        "to_node": "Math.001",
+        "to_socket": "Value"
+    }, {
+        "from_node": "Math.001",
+        "from_socket": "Value",
+        "to_node": "Math.002",
+        "to_socket": "Value"
+    }, {
+        "from_node": "Texture Coordinate",
+        "from_socket": "Normal",
+        "to_node": "Vector Math",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Texture Coordinate",
+        "from_socket": "Normal",
+        "to_node": "Vector Math.001",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Group Input",
+        "from_socket": 1,
+        "to_node": "Vector Math",
+        "to_socket": "Vector_001"
+    }, {
+        "from_node": "Group Input",
+        "from_socket": 1,
+        "to_node": "Vector Math.001",
+        "to_socket": "Vector_001"
+    }, {
+        "from_node": "Vector Math.001",
+        "from_socket": "Vector",
+        "to_node": "Vector Math.002",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Math.002",
+        "from_socket": "Value",
+        "to_node": "Vector Math.002",
+        "to_socket": "Vector_001"
+    }, {
+        "from_node": "Math.002",
+        "from_socket": "Value",
+        "to_node": "Math.003",
+        "to_socket": "Value_001"
+    }, {
+        "from_node": "Math.003",
+        "from_socket": "Value",
+        "to_node": "Vector Math.002",
+        "to_socket": "Scale"
+    }, {
+        "from_node": "Reroute",
+        "from_socket": "Output",
+        "to_node": "Math.004",
+        "to_socket": "Value"
+    }, {
+        "from_node": "Math",
+        "from_socket": "Value",
+        "to_node": "Reroute",
+        "to_socket": "Input"
+    }, {
+        "from_node": "Math.003",
+        "from_socket": "Value",
+        "to_node": "Math.004",
+        "to_socket": "Value_001"
+    }, {
+        "from_node": "Vector Math.002",
+        "from_socket": "Vector",
+        "to_node": "Vector Math.003",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Vector Math.002",
+        "from_socket": "Vector",
+        "to_node": "Vector Math.003",
+        "to_socket": "Vector_001"
+    }, {
+        "from_node": "Math.004",
+        "from_socket": "Value",
+        "to_node": "Math.005",
+        "to_socket": "Value"
+    }, {
+        "from_node": "Math.004",
+        "from_socket": "Value",
+        "to_node": "Math.005",
+        "to_socket": "Value_001"
+    }, {
+        "from_node": "Math.005",
+        "from_socket": "Value",
+        "to_node": "Math.006",
+        "to_socket": "Value"
+    }, {
+        "from_node": "Vector Math.003",
+        "from_socket": "Value",
+        "to_node": "Math.006",
+        "to_socket": "Value_001"
+    }, {
+        "from_node": "Math.006",
+        "from_socket": "Value",
+        "to_node": "Vector Math.004",
+        "to_socket": "Scale"
+    }, {
+        "from_node": "Reroute.001",
+        "from_socket": "Output",
+        "to_node": "Vector Math.004",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Reroute.002",
+        "from_socket": "Output",
+        "to_node": "Reroute.001",
+        "to_socket": "Input"
+    }, {
+        "from_node": "Vector Math.004",
+        "from_socket": "Vector",
+        "to_node": "Vector Math.005",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Vector Math.005",
+        "from_socket": "Vector",
+        "to_node": "Vector Math.006",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Vector Math.006",
+        "from_socket": "Vector",
+        "to_node": "Group Output",
+        "to_socket": 0
+    }, {
+        "from_node": "Vector Math.002",
+        "from_socket": "Vector",
+        "to_node": "Vector Math.008",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Vector Math.002",
+        "from_socket": "Vector",
+        "to_node": "Vector Math.007",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Reroute.002",
+        "from_socket": "Output",
+        "to_node": "Vector Math.007",
+        "to_socket": "Vector_001"
+    }, {
+        "from_node": "Vector Math.008",
+        "from_socket": "Vector",
+        "to_node": "Vector Math.009",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Vector Math.007",
+        "from_socket": "Value",
+        "to_node": "Vector Math.009",
+        "to_socket": "Scale"
+    }, {
+        "from_node": "Vector Math.009",
+        "from_socket": "Vector",
+        "to_node": "Vector Math.005",
+        "to_socket": "Vector_001"
+    }, {
+        "from_node": "Math.004",
+        "from_socket": "Value",
+        "to_node": "Math.007",
+        "to_socket": "Value"
+    }, {
+        "from_node": "Vector Math.002",
+        "from_socket": "Vector",
+        "to_node": "Vector Math.010",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Reroute.002",
+        "from_socket": "Output",
+        "to_node": "Vector Math.010",
+        "to_socket": "Vector_001"
+    }, {
+        "from_node": "Vector Math.010",
+        "from_socket": "Vector",
+        "to_node": "Vector Math.011",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Math.007",
+        "from_socket": "Value",
+        "to_node": "Vector Math.011",
+        "to_socket": "Scale"
+    }, {
+        "from_node": "Vector Math.011",
+        "from_socket": "Vector",
+        "to_node": "Vector Math.006",
+        "to_socket": "Vector_001"
+    }, {
+        "from_node": "Vector Math.012",
+        "from_socket": "Vector",
+        "to_node": "Reroute.002",
+        "to_socket": "Input"
+    }, {
+        "from_node": "Group Input.001",
+        "from_socket": 2,
+        "to_node": "Mix",
+        "to_socket": "Color2"
+    }, {
+        "from_node": "Group Input.001",
+        "from_socket": 0,
+        "to_node": "Mix",
+        "to_socket": "Fac"
+    }, {
+        "from_node": "Mix",
+        "from_socket": "Color",
+        "to_node": "Vector Math.012",
+        "to_socket": "Vector"
+    }, {
+        "from_node": "Texture Coordinate.001",
+        "from_socket": "Normal",
+        "to_node": "Mix",
+        "to_socket": "Color1"
+    }],
+    "inputs": [{
+        "name": "Fac",
+        "default_value": 0.5,
+        "description": "",
+        "hide_value": false,
+        "max_value": 1.0,
+        "min_value": 0.0,
+        "bl_socket_idname": "NodeSocketFloatFactor"
+    }, {
+        "name": "t (base normal)",
+        "default_value": [0.0, 0.0, 0.0],
+        "description": "",
+        "hide_value": false,
+        "max_value": 10000.0,
+        "min_value": -10000.0,
+        "bl_socket_idname": "NodeSocketVector"
+    }, {
+        "name": "u (detail normal)",
+        "default_value": [0.0, 0.0, 0.0],
+        "description": "",
+        "hide_value": false,
+        "max_value": 10000.0,
+        "min_value": -10000.0,
+        "bl_socket_idname": "NodeSocketVector"
+    }],
+    "outputs": [{
+        "name": "r",
+        "default_value": [0.0, 0.0, 0.0],
+        "description": "",
+        "hide_value": false,
+        "max_value": 3.4028234663852886e+38,
+        "min_value": -3.4028234663852886e+38,
+        "bl_socket_idname": "NodeSocketVector"
+    }]
+}

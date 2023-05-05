@@ -43,20 +43,28 @@ _MIX_NODE_BLEND_TYPES = ('MIX',
                          'VALUE'
                          )
 # Blend types which use a node group bundled with the add-on
-_ADDON_BLEND_TYPES = []
+_ADDON_BLEND_TYPES = (
+    # Reoriented Normal Mapping
+    # from blog.selfshadow.com/publications/blending-in-detail/
+    # N.B. This is the less efficient object space variant
+    'NORMAL_RNM_OS',
+)
 
 _OTHER_BLEND_TYPES = ('DEFAULT', 'CUSTOM',)
 
 # Override the default naming for these blend types
-_BLEND_NAMES = {}
+_BLEND_NAMES = {'NORMAL_RNM_OS': "Normal (RNM)"}
 
 # Override the default (empty) description for these blend types
 _BLEND_DESCR = {
+    'NORMAL_RNM_OS': "Reoriented Normal Mapping. Preserves the details of "
+                     "the normals from lower layers"
 }
 
 # The node groups used by the _ADDON_BLEND_TYPES blend modes
 # Should match a file in the add-on's node_groups directory
 _ADDON_BLEND_TYPES_GROUPS = {
+    'NORMAL_RNM_OS': "PML Normal (RNM)"
 }
 
 
