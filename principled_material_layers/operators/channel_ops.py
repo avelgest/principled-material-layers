@@ -550,15 +550,24 @@ class PML_OT_set_preview_modifier(Operator):
         if channel is None:
             return {'CANCELLED'}
 
+        # The channel that's currently previewed
+        preview_channel = layer_stack.preview_channel
+        if preview_channel is not None:
+            old_preview_modifier = preview_channel.preview_modifier
+
         channel.preview_modifier = self.preview_modifier
 
         # Replace or add the preview modifier group node only if
-        # channel is currently being previewed
-        if node_tree is None or not layer_stack.is_channel_previewed(channel):
+        # the currently previewed channel's preview_modifier property
+        # has changed
+        if (preview_channel is None
+                or preview_channel.preview_modifier == old_preview_modifier
+                or node_tree is None):
             return {'FINISHED'}
 
-        preview_socket = self._get_preview_socket(node_tree, channel)
+        preview_socket = self._get_preview_socket(node_tree, preview_channel)
         if preview_socket is None:
+            self.report({'WARNING'}, "Cannot find the previewed socket")
             return {'FINISHED'}
 
         ma_output = utils.nodes.get_output_node(node_tree)
