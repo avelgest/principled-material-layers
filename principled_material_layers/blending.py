@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools as it
+import warnings
 
 from typing import Optional
 
@@ -11,6 +12,7 @@ import bpy
 from bpy.types import NodeTree, ShaderNode, ShaderNodeTree
 
 from .channel import Channel
+from .utils import node_tree_import
 from .utils.nodes import NodeMakeInfo, get_node_by_type
 from .utils.naming import cap_enum
 
@@ -40,16 +42,46 @@ _MIX_NODE_BLEND_TYPES = ('MIX',
                          'COLOR',
                          'VALUE'
                          )
+# Blend types which use a node group bundled with the add-on
+_ADDON_BLEND_TYPES = []
+
 _OTHER_BLEND_TYPES = ('DEFAULT', 'CUSTOM',)
+
+# Override the default naming for these blend types
+_BLEND_NAMES = {}
+
+# Override the default (empty) description for these blend types
+_BLEND_DESCR = {
+}
+
+# The node groups used by the _ADDON_BLEND_TYPES blend modes
+# Should match a file in the add-on's node_groups directory
+_ADDON_BLEND_TYPES_GROUPS = {
+}
+
+
+def _enum_to_tuple(enum: Optional[str]) -> Optional[tuple[str, str, str]]:
+    """Create a tuple for use in an EnumProperty items list from a blend
+    type identifier. If enum is None then this just returns None.
+    """
+    if enum is None:
+        return None
+    name = _BLEND_NAMES.get(enum)
+    if name is None:
+        name = cap_enum(enum)
+    description = _BLEND_DESCR.get(enum, "")
+
+    return (enum, name, description)
 
 
 # BLEND_MODES enum
 # Looks like: (('MIX', "Mix", ""), None, ('DARKEN', "Darken", ""), ...)
 # May contain None as a separator
-BLEND_MODES = tuple(None if x is None else (x, cap_enum(x), "")
-                    for x in it.chain(_MIX_NODE_BLEND_TYPES,
-                                      (None,),
-                                      _OTHER_BLEND_TYPES)
+BLEND_MODES = tuple(_enum_to_tuple(x) for x in it.chain(_MIX_NODE_BLEND_TYPES,
+                                                        (None,),
+                                                        _ADDON_BLEND_TYPES,
+                                                        (None,),
+                                                        _OTHER_BLEND_TYPES)
                     )
 
 # Dict of enum strings to their indices in BLEND_MODES
@@ -107,6 +139,35 @@ def _mix_node_info(blend_mode: str) -> NodeMakeInfo:
     uses a MixRGB node with a blend_type of blend_mode.
     """
     return NodeMakeInfo("ShaderNodeMixRGB", {"blend_type": blend_mode})
+
+
+def _addon_blend_mode_fnc(node: ShaderNode, channel: Channel) -> None:
+    """Function used by the NodeMakeInfo of blend modes that use node
+    groups bundled with the add-on. Uses a fallback group if the
+    node group can't be loaded.
+    """
+    blend_mode = channel.blend_mode
+    if blend_mode == 'DEFAULT':
+        blend_mode = channel.default_blend_mode
+
+    group_name = _ADDON_BLEND_TYPES_GROUPS.get(blend_mode)
+    if group_name is None:
+        warnings.warn(f"Can't find the name of {blend_mode}' s node group")
+        node.node_tree = _get_fallback_node_group()
+        return
+
+    try:
+        node.node_tree = node_tree_import.load_addon_node_group(group_name)
+    except Exception as e:
+        node.node_tree = _get_fallback_node_group()
+        raise e
+
+
+def _addon_node_info(_blend_mode: str) -> NodeMakeInfo:
+    """Returns a NodeMakeInfo tuple for a blend_mode that uses
+    a group node and a node group bundled with the add-on.
+    """
+    return NodeMakeInfo("ShaderNodeGroup", function=_addon_blend_mode_fnc)
 
 
 def _create_node_group(name: str):
@@ -213,10 +274,18 @@ for mode_enum in _MIX_NODE_BLEND_TYPES:
     if mode_enum is not None:
         BLEND_MODES_NODE_INFO[mode_enum] = _mix_node_info(mode_enum)
 
-_BLEND_MODES_NO_NONE = [x for x in BLEND_MODES if (x is not None
-                                                   and x[0] != 'DEFAULT')]
+# Create NodeMakeInfo for add-on blend modes.
+for mode_enum in _ADDON_BLEND_TYPES:
+    if mode_enum is not None:
+        BLEND_MODES_NODE_INFO[mode_enum] = _addon_node_info(mode_enum)
 
-# Check that all (not None) blend modes have a NodeMakeInfo
-assert len(_BLEND_MODES_NO_NONE) == len(BLEND_MODES_NODE_INFO)
-for mode_enum in _BLEND_MODES_NO_NONE:
-    assert mode_enum[0] in BLEND_MODES_NODE_INFO, (f"{mode_enum[0]} not found")
+
+# Check that all blend modes that need one have a NodeMakeInfo
+
+# List of blend modes that should have NodeMakeInfo
+_BLEND_MODES_W_MAKEINFO = [x[0] for x in BLEND_MODES
+                           if x is not None and x[0] != 'DEFAULT']
+
+assert len(_BLEND_MODES_W_MAKEINFO) == len(BLEND_MODES_NODE_INFO)
+for mode_enum in _BLEND_MODES_W_MAKEINFO:
+    assert mode_enum in BLEND_MODES_NODE_INFO, (f"{mode_enum} not found")
