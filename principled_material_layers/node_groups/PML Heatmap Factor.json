@@ -1,0 +1,86 @@
+{
+    "name": "PML Heatmap Factor",
+    "bl_idname": "ShaderNodeTree",
+    "nodes": [{
+        "bl_idname": "ShaderNodeMapRange",
+        "inputs": {
+            "From Min": {
+                "default_value": 0.0
+            },
+            "From Max": {
+                "default_value": 1.0
+            },
+            "To Min": {
+                "default_value": 0.66666666
+            },
+            "To Max": {
+                "default_value": 0.0
+            }
+        },
+        "props": {
+            "location": [-110.0, 0.0],
+            "name": "Map Range",
+            "clamp": true
+        }
+    }, {
+        "bl_idname": "ShaderNodeCombineColor",
+        "inputs": {
+            "Green": {
+                "default_value": 1.0
+            },
+            "Blue": {
+                "default_value": 0.5
+            }
+        },
+        "props": {
+            "location": [110.0, 0.0],
+            "name": "Combine Color",
+            "mode": "HSV"
+        }
+    }, {
+        "bl_idname": "NodeGroupInput",
+        "props": {
+            "location": [-300.0, 0.0],
+            "name": "Group Input"
+        }
+    }, {
+        "bl_idname": "NodeGroupOutput",
+        "props": {
+            "location": [300.0, 0.0],
+            "name": "Group Output",
+            "is_active_output": true
+        }
+    }],
+    "links": [{
+        "from_node": "Group Input",
+        "from_socket": 0,
+        "to_node": "Map Range",
+        "to_socket": "Value"
+    }, {
+        "from_node": "Combine Color",
+        "from_socket": "Color",
+        "to_node": "Group Output",
+        "to_socket": 0
+    }, {
+        "from_node": "Map Range",
+        "from_socket": "Result",
+        "to_node": "Combine Color",
+        "to_socket": "Red"
+    }],
+    "inputs": [{
+        "name": "Value",
+        "default_value": 1.0,
+        "description": "",
+        "hide_value": false,
+        "max_value": 1.0,
+        "min_value": 0.0,
+        "bl_socket_idname": "NodeSocketFloat"
+    }],
+    "outputs": [{
+        "name": "Color",
+        "default_value": [0.0, 0.0, 0.0, 0.0],
+        "description": "",
+        "hide_value": false,
+        "bl_socket_idname": "NodeSocketColor"
+    }]
+}

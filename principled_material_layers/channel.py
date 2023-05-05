@@ -504,6 +504,10 @@ PREVIEW_MODIFIERS = (
     PreviewModifier('OBJECT_TO_TANGENT', "Tangent Space",
                     "Preview a vector channel in tangent space",
                     "PML Object to Tangent Space", channel_types={'VECTOR'}),
+    PreviewModifier('HEATMAP_FACTOR', "Heat Map",
+                    "Heatmap from blue to red. Blue is 0; red is 1",
+                    "PML Heatmap Factor",
+                    channel_types={'FLOAT', 'FLOAT_FACTOR'}),
 )
 PREVIEW_MODIFIERS_ENUM = [x.to_enum_tuple() for x in PREVIEW_MODIFIERS]
 
