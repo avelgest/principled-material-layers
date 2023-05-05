@@ -28,6 +28,9 @@ _NODE_IGNORE_PROPS = {"dimensions", "internal_links", "inputs", "outputs",
 _NODE_PREFIX = "#NODE_IO_NODE"
 _ID_PREFIX = "#NODE_IO_ID"
 
+# Ignore node properties with these default values
+_NODE_DEFAULTS = {"parent": None, "show_options": True}
+
 
 def _prop_to_py(value: Any) -> Any:
     if isinstance(value, (bpy.types.bpy_prop_collection,
@@ -168,14 +171,14 @@ def _sockets_to_dict(sockets: Iterable[bpy.types.NodeSocket]
             soc_dict["default_value"] = _prop_to_py(socket.default_value)
 
         if soc_dict:
-            sockets_dict[socket.identifier] = soc_dict
+            sockets_dict[_socket_to_identifier(socket)] = soc_dict
 
     return sockets_dict
 
 
 def _socket_values_from_dict(sockets, sockets_dict) -> None:
     for socket in sockets:
-        soc_dict = sockets_dict.get(socket.identifier)
+        soc_dict = sockets_dict.get(_socket_to_identifier(socket))
         if soc_dict is not None:
             for prop_name, value in soc_dict.items():
                 setattr(socket, prop_name, value)
@@ -233,14 +236,20 @@ def _node_to_dict(node: bpy.types.Node) -> dict[str, None]:
         if _is_prop_default(prop, value):
             continue
 
+        # Skip properties with specific default values
+        if value == _NODE_DEFAULTS.get(prop.identifier, _NOT_FOUND):
+            continue
+
         props[prop.identifier] = _prop_to_py(value)
 
     inputs = _sockets_to_dict(node.inputs)
     outputs = _sockets_to_dict(node.outputs)
 
-    return {"bl_idname": node.bl_idname,
-            "inputs": inputs, "outputs": outputs,
-            "props": props}
+    out_dict = {"bl_idname": node.bl_idname,
+                "inputs": inputs, "outputs": outputs,
+                "props": props}
+    # Filter empty items
+    return {k: v for k, v in out_dict.items() if v}
 
 
 def _set_node_values_from_py(node: bpy.types.Node,
@@ -278,22 +287,49 @@ def _nodes_from_py(node_tree: bpy.types.NodeTree,
         _set_node_values_from_py(node, node_dict)
 
 
+def _socket_to_identifier(socket):
+    node = socket.node
+    socket_col = node.outputs if socket.is_output else node.inputs
+
+    if getattr(node, "type", "") in ('GROUP_INPUT', 'GROUP_OUTPUT', ""):
+        return [x for x in socket_col if x.enabled].index(socket)
+    return socket.identifier
+
+
+def _socket_from_identifier(socket_col,
+                            identifier: Union[str, int]
+                            ) -> bpy.types.NodeSocket:
+    """Deserialize a socket given by identifier (either the socket's
+    identifier property or its index in the enabled sockets of
+    socket_col). socket_col is a collection of NodeSockets that the
+    socket can be found in.
+    Raises an IndexError error if the socket can't be found.
+    """
+    if isinstance(identifier, int):
+        return [x for x in socket_col if x.enabled][identifier]
+    return [x for x in socket_col if x.identifier == identifier][0]
+
+
 def _link_to_dict(link: bpy.types.NodeLink) -> dict[str, str]:
     return {"from_node": link.from_node.name,
-            "from_socket": link.from_socket.identifier,
+            "from_socket": _socket_to_identifier(link.from_socket),
             "to_node": link.to_node.name,
-            "to_socket": link.to_socket.identifier}
+            "to_socket": _socket_to_identifier(link.to_socket)}
 
 
 def _link_from_dict(node_tree: bpy.types.NodeTree,
                     link_dict: dict) -> Optional[bpy.types.NodeLink]:
     nodes = node_tree.nodes
     try:
-        from_socket = [x for x in nodes[link_dict["from_node"]].outputs
-                       if x.identifier == link_dict["from_socket"]][0]
-        to_socket = [x for x in nodes[link_dict["to_node"]].inputs
-                     if x.identifier == link_dict["to_socket"]][0]
-    except (IndexError, KeyError):
+        from_node = nodes[link_dict["from_node"]]
+        from_socket = _socket_from_identifier(from_node.outputs,
+                                              link_dict["from_socket"])
+
+        to_node = nodes[link_dict["to_node"]]
+        to_socket = _socket_from_identifier(to_node.inputs,
+                                            link_dict["to_socket"])
+    except (IndexError, KeyError) as e:
+        warnings.warn(f"Could not create link from {link_dict}. Error: {e}")
         return None
 
     return node_tree.links.new(to_socket, from_socket)
