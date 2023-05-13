@@ -6,7 +6,7 @@ import warnings
 from typing import Optional
 
 import bpy
-from bpy.types import NodeReroute, NodeSocket, ShaderNode
+from bpy.types import NodeSocket, ShaderNode
 from mathutils import Vector
 
 from . import utils
@@ -50,9 +50,10 @@ class NodeNames:
 
     @staticmethod
     def blend_node(layer, channel):
-        """MixRGB or group node. Blends a layers channel with the
+        """MixRGB, Mix or group node. Blends a layers channel with the
         channel from the previous layer. Will be a group node if using
-        a custom blending function otherwise a MixRGB node.
+        a custom blending function otherwise a MixRGB or (if supported)
+        a Mix node.
         """
         return f"{layer.identifier}.blend.{channel.name}"
 
@@ -794,6 +795,8 @@ class NodeTreeBuilder:
 
             else:
                 ch_blend = layer_ch.make_blend_node(self.node_tree)
+                # Use only enabled sockets
+                ch_blend = utils.nodes.EnabledSocketsNode(ch_blend)
                 ch_blend.hide = True
 
             ch_blend.name = NodeNames.blend_node(layer, ch)
@@ -805,7 +808,7 @@ class NodeTreeBuilder:
             prev_layer_ch_out = self._get_layer_output_socket(previous_layer,
                                                               ch)
 
-            if isinstance(ch_blend, NodeReroute):
+            if getattr(ch_blend, "type", None) == "REROUTE":
                 links.new(ch_blend.inputs[0], prev_layer_ch_out)
                 continue
 

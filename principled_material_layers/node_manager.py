@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
+import itertools as it
 import typing
 import warnings
 
@@ -15,7 +16,7 @@ from .pml_node_tree import NodeNames, rebuild_node_tree
 from .preferences import get_addon_preferences
 from .utils.layer_stack_utils import (get_layer_stack_by_id,
                                       get_layer_stack_from_prop)
-from .utils.nodes import ensure_outputs_match_channels
+from .utils.nodes import EnabledSocketsNode, ensure_outputs_match_channels
 
 
 class NodeManager(bpy.types.PropertyGroup):
@@ -73,10 +74,11 @@ class NodeManager(bpy.types.PropertyGroup):
 
         node_name = NodeNames.blend_node(layer, channel)
         node = nodes[node_name]
+        inputs = EnabledSocketsNode(node).inputs
 
-        if len(node.inputs) == 1:
-            return node.inputs[0]
-        return node.inputs[1]
+        if len(inputs) == 1:
+            return inputs[0]
+        return inputs[1]
 
     def get_layer_output_socket(self, layer, channel, nodes=None):
         """Returns the socket that gives layer's output for channel,
@@ -110,12 +112,13 @@ class NodeManager(bpy.types.PropertyGroup):
                 return self._zero_const_output_socket
             return output_socket
 
+        # layer's output socket is on a blending node
         node = nodes.get(NodeNames.blend_node(layer, channel))
         if node is None:
             warnings.warn(f"Blend node for {channel.name} not found in layer "
                           f"{layer.name}")
             return self._zero_const_output_socket
-        return node.outputs[0]
+        return EnabledSocketsNode(node).outputs[0]
 
     def get_layer_final_alpha_socket(self, layer, nodes=None):
         """Returns the socket that gives the alpha value of the layer
@@ -192,6 +195,12 @@ class NodeManager(bpy.types.PropertyGroup):
         elif node.bl_idname == making_info.bl_idname:
             # Just update the options of the existing node
             making_info.update_node(node, channel)
+            # Updating the node may have enabled/disabled sockets so
+            # may need to rebuild the node tree after all.
+            node = EnabledSocketsNode(node)
+            if not all(x.is_linked for x in it.chain(node.inputs[:3],
+                                                     node.outputs[:1])):
+                self.rebuild_node_tree()
         else:
             self.rebuild_node_tree()
 
@@ -270,8 +279,9 @@ class NodeManager(bpy.types.PropertyGroup):
                                                             use_baked=baked,
                                                             nodes=nodes)
                 blend_node = nodes.get(NodeNames.blend_node(layer, ch))
-                if blend_node:
-                    links.new(blend_node.inputs[-1], ma_output)
+                if blend_node is not None:
+                    blend_node = EnabledSocketsNode(blend_node)
+                    links.new(blend_node.inputs[2], ma_output)
 
     def _on_active_image_change(self):
         layer_stack = self.layer_stack

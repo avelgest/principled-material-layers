@@ -142,10 +142,30 @@ def is_group_blending_compat(node_group: Optional[NodeTree],
     return True
 
 
+# Dict of socket types to the equivalent ShaderNodeMix.data_type value
+_mix_node_data_types = {'FLOAT': 'FLOAT',
+                        'FLOAT_FACTOR': 'FLOAT',
+                        'COLOR': 'RGBA',
+                        'VECTOR': 'VECTOR',
+                        }
+
+
+def _mix_node_fnc(node: ShaderNode, channel: Channel) -> None:
+    blend_mode = channel.effective_blend_mode
+    if blend_mode != 'MIX':
+        node.data_type = 'RGBA'
+        node.blend_type = blend_mode
+    else:
+        node.data_type = _mix_node_data_types.get(channel.socket_type, 'RGBA')
+        node.blend_type = 'MIX'
+
+
 def _mix_node_info(blend_mode: str) -> NodeMakeInfo:
     """Returns a NodeMakeInfo tuple for a blend_mode that
     uses a MixRGB node with a blend_type of blend_mode.
     """
+    if hasattr(bpy.types, "ShaderNodeMix"):
+        return NodeMakeInfo("ShaderNodeMix", function=_mix_node_fnc)
     return NodeMakeInfo("ShaderNodeMixRGB", {"blend_type": blend_mode})
 
 
