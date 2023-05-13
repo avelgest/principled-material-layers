@@ -9,6 +9,8 @@ import bpy
 from bpy.types import NodeReroute, NodeSocket, ShaderNode
 from mathutils import Vector
 
+from . import utils
+
 
 class NodeNames:
     """The methods in this class return the names used for the nodes
@@ -726,13 +728,14 @@ class NodeTreeBuilder:
         is_active.parent = parent
         is_active.location = (0, 300)
 
-        is_active_mix = nodes.new("ShaderNodeMixRGB")
-        is_active_mix.blend_type = 'MIX'
+        is_active_mix = utils.nodes.add_mix_node(self.node_tree, 'FLOAT')
         is_active_mix.name = NodeNames.layer_is_active_mix(layer)
         is_active_mix.label = f"{layer.name} Is Active? Mix"
         is_active_mix.parent = parent
         is_active_mix.hide = True
         is_active_mix.location = (200, 200)
+        # Use only enabled sockets
+        is_active_mix = utils.nodes.EnabledSocketsNode(is_active_mix)
 
         links.new(is_active_mix.inputs[0], is_active.outputs[0])
         links.new(is_active_mix.inputs[1], layer_image_socket)

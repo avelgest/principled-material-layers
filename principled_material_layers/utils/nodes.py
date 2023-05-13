@@ -39,6 +39,7 @@ _SIMPLE_NODES = {
     "ShaderNodeMapping",
     "ShaderNodeMapRange",
     "ShaderNodeMath",
+    "ShaderNodeMix",
     "ShaderNodeMixRGB",
     "ShaderNodeObjectInfo",
     "ShaderNodeRGB",
@@ -506,6 +507,25 @@ def _ensure_default_tangents_socket(node_tree: ShaderNodeTree) -> NodeSocket:
     return tangent_node.outputs[0]
 
 
+def add_mix_node(node_tree: ShaderNodeTree,
+                 data_type: str,
+                 blend_type: str = 'MIX') -> ShaderNode:
+    """Adds and returns a Mix node if supported else a MixRGB node.
+    If the blend_type is not supported by data_type then the Mix node
+    will use the color data type.
+    """
+    if hasattr(bpy.types, "ShaderNodeMix"):
+        node = node_tree.nodes.new("ShaderNodeMix")
+        if blend_type != 'MIX':
+            node.data_type = 'RGBA'
+        else:
+            node.data_type = data_type
+    else:
+        node = node_tree.nodes.new("ShaderNodeMixRGB")
+    node.blend_type = blend_type
+    return node
+
+
 class DefaultSocket(NamedTuple):
     """Contains reference default value of a NodeSocket, i.e. the
     default_value attribute of a socket when its node has just been
@@ -686,3 +706,25 @@ class NodeMakeInfo(NamedTuple):
 
         if self.function is not None:
             self.function(node, channel)
+
+
+class EnabledSocketsNode:
+    """A wrapper around a node that only contains enabled sockets in
+    its inputs and outputs properties.
+    """
+    def __init__(self, node: Node):
+        object.__setattr__(self, "node", node)
+
+    def __getattr__(self, name):
+        return getattr(self.node, name)
+
+    def __setattr__(self, name, value):
+        setattr(self.node, name, value)
+
+    @property
+    def inputs(self) -> list[NodeSocket]:
+        return [x for x in self.node.inputs if x.enabled]
+
+    @property
+    def outputs(self) -> list[NodeSocket]:
+        return [x for x in self.node.outputs if x.enabled]
