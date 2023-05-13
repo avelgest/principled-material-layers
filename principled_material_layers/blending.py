@@ -154,9 +154,7 @@ def _addon_blend_mode_fnc(node: ShaderNode, channel: Channel) -> None:
     groups bundled with the add-on. Uses a fallback group if the
     node group can't be loaded.
     """
-    blend_mode = channel.blend_mode
-    if blend_mode == 'DEFAULT':
-        blend_mode = channel.default_blend_mode
+    blend_mode = channel.effective_blend_mode
 
     group_name = _ADDON_BLEND_TYPES_GROUPS.get(blend_mode)
     if group_name is None:
@@ -171,11 +169,10 @@ def _addon_blend_mode_fnc(node: ShaderNode, channel: Channel) -> None:
         raise e
 
 
-def _addon_node_info(_blend_mode: str) -> NodeMakeInfo:
-    """Returns a NodeMakeInfo tuple for a blend_mode that uses
-    a group node and a node group bundled with the add-on.
-    """
-    return NodeMakeInfo("ShaderNodeGroup", function=_addon_blend_mode_fnc)
+# NodeMakeInfo for blend modes that use node groups bundled with the
+# add-on and Group nodes
+_addon_node_info = NodeMakeInfo("ShaderNodeGroup",
+                                function=_addon_blend_mode_fnc)
 
 
 def _create_node_group(name: str):
@@ -285,7 +282,7 @@ for mode_enum in _MIX_NODE_BLEND_TYPES:
 # Create NodeMakeInfo for add-on blend modes.
 for mode_enum in _ADDON_BLEND_TYPES:
     if mode_enum is not None:
-        BLEND_MODES_NODE_INFO[mode_enum] = _addon_node_info(mode_enum)
+        BLEND_MODES_NODE_INFO[mode_enum] = _addon_node_info
 
 
 # Check that all blend modes that need one have a NodeMakeInfo

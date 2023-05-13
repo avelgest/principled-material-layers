@@ -296,6 +296,22 @@ class Channel(BasicChannel):
                     layer_ch.preview_modifier = preview_mod
 
     @property
+    def effective_blend_mode(self) -> str:
+        """The blend_mode enum actually used by this channel. The same
+        as self.blend_mode unless the value is 'DEFAULT' in which case
+        the value on the layer stack's matching channel is returned.
+        """
+        if not self.is_layer_channel:
+            return self.blend_mode if self.blend_mode != 'DEFAULT' else 'MIX'
+
+        if self.blend_mode == 'DEFAULT':
+            layer_stack_ch = self.layer_stack_channel
+            if layer_stack_ch is not None:
+                return layer_stack_ch.effective_blend_mode
+
+        return self.blend_mode
+
+    @property
     def effective_hardness(self) -> str:
         """The hardness enum actually used by this channel. The same as
         self.hardness unless the value is 'DEFAULT' in which case the
@@ -305,7 +321,7 @@ class Channel(BasicChannel):
             return self.hardness if self.hardness != 'DEFAULT' else 'LINEAR'
 
         if self.hardness == 'DEFAULT':
-            layer_stack_ch = self.layer_stack.channels.get(self.name)
+            layer_stack_ch = self.layer_stack_channel
             if layer_stack_ch is not None:
                 return layer_stack_ch.effective_hardness
         return self.hardness
