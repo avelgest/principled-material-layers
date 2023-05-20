@@ -117,9 +117,19 @@ class PML_UL_material_layers_list(UIList):
 
 
 def draw_ch_preview_btn(layout, layer_stack, *, layer, channel) -> None:
-    if layer_stack.is_channel_previewed(channel):
+
+    # If no layer is given then don't check the channels are on the
+    # the same layer
+    ignore_layer = (layer is not None)
+
+    # Show the clear operator if given channel is currently previewed
+    if layer_stack.is_channel_previewed(channel, ignore_layer=ignore_layer):
+        # Use SHADING_SOLID icon if the previewed channel is on a layer
+        # rather than on the layer stack itself
+        icon = ("SHADING_SOLID" if layer_stack.layer_channel_previewed
+                else "SHADING_TEXTURE")
         layout.operator("node.pml_clear_preview_channel", text="",
-                        emboss=True, depress=True, icon="SHADING_TEXTURE")
+                        emboss=True, depress=True, icon=icon)
     else:
         op_props = layout.operator("node.pml_preview_channel", text="",
                                    emboss=False, icon="SHADING_TEXTURE")
@@ -434,7 +444,8 @@ class PML_MT_set_preview_modifier(Menu):
     """
     bl_idname = "PML_MT_set_preview_modifier"
     bl_label = "Set Preview Type"
-    bl_description = "Sets the preview type of the channel"
+    bl_description = ("Sets the preview type of the channel. Only takes "
+                      "effect when the channel is being previewed")
 
     def draw(self, context):
         channel = getattr(context, "pml_channel", None)
@@ -573,15 +584,11 @@ class layer_stack_channels_PT_base:
         row = layout.row(align=True)
         row.context_pointer_set("pml_channel", channel)
 
-        row.label(text="Preview:")
+        row.label(text="Preview Type:")
 
         menu_text = row.enum_item_name(channel, "preview_modifier",
                                        channel.preview_modifier)
         row.menu("PML_MT_set_preview_modifier", text=menu_text)
-
-        draw_ch_preview_btn(row, layer_stack,
-                            layer=channel.layer,
-                            channel=channel)
 
     def draw(self, context):
         layout = self.layout

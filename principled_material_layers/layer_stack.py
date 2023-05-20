@@ -1056,13 +1056,18 @@ class LayerStack(bpy.types.PropertyGroup):
         self.bake_groups.clear()
         self.image_manager.update_tiled_storage()
 
-    def is_channel_previewed(self, ch: Channel) -> bool:
+    def is_channel_previewed(self, ch: Channel,
+                             ignore_layer: bool = False) -> bool:
         """Returns whether Channel ch is the current preview channel.
-        More efficient than doing ch == layer_stack.preview_channel
+        More efficient than doing ch == layer_stack.preview_channel.
+        If ignore_layer is True then don't check that ch belongs to
+        the same layer as the previewed channel.
         """
         ch_name = self.get("preview_channel_name", "")
         if not ch_name:
             return False
+        if ignore_layer:
+            return ch_name == ch.name
         layer_id = self.get("preview_layer_id", "")
         return ch_name == ch.name and layer_id == ch.layer_identifier
 
@@ -1174,6 +1179,13 @@ class LayerStack(bpy.types.PropertyGroup):
     @layers_share_images.setter
     def layers_share_images(self, value: bool):
         self.image_manager.layers_share_images = value
+
+    @property
+    def layer_channel_previewed(self) -> bool:
+        """True if there is a channel currently being previewed and the
+        channel belongs to a layer rather than the layer stack itself.
+        """
+        return bool(self.get("preview_layer_id"))
 
     @property
     def material(self) -> bpy.types.Material:

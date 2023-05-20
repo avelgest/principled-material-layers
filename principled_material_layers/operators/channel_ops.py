@@ -287,8 +287,7 @@ def restore_old_links(node_tree) -> None:
 class PML_OT_preview_channel(Operator):
     bl_idname = "node.pml_preview_channel"
     bl_label = "Preview Channel"
-    bl_description = ("Connects the output of this channel directly to the "
-                      "Material Output node")
+    bl_description = "Connect this channel to the material output"
     bl_options = {'INTERNAL', 'REGISTER'}
 
     layer_name: StringProperty(
@@ -300,6 +299,16 @@ class PML_OT_preview_channel(Operator):
         name="Channel Name",
         description="The name of the channel to be previewed"
     )
+
+    @classmethod
+    def description(cls, _context, properties):
+        if properties.layer_name:
+            return (f"{cls.bl_description}. Shift-click to preview the "
+                    "channel of an individual layer")
+        if not properties.channel_name:
+            return ("Stop previewing a channel and restore the Material "
+                    "Output node's previous connection")
+        return cls.bl_description
 
     @classmethod
     def poll(cls, context):
@@ -352,15 +361,30 @@ class PML_OT_preview_channel(Operator):
         if self.node_tree is None:
             return {'CANCELLED'}
 
+        # Clear the preview if no channel is given
+        if not self.channel_name:
+            return self._clear_preview_channel()
+
         self.ma_output = utils.nodes.get_output_node(self.node_tree)
         if self.ma_output is None:
             self.report({'WARNING'}, "Could not find a Material Output node")
             return {'CANCELLED'}
 
         if not self.layer_name:
+            # Preview a channel of the layer stack
             return self._preview_stack_channel()
 
+        # Preview a channel of the given layer
         return self._preview_layer_channel()
+
+    def invoke(self, context, event):
+        # When invoking shift click previews a channel of the given
+        # layer, whilst a normal click previews a channel of the
+        # layer stack itself.
+        if not event.shift:
+            self.layer_name = ""
+
+        return self.execute(context)
 
     def _ensure_layer_group_node(self) -> bpy.types.ShaderNodeGroup:
         """Returns the group node for accessing the value of layers'
@@ -450,6 +474,21 @@ class PML_OT_preview_channel(Operator):
         self.layer_stack.preview_channel = ch
 
         self.insert_preview_modifier(ch, out_socket, self._ma_output_socket)
+
+        return {'FINISHED'}
+
+    def _clear_preview_channel(self):
+        self.layer_stack.preview_channel = None
+
+        node_tree = self.node_tree
+
+        # Delete the layer preview and the preview modifier nodes
+        for node_name in (PREVIEW_GROUP_NODE_NAME, PREVIEW_MOD_NODE_NAME):
+            node = node_tree.nodes.get(node_name)
+            if node is not None:
+                node_tree.nodes.remove(node)
+
+        restore_old_links(node_tree)
 
         return {'FINISHED'}
 
