@@ -97,8 +97,15 @@ class PML_PT_layer_stack_popover_ip(ImgPaintPanel, layer_stack_PT_base):
 
         row = layout.row(align=True)
         row.context_pointer_set("pml_preview_channel",  preview_ch)
-        row.menu("PML_MT_set_preview_channel",
-                 text="Preview" if preview_ch is None else preview_ch.name)
+
+        if preview_ch is None:
+            menu_text = "Preview"
+        elif preview_ch.is_layer_channel:
+            menu_text = f"{preview_ch.name} ({preview_ch.layer.name})"
+        else:
+            menu_text = preview_ch.name
+
+        row.menu("PML_MT_set_preview_channel", text=menu_text)
         if preview_ch is None:
             return
 
