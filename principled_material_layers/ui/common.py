@@ -438,9 +438,30 @@ class PML_MT_set_image_proj(Menu):
                             text=name).proj_mode = val
 
 
+class PML_MT_set_preview_channel(Menu):
+    """Menu for setting the preview channel."""
+    bl_idname = "PML_MT_set_preview_channel"
+    bl_label = "Preview"
+    bl_description = ("Connect a channel to the material output. Shift-click "
+                      "a channel name to preview the same channel of the "
+                      "active layer")
+
+    def draw(self, context):
+        layer_stack = get_layer_stack(context)
+        active_layer = layer_stack.active_layer
+        active_layer_name = active_layer.name if active_layer else ""
+
+        layout = self.layout
+        for ch in layer_stack.channels:
+            op_props = layout.operator("node.pml_preview_channel",
+                                       text=ch.name)
+            op_props.layer_name = active_layer_name
+            op_props.channel_name = ch.name
+
+
 class PML_MT_set_preview_modifier(Menu):
     """Menu for setting the preview modifier of the channel given by
-    context.pml_channel.
+    context.pml_preview_channel.
     """
     bl_idname = "PML_MT_set_preview_modifier"
     bl_label = "Set Preview Type"
@@ -448,7 +469,7 @@ class PML_MT_set_preview_modifier(Menu):
                       "effect when the channel is being previewed")
 
     def draw(self, context):
-        channel = getattr(context, "pml_channel", None)
+        channel = getattr(context, "pml_preview_channel", None)
         if channel is None:
             return
 
@@ -582,7 +603,7 @@ class layer_stack_channels_PT_base:
     def draw_ch_preview_options(cls, layout, layer_stack, channel) -> None:
         """Draws the preview type menu / preview button for channel."""
         row = layout.row(align=True)
-        row.context_pointer_set("pml_channel", channel)
+        row.context_pointer_set("pml_preview_channel", channel)
 
         row.label(text="Preview Type:")
 
@@ -1015,6 +1036,7 @@ classes = (
     PML_MT_custom_blend_mode_select,
     PML_MT_custom_hardness_select,
     PML_MT_set_image_proj,
+    PML_MT_set_preview_channel,
     PML_MT_set_preview_modifier,
     )
 

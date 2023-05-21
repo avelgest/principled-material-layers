@@ -85,9 +85,28 @@ class PML_PT_layer_stack_popover_ip(ImgPaintPanel, layer_stack_PT_base):
         super().draw(context)
 
     def draw_initialized(self, context):
+        layout = self.layout
         layer_stack = get_layer_stack(context)
 
-        self.draw_layers_list(self.layout, layer_stack, rows=4)
+        self.draw_layers_list(layout, layer_stack, rows=4)
+
+        self._draw_preview_menus(layout, layer_stack)
+
+    def _draw_preview_menus(self, layout, layer_stack) -> None:
+        preview_ch = layer_stack.preview_channel
+
+        row = layout.row(align=True)
+        row.context_pointer_set("pml_preview_channel",  preview_ch)
+        row.menu("PML_MT_set_preview_channel",
+                 text="Preview" if preview_ch is None else preview_ch.name)
+        if preview_ch is None:
+            return
+
+        row.menu("PML_MT_set_preview_modifier",
+                 text=row.enum_item_name(preview_ch, "preview_modifier",
+                                         preview_ch.preview_modifier))
+        row.operator("node.pml_clear_preview_channel", text="",
+                     icon="X")
 
 
 classes = (PML_PT_layer_stack_ip,
