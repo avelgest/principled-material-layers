@@ -47,12 +47,14 @@ class PML_PT_asset_browser_panel(bpy.types.Panel):
             is_compat = self.check_compat(context, layer_stack)
             layout.label(text=is_compat.label_text,
                          icon=is_compat.label_icon)
+        else:
+            is_compat = None
 
         layout.label(text="Active Layer: "
                           f"{active_layer.name if active_layer else 'None'}")
 
         col = layout.column(align=True)
-        col.enabled = bool(locals().get("is_compat", True))
+        col.enabled = (is_compat is None or is_compat)
         col.operator("material.pml_new_layer_material_ab")
         col.operator("material.pml_replace_layer_material_ab")
         col.operator("material.pml_combine_material_ab")
