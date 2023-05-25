@@ -34,10 +34,16 @@ from .utils.nodes import (set_node_group_vector_defaults,
 
 LAYER_TYPES = (('MATERIAL_PAINT', "Material Paint",
                 "An image-based layer for painting"),
-               ('MATERIAL_FILL', "Material Fill", "A fill layer"))
+               ('MATERIAL_FILL', "Material Fill", "A fill layer"),
+               ('MATERIAL_W_ALPHA', "Custom Alpha",
+                "A material with a node-based alpha"),
+               )
 
 # Set of valid Enum Strings for LAYER_TYPES
-_VALID_LAYER_TYPES = set(x[0] for x in LAYER_TYPES)
+_VALID_LAYER_TYPES = {x[0] for x in LAYER_TYPES}
+
+# The name of the custom alpha channel used by MATERIAL_W_ALPHA layers
+CUSTOM_ALPHA_CH_NAME = "Layer Alpha (PML)"
 
 
 class MaterialLayerRef(PropertyGroup):
@@ -433,6 +439,8 @@ class MaterialLayer(PropertyGroup):
 
         if self.layer_type == 'MATERIAL_PAINT':
             layer_stack.image_manager.allocate_image_to_layer(self)
+        elif self.layer_type == 'MATERIAL_W_ALPHA':
+            self._ensure_custom_alpha_ch()
 
         if self.node_tree is not None and prefs.show_previews:
             self._create_preview_material()
@@ -483,10 +491,11 @@ class MaterialLayer(PropertyGroup):
         layer_stack = self.layer_stack
         im = layer_stack.image_manager
 
-        if layer_type == 'MATERIAL_PAINT' and self.image is None:
-            im.allocate_image_to_layer(self)
+        if layer_type == 'MATERIAL_PAINT':
+            if self.image is None:
+                im.allocate_image_to_layer(self)
 
-        elif layer_type == 'MATERIAL_FILL' and not keep_data:
+        elif not keep_data:
             im.deallocate_layer_image(self)
 
         self.layer_type = layer_type
@@ -638,9 +647,22 @@ class MaterialLayer(PropertyGroup):
         # correct default value rather than just a constant vector.
         set_node_group_vector_defaults(node_tree)
 
+        if self.layer_type == 'MATERIAL_W_ALPHA':
+            self._ensure_custom_alpha_ch()
+
         self._refresh_preview_material()
 
         self.img_proj_mode = 'ORIGINAL'
+
+    def _ensure_custom_alpha_ch(self) -> Channel:
+        ch = self.channels.get(CUSTOM_ALPHA_CH_NAME)
+        if ch is None:
+            ch = self.channels.add()
+            ch.initialize(CUSTOM_ALPHA_CH_NAME, 'FLOAT_FACTOR', self)
+
+            self._ensure_node_tree_output(ch)
+            bpy.msgbus.publish_rna(key=self.channels)
+        return ch
 
     def _create_preview_material(self) -> None:
         if self.node_tree is None:
@@ -767,7 +789,7 @@ class MaterialLayer(PropertyGroup):
 
     @property
     def uses_image(self) -> bool:
-        """True if this layer has an image that it uses.
+        """True if this layer requires an image for it's alpha.
         This is different to has_image since a layer may have an image
         that it doesn't use if it's type has been changed.
         """

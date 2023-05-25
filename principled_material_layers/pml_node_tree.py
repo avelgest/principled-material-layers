@@ -10,6 +10,7 @@ from bpy.types import NodeSocket, ShaderNode
 from mathutils import Vector
 
 from . import utils
+from . import material_layer
 
 
 class NodeNames:
@@ -626,10 +627,10 @@ class NodeTreeBuilder:
             bake_node = nodes[NodeNames.bake_image_rgb(ch.bake_image)]
         return bake_node.outputs[ch.bake_image_channel]
 
-    def _get_paint_image_socket(self, layer):
+    def _get_paint_image_socket(self, layer) -> Optional[NodeSocket]:
 
-        if layer.layer_type == 'MATERIAL_FILL':
-            return self._one_const_socket
+        if layer.layer_type != 'MATERIAL_PAINT':
+            return None
 
         nodes = self.nodes
 
@@ -693,9 +694,20 @@ class NodeTreeBuilder:
         alpha_x_opacity = nodes[NodeNames.layer_alpha_x_opacity(layer)]
 
         if layer.layer_type == 'MATERIAL_FILL':
-            # Ignore active_* nodes when using fill layers since
-            # they can't be painted on.
+            # Ignore active_* nodes when using layers that can't be
+            # painted on.
             links.new(alpha_x_opacity.inputs[1], self._one_const_socket)
+
+        elif layer.layer_type == 'MATERIAL_W_ALPHA':
+            # For custom alpha layers the alpha is an output on the
+            # the layer's node group
+            alpha_socket = ma_group.outputs.get(
+                                material_layer.CUSTOM_ALPHA_CH_NAME)
+            if alpha_socket is not None:
+                links.new(alpha_x_opacity.inputs[1], alpha_socket)
+            else:
+                warnings.warn("Could not find alpha socket for Custom Alpha "
+                              f"layer {layer.name}")
 
         if layer.node_mask is not None:
             self._insert_layer_mask_node(layer)
@@ -739,7 +751,8 @@ class NodeTreeBuilder:
         is_active_mix = utils.nodes.EnabledSocketsNode(is_active_mix)
 
         links.new(is_active_mix.inputs[0], is_active.outputs[0])
-        links.new(is_active_mix.inputs[1], layer_image_socket)
+        if layer_image_socket is not None:
+            links.new(is_active_mix.inputs[1], layer_image_socket)
         links.new(is_active_mix.inputs[2], active_layer_image.outputs[0])
 
         alpha_x_opacity = nodes.new("ShaderNodeMath")

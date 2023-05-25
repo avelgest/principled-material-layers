@@ -803,9 +803,6 @@ class LayerStack(bpy.types.PropertyGroup):
 
     def get_channel_default_value(self,
                                   channel: BasicChannel) -> Optional[Any]:
-        if channel.name not in self.channels:
-            raise ValueError(f"Layer stack has no channel '{channel.name}'")
-
         # If this layer stack should connect to a group node then use
         # the default_value of the node group's input socket interface.
         if self.group_to_connect is not None:
