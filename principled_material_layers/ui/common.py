@@ -11,6 +11,7 @@ from .. import bake_group
 from .. import blending
 from .. import hardness
 from .. import image_mapping
+from .. import material_layer
 from .. import utils
 
 from ..channel import PREVIEW_MODIFIERS
@@ -260,6 +261,21 @@ class PML_MT_open_layer_group(Menu):
                                        text=layer.name, icon_value=icon_value)
             op_props.node_group = layer.node_tree.name
             op_props.custom_description = "Edit this layer's node tree"
+
+
+class PML_MT_new_layer_menu(Menu):
+    bl_label = "New Layer"
+    bl_idname = "PML_MT_new_layer_menu"
+    bl_description = ("Select a type of new layer to add to the top of the "
+                      "stack")
+
+    def draw(self, _context):
+        layout = self.layout
+
+        for enum_tuple in material_layer.LAYER_TYPES:
+            enum, name = enum_tuple[:2]
+            op_props = layout.operator("material.pml_add_layer", text=name)
+            op_props.layer_type = enum
 
 
 class PML_MT_add_channel_layer(Menu):
@@ -530,10 +546,14 @@ class layer_stack_PT_base:
 
             # Change layer type
             row = col.row()
-            text = ("Convert to Fill Layer"
-                    if active_layer.layer_type == 'MATERIAL_PAINT'
-                    else "Convert to Paint Layer")
-            row.operator("material.pml_convert_layer", text=text)
+            if active_layer.layer_type != 'MATERIAL_PAINT':
+                row.operator("material.pml_convert_layer",
+                             text="Convert to Paint Layer"
+                             ).new_type = 'MATERIAL_PAINT'
+            else:
+                row.operator("material.pml_convert_layer",
+                             text="Convert to Fill Layer"
+                             ).new_type = 'MATERIAL_FILL'
 
         layout.separator()
 
@@ -578,6 +598,7 @@ class layer_stack_PT_base:
                           "layers", layer_stack, "active_layer_index",
                           sort_lock=True, sort_reverse=True, rows=rows)
         col = row.column(align=True)
+        col.menu("PML_MT_new_layer_menu", icon='ADD', text="")
         col.operator("material.pml_add_layer", icon='ADD', text="")
         col.operator("material.pml_remove_layer", icon='REMOVE', text="")
 
@@ -1031,6 +1052,7 @@ classes = (
     PML_UL_layer_stack_channels_list,
     PML_UL_layer_channels_list,
     PML_MT_open_layer_group,
+    PML_MT_new_layer_menu,
     PML_MT_add_channel_layer,
     PML_MT_channel_blend_mode,
     PML_MT_custom_blend_mode_select,

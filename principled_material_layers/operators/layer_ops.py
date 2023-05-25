@@ -60,8 +60,22 @@ class PML_OT_set_active_layer_index(Operator):
 class PML_OT_add_layer(Operator):
     bl_idname = "material.pml_add_layer"
     bl_label = "Add Material Layer"
-    bl_description = "Adds a new paint layer to the top of the stack."
+    bl_description = "Adds a new layer to the top of the stack."
     bl_options = {'REGISTER', 'UNDO'}
+
+    layer_type: EnumProperty(
+        items=LAYER_TYPES,
+        name="Type",
+        description="The type of layer to add",
+        default='MATERIAL_PAINT'
+    )
+
+    @classmethod
+    def description(cls, _context, properties) -> str:
+        enum_tuple = next(x for x in LAYER_TYPES
+                          if x[0] == properties.layer_type)
+        return (f"Adds a new {enum_tuple[1]} layer to the top of the stack. "
+                f"{enum_tuple[1]}: {enum_tuple[2]}")
 
     @classmethod
     def poll(cls, context):
@@ -69,7 +83,8 @@ class PML_OT_add_layer(Operator):
 
     def execute(self, context):
         layer_stack = get_layer_stack(context)
-        new_layer = layer_stack.insert_layer("Layer", -1)
+        new_layer = layer_stack.insert_layer("Layer", -1,
+                                             layer_type=self.layer_type)
         layer_stack.active_layer = new_layer
 
         ensure_global_undo()
@@ -401,11 +416,7 @@ class PML_OT_convert_layer(Operator):
 
     @property
     def new_type_name(self) -> str:
-        if self.new_type == 'MATERIAL_FILL':
-            return "Fill Layer"
-        if self.new_type == 'MATERIAL_PAINT':
-            return "Paint Layer"
-        return ""
+        return self.layout.enum_item_name(self, "new_type", self.new_type)
 
 
 class PML_OT_layer_img_projection(Operator):

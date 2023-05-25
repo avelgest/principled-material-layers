@@ -853,7 +853,8 @@ class LayerStack(bpy.types.PropertyGroup):
 
         return self.insert_layer(name, above_idx + 1)
 
-    def insert_layer(self, name: str, position: int) -> MaterialLayer:
+    def insert_layer(self, name: str, position: int,
+                     layer_type='MATERIAL_PAINT') -> MaterialLayer:
         """Inserts a new layer into the top level of the layer stack.
         Params:
             name: The name of the new layer. The layer's actual name
@@ -861,6 +862,8 @@ class LayerStack(bpy.types.PropertyGroup):
                 this name).
             position: The position in the top level of the layer stack
                 in which to insert the new layer.
+            layer_type: The type of the new layer. Defaults to
+                'MATERIAL_PAINT'.
         Returns:
             The new layer.
         """
@@ -873,7 +876,8 @@ class LayerStack(bpy.types.PropertyGroup):
                 raise IndexError("position is out of range")
 
         new_layer = self.layers.add()
-        new_layer.initialize(name, self, channels=self.channels)
+        new_layer.initialize(name, self, channels=self.channels,
+                             layer_type=layer_type)
 
         new_layer_ref = top_lvl.add()
         new_layer_ref.set(new_layer)
@@ -996,7 +1000,7 @@ class LayerStack(bpy.types.PropertyGroup):
         Params:
             layer: The MaterialLayer to convert.
             new_type: The type to convert to as a LAYER_TYPES enum
-                string. Must be in {'MATERIAL_PAINT', 'MATERIAL_FILL'}.
+                string.
             keep_image: If converting from a type that uses an image to
                 a type that does not then keep the image, otherwise
                 delete the image.
