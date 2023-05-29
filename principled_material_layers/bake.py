@@ -749,8 +749,13 @@ class LayerBaker(LayerStackBaker):
             raise RuntimeError("Could not find material node for layer "
                                f"{layer.name}.")
 
+        # Only bake channels that are enabled on the layer stack
+        layer_stack_ch_names = {x.name for x in self.layer_stack.channels
+                                if x.enabled}
+
         baking_sockets = [ChannelSocket(ch, ma_node.outputs[ch.name])
-                          for ch in layer.channels]
+                          for ch in layer.channels
+                          if ch.name in layer_stack_ch_names]
 
         return baking_sockets
 
