@@ -217,6 +217,18 @@ class Channel(BasicChannel):
         update=lambda self, _: self._preview_modifier_update()
     )
 
+    usage: EnumProperty(
+        items=(
+            ('BLENDING', "Blending", "Channel can be blended with channels "
+             "in other layers"),
+            ('LAYER_ALPHA', "Layer Alpha", "Channel outputs a layer's alpha"),
+            ('NONE', "None", "Channel is not unused"),
+        ),
+        name="Channel Usage",
+        description="How the channel is used",
+        default='BLENDING'
+    )
+
     # The identifier of the layer this channel belongs to. May be "" if
     # this channel instance is in LayerStack.channels rather than on a
     # layer

@@ -195,7 +195,7 @@ class PML_UL_layer_channels_list(UIList):
         channel = item
         layer_stack = layer.layer_stack
 
-        if layer.is_base_layer:
+        if layer.is_base_layer or channel.usage != 'BLENDING':
             # Only show label for base layer channels
             row = layout.row()
             row.separator(factor=2.0)
@@ -806,7 +806,7 @@ class active_layer_channels_PT_base:
                     col, layer_stack, active_channel
                 )
 
-            if not is_base_layer:
+            if not is_base_layer and active_channel.usage == 'BLENDING':
                 op_props = row.operator("material.pml_layer_remove_channel",
                                         icon='REMOVE', text="")
                 op_props.channel_name = active_channel.name

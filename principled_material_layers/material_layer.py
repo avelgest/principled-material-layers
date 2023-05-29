@@ -662,6 +662,8 @@ class MaterialLayer(PropertyGroup):
 
             self._ensure_node_tree_output(ch)
             bpy.msgbus.publish_rna(key=self.channels)
+        if ch.usage != 'LAYER_ALPHA':
+            ch.usage = 'LAYER_ALPHA'
         return ch
 
     def _create_preview_material(self) -> None:
