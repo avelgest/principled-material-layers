@@ -284,7 +284,8 @@ class Channel(BasicChannel):
             # For layer channels set the layer stack channel's value
             # as well.
             layer_stack_ch = self.layer_stack_channel
-            if layer_stack_ch.preview_modifier != preview_mod:
+            if (layer_stack_ch is not None
+                    and layer_stack_ch.preview_modifier != preview_mod):
                 layer_stack_ch.preview_modifier = preview_mod
         else:
             # For layer stack channels set the value on the matching

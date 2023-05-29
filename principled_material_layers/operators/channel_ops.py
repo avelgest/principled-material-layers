@@ -378,10 +378,12 @@ class PML_OT_preview_channel(Operator):
         return self._preview_layer_channel()
 
     def invoke(self, context, event):
+        layer_stack = get_layer_stack(context)
+
         # When invoking shift click previews a channel of the given
         # layer, whilst a normal click previews a channel of the
         # layer stack itself.
-        if not event.shift:
+        if not event.shift and self.channel_name in layer_stack.channels:
             self.layer_name = ""
 
         return self.execute(context)
@@ -421,7 +423,7 @@ class PML_OT_preview_channel(Operator):
         ch = self.layer_stack.channels.get(self.channel_name)
 
         if ch is None:
-            self.report({'WARNING'}, "Channel {self.channel_name} not found")
+            self.report({'WARNING'}, f"Channel {self.channel_name} not found")
             return {'CANCELLED'}
 
         socket = pml_node.outputs.get(self.channel_name)

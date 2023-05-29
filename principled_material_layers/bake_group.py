@@ -265,8 +265,8 @@ class BakeGroupBaker(LayerStackBaker):
                 socket = nm.get_ma_group_output_socket(layer, layer_ch,
                                                        use_baked=False,
                                                        nodes=nodes)
-            if not is_socket_simple(socket):
-                return False
+                if not is_socket_simple(socket):
+                    return False
         return True
 
     def bake(self) -> BakedSocketGen:
