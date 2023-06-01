@@ -89,7 +89,8 @@ class BakeGroup(bpy.types.PropertyGroup):
             layer = layer.resolve()
 
         for ch in layer.channels:
-            self._ensure_channel(ch)
+            if ch.usage == 'BLENDING':
+                self._ensure_channel(ch)
 
         layer_ids = self.layer_ids
         layer_ids.append(layer.identifier)

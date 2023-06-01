@@ -97,28 +97,28 @@ class NodeManager(bpy.types.PropertyGroup):
             if node:
                 return node.outputs[0]
 
-        if layer.is_base_layer:
-            # Use channel's baked value if present
+        if layer.is_base_layer or channel.usage != 'BLENDING':
+            # Can return a baked value for channels that don't blend
             node = nodes.get(NodeNames.baked_value(layer, channel))
             if node is not None:
                 return node.outputs[0]
 
-            node = nodes[NodeNames.layer_material(layer)]
-            output_socket = node.outputs.get(channel.name)
-            if output_socket is None:
-                warnings.warn(f"Socket for {channel.name} not found in base "
-                              "layer node group.")
-                # Value socket which is always 0
-                return self._zero_const_output_socket
-            return output_socket
+        else:
+            # Look for a blending node
+            node = nodes.get(NodeNames.blend_node(layer, channel))
+            if node is not None:
+                return EnabledSocketsNode(node).outputs[0]
 
-        # layer's output socket is on a blending node
-        node = nodes.get(NodeNames.blend_node(layer, channel))
-        if node is None:
-            warnings.warn(f"Blend node for {channel.name} not found in layer "
-                          f"{layer.name}")
+        # Look for a socket on the layer's material group
+        node = nodes[NodeNames.layer_material(layer)]
+        output_socket = node.outputs.get(channel.name)
+        if output_socket is None:
+            warnings.warn(f"Socket for {channel.name} not found in "
+                          "layer node group.")
+            # Value socket which is always 0
             return self._zero_const_output_socket
-        return EnabledSocketsNode(node).outputs[0]
+
+        return output_socket
 
     def get_layer_final_alpha_socket(self, layer, nodes=None):
         """Returns the socket that gives the alpha value of the layer
