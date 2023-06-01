@@ -278,6 +278,29 @@ class PML_MT_new_layer_menu(Menu):
             op_props.layer_type = enum
 
 
+class PML_MT_convert_layer(Menu):
+    """Menu for converting the active layer to a new layer type."""
+    bl_label = "Convert Layer To"
+    bl_idname = "PML_MT_convert_layer"
+    bl_description = "Convert the active layer to a new layer type"
+
+    def draw(self, context):
+        layout = self.layout
+
+        active_layer = get_layer_stack(context).active_layer
+        if active_layer is None:
+            return
+
+        current_type = active_layer.layer_type
+
+        for enum, name, *_ in material_layer.LAYER_TYPES:
+            if current_type == enum:
+                continue
+            op_props = layout.operator("material.pml_convert_layer", text=name)
+            op_props.new_type = enum
+            op_props.keep_image = True
+
+
 class PML_MT_add_channel_layer(Menu):
     """Menu for adding a channel to the active layer. The menu is a
     list of all the layer stack's enabled layers that are not on the
@@ -545,15 +568,7 @@ class layer_stack_PT_base:
             op_props = col.operator("material.pml_replace_layer_material")
 
             # Change layer type
-            row = col.row()
-            if active_layer.layer_type != 'MATERIAL_PAINT':
-                row.operator("material.pml_convert_layer",
-                             text="Convert to Paint Layer"
-                             ).new_type = 'MATERIAL_PAINT'
-            else:
-                row.operator("material.pml_convert_layer",
-                             text="Convert to Fill Layer"
-                             ).new_type = 'MATERIAL_FILL'
+            col.menu("PML_MT_convert_layer")
 
         layout.separator()
 
@@ -1053,6 +1068,7 @@ classes = (
     PML_UL_layer_channels_list,
     PML_MT_open_layer_group,
     PML_MT_new_layer_menu,
+    PML_MT_convert_layer,
     PML_MT_add_channel_layer,
     PML_MT_channel_blend_mode,
     PML_MT_custom_blend_mode_select,
