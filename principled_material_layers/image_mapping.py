@@ -5,18 +5,29 @@ import warnings
 
 from typing import Optional
 
+import bpy
+
 from bpy.types import ShaderNodeTree, ShaderNode
 
 from . import tiled_storage
 from . import utils
 
 # The projection used by any image nodes in the material
-IMG_PROJ_MODES = (('ORIGINAL', "Original", ""),
-                  ('FLAT', "Flat", ""),
-                  ('BOX', "Box", ""))
+IMG_PROJ_MODES = [('ORIGINAL', "Original", ""), ]
+
 
 COORD_MAP_NODE_NAME = "pml_proj_coords_map"
 COORD_NODE_NAME = "pml_proj_tex_coords"
+
+
+def _get_shader_node_proj_enum():
+    prop = bpy.types.ShaderNodeTexImage.bl_rna.properties.get("projection")
+    if prop is None:
+        return []
+    return [(x.identifier, x.name, x.description) for x in prop.enum_items]
+
+
+IMG_PROJ_MODES += _get_shader_node_proj_enum()
 
 
 def set_layer_projection(layer, proj_mode: str) -> None:
@@ -38,10 +49,8 @@ def set_layer_projection(layer, proj_mode: str) -> None:
         _set_layer_projection_orig(layer)
     elif proj_mode == 'BOX':
         _set_layer_projection_box(layer)
-    elif proj_mode == 'FLAT':
-        _set_layer_projection_flat(layer)
     else:
-        raise NotImplementedError(f"proj_mode {proj_mode} not yet implemented")
+        _set_layer_projection_other(layer, proj_mode)
 
     layer.img_proj_mode = proj_mode
 
@@ -122,19 +131,20 @@ def _set_layer_projection_box(layer) -> None:
         node_tree.links.new(node.inputs[0], mapping_node.outputs[0])
         _add_blend_driver(node, layer)
 
-    layer.proj_mode = 'BOX'
+    layer.img_proj_mode = 'BOX'
 
 
-def _set_layer_projection_flat(layer) -> None:
+def _set_layer_projection_other(layer, proj_mode: str) -> None:
     node_tree = layer.node_tree
     img_nodes = _get_img_nodes(node_tree)
 
-    mapping_node = _init_mapping_node(node_tree, img_nodes, "UV")
+    coords = "UV" if proj_mode == 'FLAT' else "Object"
+    mapping_node = _init_mapping_node(node_tree, img_nodes, coords)
 
     for node in img_nodes:
-        node.projection = 'FLAT'
+        node.projection = proj_mode
         node_tree.links.new(node.inputs[0], mapping_node.outputs[0])
-    layer.proj_mode = 'FLAT'
+    layer.img_proj_mode = proj_mode
 
 
 def _get_img_nodes(node_tree: ShaderNodeTree) -> typing.List[ShaderNode]:
