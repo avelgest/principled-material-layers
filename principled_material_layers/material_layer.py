@@ -34,7 +34,8 @@ from .utils.nodes import (set_node_group_vector_defaults,
 
 LAYER_TYPES = (('MATERIAL_PAINT', "Material Paint",
                 "An image-based layer for painting"),
-               ('MATERIAL_FILL', "Material Fill", "A fill layer"),
+               ('MATERIAL_FILL', "Material Fill",
+                "A layer that covers the whole object"),
                ('MATERIAL_W_ALPHA', "Custom Alpha",
                 "A material with a node-based alpha"),
                )
@@ -76,6 +77,7 @@ class MaterialLayerRef(PropertyGroup):
         return False
 
     def initialize(self, layer: Optional[MaterialLayer]) -> None:
+        """Same as MaterialLayerRef.set"""
         self.set(layer)
         if self.id_data is not layer.id_data:
             raise RuntimeError("MaterialLayerRef only supported on objects "
@@ -288,7 +290,7 @@ class MaterialLayer(PropertyGroup):
             if socket is not None:
                 socket.default_value = value
 
-    def _ensure_node_tree_output(self, channel: Channel) -> None:
+    def _ensure_node_tree_output(self, channel: BasicChannel) -> None:
         """Ensure that the layer's node tree has an output for channel
         and that it is of the correct type.
         """
@@ -337,7 +339,10 @@ class MaterialLayer(PropertyGroup):
     def _preview_material_name(self) -> str:
         return f".{self.layer_stack.material.name}.{self.name}.preview"
 
-    def add_channel(self, channel: Channel) -> Channel:
+    def add_channel(self, channel: BasicChannel) -> Channel:
+        """Adds a channel to this layer based on the given channel and
+        returns this layer's new created channel.
+        """
         if not isinstance(channel, BasicChannel):
             raise TypeError("channel must be an instance of BasicChannel")
 
@@ -361,6 +366,13 @@ class MaterialLayer(PropertyGroup):
     def remove_channel(self,
                        channel_name: Union[str, BasicChannel],
                        keep_sockets: bool = True) -> None:
+        """Removes a channel from this layer. channel_name may be
+        either a name of a channel or a BasicChannel instance with the
+        same name as the channel to remove. If keep_sockets is True the
+        socket for the channel will not be removed from this layer's
+        node tree. Raises a ValueError if the channel can't be found
+        in this layer.
+        """
         if isinstance(channel_name, BasicChannel):
             channel_name = channel_name.name
         elif not isinstance(channel_name, str):
@@ -392,12 +404,20 @@ class MaterialLayer(PropertyGroup):
 
         bpy.msgbus.publish_rna(key=self.channels)
 
-    def clear_channels(self) -> None:
+    def clear_channels(self, keep_sockets: bool = True) -> None:
+        """Removes all channels from this layer. If keep_sockets is
+        True then the channels' sockets will not be removed from
+        this layer's node tree.
+        """
         for ch_name in [x.name for x in self.channels]:
-            self.remove_channel(ch_name)
+            self.remove_channel(ch_name, keep_sockets)
 
-    def initialize(self, name, layer_stack, layer_type='MATERIAL_PAINT',
-                   channels=None, enabled_channels_only=True):
+    def initialize(self,
+                   name: str,
+                   layer_stack,
+                   layer_type: str = 'MATERIAL_PAINT',
+                   channels: Optional[typing.Iterable[BasicChannel]] = None,
+                   enabled_channels_only: bool = True):
         """Initializes the layer. Must be called before the layer can
         be used.
         """
@@ -482,6 +502,11 @@ class MaterialLayer(PropertyGroup):
         assert self.image_channel == -1
 
     def convert_to(self, layer_type: str, keep_data=True) -> None:
+        """Convert this layer to a different layer type. layer_type
+        should be an enum string found in LAYER_TYPES. If keep_data is
+        True then data such as images used for alpha by this layer will
+        not be deleted.
+        """
         if layer_type not in _VALID_LAYER_TYPES:
             raise ValueError(f"Expected a value in {_VALID_LAYER_TYPES}")
 
@@ -539,6 +564,7 @@ class MaterialLayer(PropertyGroup):
         assert not self.any_channel_baked
 
     def get_layer_above(self) -> Optional[MaterialLayer]:
+        """Returns the layer above this layer in the layer stack."""
         if not self.is_initialized:
             raise RuntimeError("Layer is uninitialized")
 
@@ -553,6 +579,7 @@ class MaterialLayer(PropertyGroup):
         return None if idx+1 == len(siblings) else siblings[idx+1].resolve()
 
     def get_layer_below(self) -> Optional[MaterialLayer]:
+        """Returns the layer below this layer in the layer stack."""
         if not self.is_initialized:
             raise RuntimeError("Layer is uninitialized")
 
@@ -592,7 +619,9 @@ class MaterialLayer(PropertyGroup):
             layer = layer.parent.resolve()
         raise RuntimeError("Maximum layer recursion depth reached.")
 
-    def replace_node_tree(self, node_tree, update_channels=False):
+    def replace_node_tree(self,
+                          node_tree: bpy.types.ShaderNodeTree,
+                          update_channels: bool = False) -> None:
         """Replaces this layers internal node tree.
         Params:
             update_channels: add/remove channels from the layer to
@@ -655,6 +684,7 @@ class MaterialLayer(PropertyGroup):
         self.img_proj_mode = 'ORIGINAL'
 
     def _ensure_custom_alpha_ch(self) -> Channel:
+        """Ensures this layer has a channel for a custom alpha."""
         ch = self.channels.get(CUSTOM_ALPHA_CH_NAME)
         if ch is None:
             ch = self.channels.add()
@@ -722,7 +752,7 @@ class MaterialLayer(PropertyGroup):
                 if ma_out_input.type != 'SHADER':
                     links.new(ma_out_input, output)
 
-    def _refresh_preview_material(self):
+    def _refresh_preview_material(self) -> None:
         if self.preview_material is None:
             return
 
@@ -742,11 +772,11 @@ class MaterialLayer(PropertyGroup):
 
         self._link_preview_group(group_node, shader, ma_out)
 
-    def _delete_preview_material(self):
+    def _delete_preview_material(self) -> None:
         if self.preview_material is not None:
             bpy.data.materials.remove(self.preview_material)
 
-    def _rebuild_node_tree(self):
+    def _rebuild_node_tree(self) -> None:
         if not self.is_initialized:
             return
         layer_stack = self.layer_stack
@@ -793,7 +823,7 @@ class MaterialLayer(PropertyGroup):
     def uses_image(self) -> bool:
         """True if this layer requires an image for it's alpha.
         This is different to has_image since a layer may have an image
-        that it doesn't use if it's type has been changed.
+        that it doesn't use if its type has been changed.
         """
         return self.layer_type == 'MATERIAL_PAINT'
 
@@ -855,7 +885,10 @@ class MaterialLayer(PropertyGroup):
         return parent.parent.resolve().stack_depth + 2
 
     @property
-    def has_shared_image(self):
+    def has_shared_image(self) -> bool:
+        """Returns True if the image uses an image for it's alpha that
+        may also store the data for other layers.
+        """
         return self.image is not None and self.image_channel >= 0
 
 
