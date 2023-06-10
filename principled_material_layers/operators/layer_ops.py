@@ -60,7 +60,7 @@ class PML_OT_set_active_layer_index(Operator):
 class PML_OT_add_layer(Operator):
     bl_idname = "material.pml_add_layer"
     bl_label = "Add Material Layer"
-    bl_description = "Adds a new layer to the top of the stack."
+    bl_description = "Adds a new layer above the active layer"
     bl_options = {'REGISTER', 'UNDO'}
 
     layer_type: EnumProperty(
@@ -74,7 +74,7 @@ class PML_OT_add_layer(Operator):
     def description(cls, _context, properties) -> str:
         enum_tuple = next(x for x in LAYER_TYPES
                           if x[0] == properties.layer_type)
-        return (f"Adds a new {enum_tuple[1]} layer to the top of the stack. "
+        return (f"Adds a new {enum_tuple[1]} layer above the active layer."
                 f"{enum_tuple[1]}: {enum_tuple[2]}")
 
     @classmethod
@@ -83,7 +83,19 @@ class PML_OT_add_layer(Operator):
 
     def execute(self, context):
         layer_stack = get_layer_stack(context)
-        new_layer = layer_stack.insert_layer("Layer", -1,
+        active_layer = layer_stack.active_layer
+
+        if active_layer:
+            top_level_layers_ref = layer_stack.top_level_layers_ref
+            position = top_level_layers_ref.find(active_layer.identifier)
+            # Increment position by 1 to insert above the active layer
+            position = -1 if position < 0 else position + 1
+        else:
+            # If there is no active layer add the new layer to the top
+            # of the stack.
+            position = -1
+
+        new_layer = layer_stack.insert_layer("Layer", position,
                                              layer_type=self.layer_type)
         layer_stack.active_layer = new_layer
 
