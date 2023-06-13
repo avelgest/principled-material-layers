@@ -33,18 +33,18 @@ from .utils.nodes import (set_node_group_vector_defaults,
                           sort_sockets_by)
 
 LAYER_TYPES = (('MATERIAL_PAINT', "Material Paint",
-                "An image-based layer for painting"),
+                "A paintable layer with an image-based alpha"),
                ('MATERIAL_FILL', "Material Fill",
                 "A layer that covers the whole object"),
                ('MATERIAL_W_ALPHA', "Custom Alpha",
-                "A material with a node-based alpha"),
+                "A material layer with a node-based alpha"),
                )
 
 # Set of valid Enum Strings for LAYER_TYPES
 _VALID_LAYER_TYPES = {x[0] for x in LAYER_TYPES}
 
 # The name of the custom alpha channel used by MATERIAL_W_ALPHA layers
-CUSTOM_ALPHA_CH_NAME = "Layer Alpha (PML)"
+CUSTOM_ALPHA_CH_NAME = "Layer Alpha"
 
 
 class MaterialLayerRef(PropertyGroup):
