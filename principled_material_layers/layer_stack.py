@@ -815,23 +815,18 @@ class LayerStack(bpy.types.PropertyGroup):
         return next((x.default_value for x in default_sockets
                      if x.name == channel.name), None)
 
-    def append_layer(self, name: str) -> MaterialLayer:
-        """Append a new layer to the top of this layer stack at the
-        top level.
-        Params:
-            name: The name of the new layer. The layer's actual name
-                may be different (e.g. if a layer already exists with
-                this name).
-        Returns:
-            The new layer. The top_layer property will now be the new
-            layer.
+    def append_layer(self, name, **kwargs) -> MaterialLayer:
+        """Appends a new layer to the top of this layer stack at the
+        top level and returns the new layer. Takes the same keyword
+        args as insert_layer.
         """
-        return self.insert_layer(name, -1)
+        return self.insert_layer(name, -1, **kwargs)
 
     def insert_layer_above(self, name: str,
-                           above: MaterialLayer) -> MaterialLayer:
+                           above: MaterialLayer, **kwargs) -> MaterialLayer:
         """Inserts a new layer into the top level of the layer stack
-        above the specified layer.
+        above the specified layer. Takes the same keyword args as
+        insert_layer.
         Params:
             name: The name of the new layer. The layer's actual name
                 may be different (e.g. if a layer already exists with
@@ -848,7 +843,7 @@ class LayerStack(bpy.types.PropertyGroup):
             raise ValueError(f"{above.name} ({above.identifier}) is not a top "
                              "level layer of this layer stack")
 
-        return self.insert_layer(name, above_idx + 1)
+        return self.insert_layer(name, above_idx + 1, **kwargs)
 
     def insert_layer(self, name: str, position: int,
                      layer_type='MATERIAL_PAINT',
@@ -860,7 +855,8 @@ class LayerStack(bpy.types.PropertyGroup):
                 may be different (e.g. if a layer already exists with
                 this name).
             position: The position in the top level of the layer stack
-                in which to insert the new layer.
+                in which to insert the new layer. If negative the layer
+                will be inserted from the opposite end of the stack.
             layer_type: The type of the new layer. Defaults to
                 'MATERIAL_PAINT'.
             channels: An iterable of channels that should be added to the
