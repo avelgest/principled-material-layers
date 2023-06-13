@@ -10,7 +10,7 @@ from bpy.props import (BoolProperty,
                        IntVectorProperty,
                        StringProperty)
 
-from .. import image_mapping
+from .. import image_mapping, utils
 from ..bake import apply_node_mask_bake, bake_node_mask_to_image
 from ..channel import SOCKET_TYPES
 from ..material_layer import LAYER_TYPES
@@ -70,8 +70,18 @@ class PML_OT_add_layer(Operator):
         default='MATERIAL_PAINT'
     )
 
+    single_channel: StringProperty(
+        name="Single Channel",
+        description="If specified adds a layer for directly painting the"
+                    "value of a single channel",
+        default=""
+    )
+
     @classmethod
     def description(cls, _context, properties) -> str:
+        if (properties.layer_type == 'MATERIAL_W_ALPHA'
+                and properties.single_channel):
+            return "Adds a new layer for painting on a single channel"
         enum_tuple = next(x for x in LAYER_TYPES
                           if x[0] == properties.layer_type)
         return (f"Adds a new {enum_tuple[1]} layer above the active layer."
@@ -81,9 +91,16 @@ class PML_OT_add_layer(Operator):
     def poll(cls, context):
         return pml_op_poll(context)
 
+    def draw(self, context):
+        self.layout.prop(self, "layer_type")
+        if self.layer_type == 'MATERIAL_W_ALPHA':
+            self.layout.prop(self, "single_channel")
+
     def execute(self, context):
         layer_stack = get_layer_stack(context)
         active_layer = layer_stack.active_layer
+        is_single_ch_layer = (self.layer_type == 'MATERIAL_W_ALPHA'
+                              and self.single_channel)
 
         if active_layer:
             top_level_layers_ref = layer_stack.top_level_layers_ref
@@ -95,13 +112,62 @@ class PML_OT_add_layer(Operator):
             # of the stack.
             position = -1
 
-        new_layer = layer_stack.insert_layer("Layer", position,
-                                             layer_type=self.layer_type)
+        if is_single_ch_layer:
+            ch = layer_stack.channels.get(self.single_channel)
+            if ch is None:
+                self.report({'WARNING'},
+                            f"Cannot find channel {self.single_channel}")
+                return {'CANCELLED'}
+
+        new_layer = layer_stack.insert_layer(
+                        "Layer", position,
+                        layer_type=self.layer_type,
+                        channels=[ch] if is_single_ch_layer else None)
+
+        # Initialization for single channel layers
+        if is_single_ch_layer:
+            self.init_single_channel_layer(new_layer, ch)
+
         layer_stack.active_layer = new_layer
 
         ensure_global_undo()
 
         return {'FINISHED'}
+
+    def init_single_channel_layer(self, layer, channel) -> None:
+        node_tree = layer.node_tree
+        im = layer.layer_stack.image_manager
+
+        # FIXME Should initialize tiles for UDIMs
+        image = bpy.data.images.new(f"{channel.name} Layer",
+                                    im.image_width, im.image_height,
+                                    alpha=True,
+                                    is_data=(channel.socket_type != 'COLOR'),
+                                    float_buffer=im.use_float)
+        image.generated_color = (0, 0, 0, 0)
+        image.alpha_mode = 'STRAIGHT'
+        image.pixels[0] = image.pixels[0]  # Needed to pack image
+        image.pack()
+
+        img_node = node_tree.nodes.new("ShaderNodeTexImage")
+        img_node.image = image
+
+        group_output = utils.nodes.get_node_by_type(node_tree,
+                                                    "NodeGroupOutput")
+        if group_output is None:
+            group_output = node_tree.nodes.new("NodeGroupOutput")
+
+        img_node.location = group_output.location
+        img_node.location.x -= 400
+
+        out_socket = group_output.inputs.get(channel.name)
+        if out_socket is not None:
+            node_tree.links.new(out_socket, img_node.outputs[0])
+
+        alpha_ch = layer.custom_alpha_channel
+        out_socket = group_output.inputs.get(alpha_ch.name if alpha_ch else "")
+        if out_socket is not None:
+            node_tree.links.new(out_socket, img_node.outputs[1])
 
 
 class PML_OT_remove_layer(Operator):

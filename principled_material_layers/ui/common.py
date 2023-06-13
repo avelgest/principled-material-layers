@@ -277,6 +277,33 @@ class PML_MT_new_layer_menu(Menu):
             op_props = layout.operator("material.pml_add_layer", text=name)
             op_props.layer_type = enum
 
+        layout.menu("PML_MT_new_single_channel_layer")
+
+
+class PML_MT_new_single_channel_layer(Menu):
+    """Menu for adding layers that directly paint the value of a single
+    channel (Custom Alpha layers with an image node connected to the alpha
+    and channel output).
+    """
+
+    bl_label = "Channel Paint"
+    bl_idname = "PML_MT_new_single_channel_layer"
+    bl_description = ("Add a layer for painting a channel's value directly."
+                      "e.g. paint the RGB values of a color channel")
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator_context = 'EXEC_DEFAULT'
+
+        layer_stack = get_layer_stack(context)
+
+        for ch in layer_stack.channels:
+            if ch.enabled:
+                op_props = layout.operator("material.pml_add_layer",
+                                           text=ch.name)
+                op_props.layer_type = 'MATERIAL_W_ALPHA'
+                op_props.single_channel = ch.name
+
 
 class PML_MT_convert_layer(Menu):
     """Menu for converting the active layer to a new layer type."""
@@ -1068,6 +1095,7 @@ classes = (
     PML_UL_layer_channels_list,
     PML_MT_open_layer_group,
     PML_MT_new_layer_menu,
+    PML_MT_new_single_channel_layer,
     PML_MT_convert_layer,
     PML_MT_add_channel_layer,
     PML_MT_channel_blend_mode,
