@@ -751,8 +751,9 @@ class ImageManager(bpy.types.PropertyGroup):
         self["active_layer_id"] = layer.identifier
 
     def set_paint_canvas(self, context=None) -> None:
-        """Sets the image paint canvas to this ImageManager's active
-        image."""
+        """Sets the image paint canvas based on this image_manager's
+        active layer.
+        """
         if context is None:
             context = bpy.context
 
@@ -760,7 +761,11 @@ class ImageManager(bpy.types.PropertyGroup):
 
         paint_settings.mode = 'IMAGE'
 
-        paint_settings.canvas = self.active_image
+        active_layer = self.active_layer
+
+        paint_settings.canvas = (active_layer.find_secondary_image()
+                                 if self.active_image is None
+                                 else self.active_image)
 
     def resize_all_layers(self, width: int, height: int) -> None:
         """Resize all layer images created by this image manager."""
@@ -863,13 +868,16 @@ class ImageManager(bpy.types.PropertyGroup):
             self.udim_layout.update_tiles(img)
 
     @property
-    def active_layer(self):
+    def active_layer(self) -> Optional[MaterialLayer]:
+        """The active MaterialLayer of this ImageManager. May possibly
+        be different from the active layer of the layer stack.
+        """
         active_id = self["active_layer_id"]
         return (None if not active_id
                 else self.layer_stack.get_layer_by_id(active_id))
 
     @active_layer.setter
-    def active_layer(self, value):
+    def active_layer(self, value: Optional[MaterialLayer]):
         self.set_active_layer(value)
 
     @property

@@ -165,6 +165,33 @@ def get_closest_node_of_type(closest_to: Node,
                default=None)
 
 
+def _add_connected_nodes(to_socket: NodeSocket,
+                         links_cache: dict[NodeSocket, Node],
+                         output: set[Node]) -> None:
+    """Used by get_connected_nodes"""
+    linked_node = links_cache.get(to_socket)
+    if linked_node is not None and linked_node not in output:
+        output.add(linked_node)
+        for socket in linked_node.inputs:
+            if socket.is_linked:
+                _add_connected_nodes(socket, links_cache, output)
+
+
+def get_connected_nodes(socket: NodeSocket) -> set[Node]:
+    """Returns a set of all nodes that could potentially affect the
+    value of socket (i.e. nodes with outputs that are either directly
+    or indirectly linked with socket). socket should be an input socket.
+    """
+    if socket.is_output:
+        raise ValueError("Expected an input socket")
+    node_tree = socket.id_data
+    links_cache = {x.to_socket: x.from_node for x in node_tree.links}
+
+    connected: set[Node] = set()
+    _add_connected_nodes(socket, links_cache, connected)
+    return connected
+
+
 def delete_nodes_not_in(nodes: bpy.types.Nodes,
                         container: Container[Node]) -> None:
     """Delete any nodes not in container"""

@@ -20,7 +20,7 @@ from bpy.props import (BoolProperty,
 
 from bpy.types import PropertyGroup
 
-from . import image_mapping
+from . import image_mapping, utils
 from .channel import BasicChannel, Channel
 from .preferences import get_addon_preferences
 
@@ -328,6 +328,33 @@ class MaterialLayer(PropertyGroup):
         # Links any normal or tangent sockets on the Group Output node
         # so they have the expected value. Does nothing for other sockets.
         group_output_link_default(output)
+
+    def find_secondary_image(self) -> Optional[bpy.types.Image]:
+        """Find an image in this material's node tree that can be
+        painted on when this layer is active or returns None if one
+        can't be found. Layers that use an image provided by the layer
+        stack (i.e. MATERIAL_PAINT layers) will always return None.
+        """
+        if self.layer_type != 'MATERIAL_W_ALPHA':
+            return None
+        for node in self.node_tree.nodes:
+            if "pml_is_alternative_image_node" in node:
+                return getattr(node, "image", None)
+
+        alpha_ch = self.custom_alpha_channel
+        if alpha_ch is None:
+            return None
+        # Find an image node connected to a the alpha socket of a
+        # group output node.
+        for node in get_nodes_by_type(self.node_tree, "NodeGroupOutput"):
+            alpha_socket = node.inputs.get(alpha_ch.name)
+            if alpha_socket is None:
+                continue
+            for linked_node in utils.nodes.get_connected_nodes(alpha_socket):
+                if (linked_node.bl_idname == 'ShaderNodeTexImage'
+                        and linked_node.image is not None):
+                    return linked_node.image
+        return None
 
     @property
     def _node_tree_name(self) -> str:
