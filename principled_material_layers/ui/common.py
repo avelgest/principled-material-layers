@@ -667,7 +667,8 @@ class layer_stack_PT_base:
                           sort_lock=True, sort_reverse=True, rows=rows)
         col = row.column(align=True)
         col.menu("PML_MT_new_layer_menu", icon='ADD', text="")
-        col.operator("material.pml_add_layer", icon='ADD', text="")
+        col.operator("material.pml_add_layer",
+                     icon='ADD', text="").layer_type = 'MATERIAL_PAINT'
         col.operator("material.pml_remove_layer", icon='REMOVE', text="")
 
         col.separator()

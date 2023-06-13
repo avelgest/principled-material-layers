@@ -74,8 +74,15 @@ class PML_OT_add_layer(Operator):
         name="Single Channel",
         description="If specified adds a layer for directly painting the"
                     "value of a single channel",
-        default=""
+        default="",
+        options={'SKIP_SAVE'}
     )
+
+    _new_layer_names = {
+        'MATERIAL_PAINT': "Paint Layer",
+        'MATERIAL_FILL': "Fill Layer",
+        'MATERIAL_W_ALPHA': "Custom Alpha Layer"
+    }
 
     @classmethod
     def description(cls, _context, properties) -> str:
@@ -84,7 +91,7 @@ class PML_OT_add_layer(Operator):
             return "Adds a new layer for painting on a single channel"
         enum_tuple = next(x for x in LAYER_TYPES
                           if x[0] == properties.layer_type)
-        return (f"Adds a new {enum_tuple[1]} layer above the active layer."
+        return (f"Adds a new {enum_tuple[1]} layer above the active layer. \n"
                 f"{enum_tuple[1]}: {enum_tuple[2]}")
 
     @classmethod
@@ -94,7 +101,9 @@ class PML_OT_add_layer(Operator):
     def draw(self, context):
         self.layout.prop(self, "layer_type")
         if self.layer_type == 'MATERIAL_W_ALPHA':
-            self.layout.prop(self, "single_channel")
+            layer_stack = get_layer_stack(context)
+            self.layout.prop_search(self, "single_channel",
+                                    layer_stack, "channels")
 
     def execute(self, context):
         layer_stack = get_layer_stack(context)
@@ -120,7 +129,7 @@ class PML_OT_add_layer(Operator):
                 return {'CANCELLED'}
 
         new_layer = layer_stack.insert_layer(
-                        "Layer", position,
+                        self.new_layer_name, position,
                         layer_type=self.layer_type,
                         channels=[ch] if is_single_ch_layer else None)
 
@@ -133,6 +142,17 @@ class PML_OT_add_layer(Operator):
         ensure_global_undo()
 
         return {'FINISHED'}
+
+    @property
+    def is_layer_single_channel(self) -> bool:
+        return self.layer_type == 'MATERIAL_W_ALPHA' and self.single_channel
+
+    @property
+    def new_layer_name(self) -> str:
+        if self.is_layer_single_channel:
+            return f"{self.single_channel} Layer"
+
+        return self._new_layer_names.get(self.layer_type, "Layer")
 
     def init_single_channel_layer(self, layer, channel) -> None:
         node_tree = layer.node_tree
