@@ -851,7 +851,9 @@ class LayerStack(bpy.types.PropertyGroup):
         return self.insert_layer(name, above_idx + 1)
 
     def insert_layer(self, name: str, position: int,
-                     layer_type='MATERIAL_PAINT') -> MaterialLayer:
+                     layer_type='MATERIAL_PAINT',
+                     channels: Optional[typing.Iterable[Channel]] = None
+                     ) -> MaterialLayer:
         """Inserts a new layer into the top level of the layer stack.
         Params:
             name: The name of the new layer. The layer's actual name
@@ -861,6 +863,9 @@ class LayerStack(bpy.types.PropertyGroup):
                 in which to insert the new layer.
             layer_type: The type of the new layer. Defaults to
                 'MATERIAL_PAINT'.
+            channels: An iterable of channels that should be added to the
+                new layer. If None then all this layerstack's channels
+                will be added.
         Returns:
             The new layer.
         """
@@ -872,8 +877,11 @@ class LayerStack(bpy.types.PropertyGroup):
             if position < 0:
                 raise IndexError("position is out of range")
 
+        if channels is None:
+            channels = self.channels
+
         new_layer = self.layers.add()
-        new_layer.initialize(name, self, channels=self.channels,
+        new_layer.initialize(name, self, channels=channels,
                              layer_type=layer_type)
 
         new_layer_ref = top_lvl.add()
