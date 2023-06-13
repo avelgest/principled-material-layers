@@ -37,14 +37,9 @@ class PML_UL_material_layers_list(UIList):
 
         row = layout.row(align=True)
 
-        if prefs.show_previews:
-            if prefs.use_large_icons:
-                row.template_icon(layer.preview_icon,
-                                  scale=prefs.layer_ui_scale)
-            else:
-                row.label(icon_value=layer.preview_icon)
+        self.draw_layer_icon(row, layer)
 
-        self.draw_layer_name(layout, layer)
+        self.draw_layer_name(row, layer)
 
         self.draw_layer_buttons(layout, layer)
 
@@ -90,6 +85,21 @@ class PML_UL_material_layers_list(UIList):
                                 emboss=layer.is_baked,
                                 depress=layer.is_baked)
         op_props.layer_name = layer.name
+
+    def draw_layer_icon(self, layout, layer) -> None:
+        prefs = get_addon_preferences()
+        if not prefs.show_previews:
+            return
+
+        show_icon = (len(layer.channels) > 2)
+
+        if prefs.use_large_icons:
+            layout.template_icon(layer.preview_icon if show_icon else 0,
+                                 scale=prefs.layer_ui_scale)
+        elif not show_icon:
+            layout.label(icon='BLANK1')
+        else:
+            layout.label(icon_value=layer.preview_icon)
 
     def draw_layer_name(self, layout, layer) -> None:
         channels = layer.channels
