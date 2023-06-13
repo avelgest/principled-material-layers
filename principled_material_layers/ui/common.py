@@ -44,7 +44,7 @@ class PML_UL_material_layers_list(UIList):
             else:
                 row.label(icon_value=layer.preview_icon)
 
-        row.prop(layer, "name", text="", emboss=False)
+        self.draw_layer_name(layout, layer)
 
         self.draw_layer_buttons(layout, layer)
 
@@ -90,6 +90,22 @@ class PML_UL_material_layers_list(UIList):
                                 emboss=layer.is_baked,
                                 depress=layer.is_baked)
         op_props.layer_name = layer.name
+
+    def draw_layer_name(self, layout, layer) -> None:
+        channels = layer.channels
+        show_channels = (channels and len(channels) <= 2)
+
+        # For layers with a single blend channel show the channel name
+        # below the layer name
+        if show_channels:
+            blend_chs = [x for x in channels if x.usage == 'BLENDING']
+            ch_name = blend_chs[0].name if len(blend_chs) == 1 else ""
+
+            col = layout.column(align=True)
+            col.prop(layer, "name", text="", emboss=False)
+            col.label(text=f"  [{ch_name}]")
+        else:
+            layout.prop(layer, "name", text="", emboss=False)
 
     def draw_filter(self, context, layout):
         prefs = get_addon_preferences()
