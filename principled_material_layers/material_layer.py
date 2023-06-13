@@ -685,7 +685,7 @@ class MaterialLayer(PropertyGroup):
 
     def _ensure_custom_alpha_ch(self) -> Channel:
         """Ensures this layer has a channel for a custom alpha."""
-        ch = self.channels.get(CUSTOM_ALPHA_CH_NAME)
+        ch = self.custom_alpha_channel
         if ch is None:
             ch = self.channels.add()
             ch.initialize(CUSTOM_ALPHA_CH_NAME, 'FLOAT_FACTOR', self)
@@ -814,6 +814,12 @@ class MaterialLayer(PropertyGroup):
     def any_channel_baked(self) -> bool:
         """Returns True if any of this layer's channels is baked."""
         return any(x.is_baked for x in self.channels)
+
+    @property
+    def custom_alpha_channel(self) -> Optional[Channel]:
+        """The channel used for this layer's custom alpha or None."""
+        return next((ch for ch in self.channels if ch.usage == 'LAYER_ALPHA'),
+                    None)
 
     @property
     def has_image(self) -> bool:

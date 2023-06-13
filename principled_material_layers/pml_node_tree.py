@@ -10,7 +10,6 @@ from bpy.types import NodeSocket, ShaderNode
 from mathutils import Vector
 
 from . import utils
-from . import material_layer
 
 
 class NodeNames:
@@ -701,8 +700,9 @@ class NodeTreeBuilder:
         elif layer.layer_type == 'MATERIAL_W_ALPHA':
             # For custom alpha layers the alpha is an output on the
             # the layer's node group
-            alpha_socket = ma_group.outputs.get(
-                                material_layer.CUSTOM_ALPHA_CH_NAME)
+            alpha_ch = layer.custom_alpha_channel
+            alpha_socket = ma_group.outputs.get(alpha_ch.name if alpha_ch
+                                                else "")
             if alpha_socket is not None:
                 links.new(alpha_x_opacity.inputs[1], alpha_socket)
             else:
