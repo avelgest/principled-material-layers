@@ -54,7 +54,7 @@ class PML_PT_asset_browser_panel(bpy.types.Panel):
                           f"{active_layer.name if active_layer else 'None'}")
 
         col = layout.column(align=True)
-        col.enabled = (is_compat is None or is_compat)
+        col.enabled = (is_compat is None or bool(is_compat))
         col.operator("material.pml_new_layer_material_ab")
         col.operator("material.pml_replace_layer_material_ab")
         col.operator("material.pml_combine_material_ab")
