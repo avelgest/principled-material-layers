@@ -3,7 +3,10 @@
 from ..import_utils import import_all, register_all, unregister_all
 
 
-submodule_names = ("common",
+submodule_names = ("menus",
+                   "panels",
+                   "ui_lists",
+
                    "image_paint",
                    "node_editor",
                    "asset_browser")

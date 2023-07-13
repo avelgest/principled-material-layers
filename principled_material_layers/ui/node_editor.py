@@ -3,7 +3,7 @@
 import bpy
 from bpy.types import Panel
 
-from .common import (layer_stack_PT_base,
+from .panels import (layer_stack_PT_base,
                      layer_stack_channels_PT_base,
                      active_layer_PT_base,
                      active_layer_channels_PT_base,
