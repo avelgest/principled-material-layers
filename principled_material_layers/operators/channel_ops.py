@@ -30,7 +30,7 @@ class ChannelSetHardnessBlend:
     def poll(cls, context):
         return pml_op_poll(context)
 
-    def draw(self, context):
+    def draw(self, _context):
         return
 
     def set_hardness_or_blend(self, context, prop, value):
@@ -63,7 +63,7 @@ class PML_OT_channel_set_blend_mode(ChannelSetHardnessBlend, Operator):
     blend_mode: StringProperty(name="Blend Mode")
 
     @classmethod
-    def description(cls, context, properties):
+    def description(cls, _context, properties):
         blend_mode = properties.blend_mode
         descript = blend_mode_description(blend_mode)
         return descript or blend_mode_display_name(blend_mode)

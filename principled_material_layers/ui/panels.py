@@ -107,7 +107,7 @@ class layer_stack_PT_base:
         col.operator("material.pml_move_layer_up", icon='TRIA_UP', text="")
         col.operator("material.pml_move_layer_down", icon='TRIA_DOWN', text="")
 
-    def draw_uninitialized(self, context):
+    def draw_uninitialized(self, _context) -> None:
         self.layout.operator("material.pml_initialize_layer_stack",
                              text="Initialize")
 
@@ -122,7 +122,7 @@ class layer_stack_channels_PT_base:
         return layer_stack is not None and layer_stack.is_initialized
 
     @classmethod
-    def draw_ch_preview_options(cls, layout, layer_stack, channel) -> None:
+    def draw_ch_preview_options(cls, layout, channel) -> None:
         """Draws the preview type menu / preview button for channel."""
         row = layout.row(align=True)
         row.context_pointer_set("pml_preview_channel", channel)
@@ -149,7 +149,7 @@ class layer_stack_channels_PT_base:
         row.prop(active_channel, "socket_type", text="Type")
 
         # Draw the preview type menu / preview button
-        self.draw_ch_preview_options(layout, layer_stack, active_channel)
+        self.draw_ch_preview_options(layout, active_channel)
 
         if active_channel.socket_type == 'VECTOR':
             layout.prop(active_channel, "renormalize")
@@ -166,7 +166,7 @@ class layer_stack_channels_PT_base:
         layout.separator()
         self.draw_hardness(layout, active_channel)
 
-    def draw_channels_list(self, layout, layer_stack):
+    def draw_channels_list(self, layout, layer_stack) -> None:
         active_channel = layer_stack.active_channel
 
         row = layout.row(align=True)
@@ -197,7 +197,7 @@ class layer_stack_channels_PT_base:
         self.draw_custom_hardness_props(col, channel)
 
     @staticmethod
-    def draw_custom_ch_node_group(layout, channel, prop, menu, compat):
+    def draw_custom_ch_node_group(layout, channel, prop, menu, compat) -> None:
         layout.context_pointer_set("pml_channel", channel)
 
         col = layout.column(align=True)
@@ -304,7 +304,7 @@ class active_layer_channels_PT_base:
         if active_channel is not None:
             # Preview type menu / preview button
             layer_stack_channels_PT_base.draw_ch_preview_options(
-                    col, layer_stack, active_channel
+                    col, active_channel
                 )
 
             if not is_base_layer and active_channel.usage == 'BLENDING':

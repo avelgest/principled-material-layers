@@ -188,7 +188,7 @@ class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
         return get_layer_stack_from_prop(self)
 
     @staticmethod
-    def _name_update(self_, context):
+    def _name_update(self_, _context):
         self = self_
         if self.image.name == self.name:
             return

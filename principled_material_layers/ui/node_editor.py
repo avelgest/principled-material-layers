@@ -3,16 +3,7 @@
 import bpy
 from bpy.types import Panel
 
-from .panels import (layer_stack_PT_base,
-                     layer_stack_channels_PT_base,
-                     active_layer_PT_base,
-                     active_layer_channels_PT_base,
-                     active_layer_node_mask_PT_base,
-                     active_layer_image_map_PT_base,
-                     settings_PT_base,
-                     UDIM_PT_base,
-                     debug_PT_base
-                     )
+from . import panels
 
 from .. import tiled_storage
 from ..preferences import running_as_proper_addon
@@ -36,7 +27,7 @@ class NodeEdPanel(Panel):
         return poll(context) if poll is not None else True
 
 
-class PML_PT_layer_stack_ne(NodeEdPanel, layer_stack_PT_base):
+class PML_PT_layer_stack_ne(NodeEdPanel, panels.layer_stack_PT_base):
 
     _can_init_from = {"ShaderNodeBsdfPrincipled",
                       "ShaderNodeGroup",
@@ -83,38 +74,38 @@ class PML_PT_layer_stack_ne(NodeEdPanel, layer_stack_PT_base):
 
 
 class PML_PT_layer_stack_channels_ne(NodeEdPanel,
-                                     layer_stack_channels_PT_base):
+                                     panels.layer_stack_channels_PT_base):
     pass
 
 
-class PML_PT_active_layer_ne(NodeEdPanel, active_layer_PT_base):
+class PML_PT_active_layer_ne(NodeEdPanel, panels.active_layer_PT_base):
     pass
 
 
-class PML_PT_active_layer_image_map_ne(active_layer_image_map_PT_base,
+class PML_PT_active_layer_image_map_ne(panels.active_layer_image_map_PT_base,
                                        NodeEdPanel):
     bl_parent_id = "PML_PT_active_layer_ne"
 
 
-class PML_PT_active_layer_node_mask_ne(active_layer_node_mask_PT_base,
+class PML_PT_active_layer_node_mask_ne(panels.active_layer_node_mask_PT_base,
                                        NodeEdPanel):
     bl_parent_id = "PML_PT_active_layer_ne"
 
 
-class PML_PT_active_layer_channels_ne(active_layer_channels_PT_base,
+class PML_PT_active_layer_channels_ne(panels.active_layer_channels_PT_base,
                                       NodeEdPanel):
     bl_parent_id = "PML_PT_active_layer_ne"
 
 
-class PML_PT_udim_layout_ne(NodeEdPanel, UDIM_PT_base):
+class PML_PT_udim_layout_ne(NodeEdPanel, panels.UDIM_PT_base):
     pass
 
 
-class PML_PT_layer_stack_settings_ne(NodeEdPanel, settings_PT_base):
+class PML_PT_layer_stack_settings_ne(NodeEdPanel, panels.settings_PT_base):
     pass
 
 
-class PML_PT_debug_ne(NodeEdPanel, debug_PT_base):
+class PML_PT_debug_ne(NodeEdPanel, panels.debug_PT_base):
 
     def draw(self, context):
         layout = self.layout

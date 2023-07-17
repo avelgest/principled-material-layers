@@ -203,7 +203,7 @@ class CustomHardnessBlendSelectBase:
                 and active_layer.active_channel is not None)
 
     def draw_menu(self, context, layout,
-                  new_op=None, set_op=None, compat=None):
+                  new_op=None, set_op=None, compat=None) -> bpy.types.UILayout:
         layout.operator_context = 'EXEC_DEFAULT'
 
         # pml_channel can be set using context_pointer_set
@@ -277,9 +277,9 @@ class PML_MT_set_image_proj(Menu):
     bl_description = ("Sets the projection of all image nodes in a layer's "
                       "material")
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
-        for val, name, descr, *_ in image_mapping.IMG_PROJ_MODES:
+        for val, name, *_ in image_mapping.IMG_PROJ_MODES:
 
             layout.operator("material.pml_set_layer_img_proj",
                             text=name).proj_mode = val

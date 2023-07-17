@@ -15,8 +15,8 @@ from ..preferences import get_addon_preferences
 class PML_UL_material_layers_list(UIList):
     """UIList for displaying the layer stack's layers"""
 
-    def draw_item(self, context, layout, data, item, icon, active_data,
-                  active_property, index=0, flt_flag=0):
+    def draw_item(self, _context, layout, _data, item, _icon, _active_data,
+                  _active_property, _index=0, _flt_flag=0):
 
         layer = item
 
@@ -106,7 +106,7 @@ class PML_UL_material_layers_list(UIList):
         else:
             layout.prop(layer, "name", text="", emboss=False)
 
-    def draw_filter(self, context, layout):
+    def draw_filter(self, _context, layout):
         prefs = get_addon_preferences()
 
         col = layout.column(align=True)
@@ -115,7 +115,7 @@ class PML_UL_material_layers_list(UIList):
             col.prop(prefs, "show_previews", text="Show Previews")
             col.prop(prefs, "use_large_icons", text="Large Icons")
 
-    def filter_items(self, context, data, propname):
+    def filter_items(self, _context, data, propname):
         layer_stack = data
         layers = getattr(data, propname)
 
@@ -162,8 +162,8 @@ class PML_UL_layer_stack_channels_list(UIList):
         default=True
     )
 
-    def draw_item(self, context, layout, data, item, icon, active_data,
-                  active_property, index=0, flt_flag=0):
+    def draw_item(self, _context, layout, data, item, _icon, _active_data,
+                  _active_property, _index=0, _flt_flag=0):
 
         layer_stack = data
         channel = item
@@ -176,10 +176,10 @@ class PML_UL_layer_stack_channels_list(UIList):
         else:
             row.label(text="", icon='BLANK1')
 
-    def draw_filter(self, context, layout):
+    def draw_filter(self, _context, layout):
         layout.prop(self, "sort_enabled")
 
-    def filter_items(self, context, data, propname):
+    def filter_items(self, _context, data, propname):
         if not self.sort_enabled:
             return [], []
 
@@ -203,8 +203,8 @@ class PML_UL_layer_stack_channels_list(UIList):
 
 class PML_UL_layer_channels_list(UIList):
     """UIList for displaying a layers channels."""
-    def draw_item(self, context, layout, data, item, icon, active_data,
-                  active_property, index=0, flt_flag=0):
+    def draw_item(self, _context, layout, data, item, _icon, _active_data,
+                  _active_property, _index=0, _flt_flag=0):
 
         layer = data
         channel = item
@@ -230,7 +230,7 @@ class PML_UL_layer_channels_list(UIList):
 
         draw_ch_preview_btn(row, layer_stack, layer=layer, channel=channel)
 
-    def filter_items(self, context, data, propname):
+    def filter_items(self, _context, data, propname):
         # Sort the channels by their order in layer_stack.channels
         layer_stack = data.layer_stack
         ls_channels = layer_stack.channels
@@ -244,7 +244,7 @@ class PML_UL_layer_channels_list(UIList):
 
         return [], order
 
-    def draw_filter(self, context, layout):
+    def draw_filter(self, _context, _layout):
         pass
 
 

@@ -204,7 +204,7 @@ class BakeNodeOpBase:
 
         return {'FINISHED'}
 
-    def invoke(self, context, event):
+    def invoke(self, context, _event):
         wm = context.window_manager
 
         if context.active_node is None:
@@ -369,7 +369,7 @@ class PML_OT_bake_layer(Operator):
 
         return {'FINISHED'}
 
-    def invoke(self, context, event):
+    def invoke(self, context, _event):
         if not self.layer_name:
             self.layer_name = get_layer_stack(context).active_layer.name
         return self.execute(context)
@@ -411,7 +411,7 @@ class PML_OT_free_layer_bake(Operator):
 
         return {'FINISHED'}
 
-    def invoke(self, context, event):
+    def invoke(self, context, _event):
         if not self.layer_name:
             self.layer_name = get_layer_stack(context).active_layer.name
         return self.execute(context)
@@ -535,7 +535,7 @@ class PML_OT_bake_layer_stack(Operator):
 
         return {'FINISHED'}
 
-    def invoke(self, context, event):
+    def invoke(self, context, _event):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
 

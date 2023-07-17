@@ -70,7 +70,7 @@ class PML_OT_view_shader_node_group(Operator):
     )
 
     @classmethod
-    def description(cls, context, properties):
+    def description(cls, _context, properties):
         return properties.custom_description or cls.bl_description
 
     @classmethod
@@ -301,14 +301,14 @@ class PML_OT_rename_node_group(Operator):
         description="The current name of the node group to rename"
     )
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
         layout.activate_init = True
         layout.prop(self, "new_name")
 
         layout.active_default = True
 
-    def execute(self, context):
+    def execute(self, _context):
         node_group = bpy.data.node_groups.get(self.node_group_str)
 
         if node_group is None:
@@ -319,7 +319,7 @@ class PML_OT_rename_node_group(Operator):
         node_group.name = self.new_name
         return {'FINISHED'}
 
-    def invoke(self, context, event):
+    def invoke(self, context, _event):
         node_group = bpy.data.node_groups.get(self.node_group_str)
 
         if node_group is None:
@@ -354,7 +354,7 @@ class PML_OT_add_pml_node(Operator):
                 and space.type == 'NODE_EDITOR'
                 and space.edit_tree is layer_stack.material.node_tree)
 
-    def draw(self, context):
+    def draw(self, _context):
         return
 
     def execute(self, context):

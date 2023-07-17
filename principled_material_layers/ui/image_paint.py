@@ -3,16 +3,7 @@
 import bpy
 from bpy.types import Panel
 
-from .panels import (layer_stack_PT_base,
-                     layer_stack_channels_PT_base,
-                     active_layer_PT_base,
-                     active_layer_channels_PT_base,
-                     active_layer_node_mask_PT_base,
-                     active_layer_image_map_PT_base,
-                     settings_PT_base,
-                     UDIM_PT_base,
-                     debug_PT_base
-                     )
+from . import panels
 
 from ..preferences import get_addon_preferences, running_as_proper_addon
 
@@ -26,47 +17,47 @@ class ImgPaintPanel(Panel):
     bl_category = "Material Layers"
 
 
-class PML_PT_layer_stack_ip(ImgPaintPanel, layer_stack_PT_base):
+class PML_PT_layer_stack_ip(ImgPaintPanel, panels.layer_stack_PT_base):
     pass
 
 
 class PML_PT_layer_stack_channels_ip(ImgPaintPanel,
-                                     layer_stack_channels_PT_base):
+                                     panels.layer_stack_channels_PT_base):
     pass
 
 
-class PML_PT_active_layer_ip(active_layer_PT_base, ImgPaintPanel):
+class PML_PT_active_layer_ip(panels.active_layer_PT_base, ImgPaintPanel):
     pass
 
 
-class PML_PT_active_layer_image_map_ip(active_layer_image_map_PT_base,
+class PML_PT_active_layer_image_map_ip(panels.active_layer_image_map_PT_base,
                                        ImgPaintPanel):
     bl_parent_id = "PML_PT_active_layer_ip"
 
 
-class PML_PT_active_layer_node_mask_ip(active_layer_node_mask_PT_base,
+class PML_PT_active_layer_node_mask_ip(panels.active_layer_node_mask_PT_base,
                                        ImgPaintPanel):
     bl_parent_id = "PML_PT_active_layer_ip"
 
 
-class PML_PT_active_layer_channels_ip(active_layer_channels_PT_base,
+class PML_PT_active_layer_channels_ip(panels.active_layer_channels_PT_base,
                                       ImgPaintPanel):
     bl_parent_id = "PML_PT_active_layer_ip"
 
 
-class PML_PT_layer_stack_settings_ip(ImgPaintPanel, settings_PT_base):
+class PML_PT_layer_stack_settings_ip(ImgPaintPanel, panels.settings_PT_base):
     pass
 
 
-class PML_PT_udim_layout_ip(ImgPaintPanel, UDIM_PT_base):
+class PML_PT_udim_layout_ip(ImgPaintPanel, panels.UDIM_PT_base):
     pass
 
 
-class PML_PT_debug_ip(ImgPaintPanel, debug_PT_base):
+class PML_PT_debug_ip(ImgPaintPanel, panels.debug_PT_base):
     pass
 
 
-class PML_PT_layer_stack_popover_ip(ImgPaintPanel, layer_stack_PT_base):
+class PML_PT_layer_stack_popover_ip(ImgPaintPanel, panels.layer_stack_PT_base):
     bl_context = ".imagepaint"
     bl_category = "Tool"
     bl_options = {'DEFAULT_CLOSED', 'HIDE_HEADER'}

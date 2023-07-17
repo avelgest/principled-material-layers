@@ -36,7 +36,7 @@ class PML_OT_set_active_layer_index(Operator):
         min=0
     )
 
-    def execute(self, context):
+    def execute(self, _context):
         layer_stack = get_layer_stack_by_id(self.layer_stack_id)
         if layer_stack is None:
             return {'CANCELLED'}
@@ -393,7 +393,7 @@ class PML_OT_apply_node_mask(Operator):
 
         return {'FINISHED'}
 
-    def invoke(self, context, event):
+    def invoke(self, context, _event):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
 
@@ -475,7 +475,7 @@ class PML_OT_convert_layer(Operator):
             return False
         return True
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
         row = layout.row()
         row.prop(self, "new_type")
@@ -502,7 +502,7 @@ class PML_OT_convert_layer(Operator):
 
         return {'FINISHED'}
 
-    def invoke(self, context, event):
+    def invoke(self, context, _event):
         active_layer = get_layer_stack(context).active_layer
 
         # Set to a value different from the layer's current type
@@ -592,7 +592,7 @@ class PML_OT_layer_add_channel(Operator):
         layer_stack.node_manager.rebuild_node_tree()
         return {'FINISHED'}
 
-    def invoke(self, context, event):
+    def invoke(self, context, _event):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
 
@@ -676,7 +676,7 @@ class PML_OT_stack_add_channel(Operator):
         ensure_global_undo()
         return {'FINISHED'}
 
-    def invoke(self, context, event):
+    def invoke(self, context, _event):
         layer_stack = get_layer_stack(context)
 
         # Default name unique in layer_stack.channels
@@ -749,7 +749,7 @@ class PML_OT_stack_resize_layers(Operator):
 
         return {'FINISHED'}
 
-    def invoke(self, context, event):
+    def invoke(self, context, _event):
         im = get_layer_stack(context).image_manager
         self.size = (im.image_width, im.image_height)
 

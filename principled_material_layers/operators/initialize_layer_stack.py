@@ -32,21 +32,21 @@ def set_keep_ratio(self, value):
         self.ratio = 0.0
 
 
-def width_keep_ratio_update(self, context):
+def width_keep_ratio_update(self, _context):
     if self.keep_size_ratio:
         new_height = int(round(self.image_width / self.ratio))
         if self.image_height != new_height:
             self.image_height = new_height
 
 
-def height_keep_ratio_update(self, context):
+def height_keep_ratio_update(self, _context):
     if self.keep_size_ratio:
         new_width = int(round(self.image_height * self.ratio))
         if self.image_width != new_width:
             self.image_width = new_width
 
 
-def _select_enum_prop_update(self, context):
+def _select_enum_prop_update(self, _context):
     if self.select == 'ALL':
         for ch in self.channels:
             ch.enabled = True
@@ -316,7 +316,7 @@ class PML_OT_initialize_layer_stack(Operator):
 
         return pml_node
 
-    def invoke(self, context, event):
+    def invoke(self, context, _event):
         obj = context.active_object
         ma = obj.active_material
 

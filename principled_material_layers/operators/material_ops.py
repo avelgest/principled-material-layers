@@ -619,15 +619,15 @@ class PML_UL_load_material_list(UIList):
     def _should_cache_compat(self, ma: Material) -> bool:
         return ma.library is not None
 
-    def draw_filter(self, context, layout):
+    def draw_filter(self, _context, layout):
         layout.scale_y = 0.5
 
         row = layout.row(align=True)
         row.prop(self, "filter_name", text="")
         row.prop(self, "use_filter_invert", text="", icon="ARROW_LEFTRIGHT")
 
-    def draw_item(self, context, layout, data, item, icon, active_data,
-                  active_property, index=0, flt_flag=0):
+    def draw_item(self, _context, layout, _data, item, icon, _active_data,
+                  _active_property, _index=0, _flt_flag=0):
 
         ma = item
         layout.scale_y = 0.5
@@ -833,7 +833,7 @@ class PML_OT_replace_layer_material(ReplaceLayerMaOpBase, Operator):
 
             return {'FINISHED'}
 
-    def invoke(self, context, event):
+    def invoke(self, context, _event):
         self.layer_name = get_layer_stack(context).active_layer.name
 
         wm = context.window_manager
@@ -909,7 +909,7 @@ class ReplaceLayerMaOpAssetBrowser(ReplaceLayerMaOpBase):
 
             return {'FINISHED'}
 
-    def invoke(self, context, event):
+    def invoke(self, context, _event):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
 
@@ -1040,7 +1040,7 @@ class PML_OT_combine_material_ab(ReplaceLayerMaOpAssetBrowser, Operator):
 
         return {'FINISHED'}
 
-    def invoke(self, context, event):
+    def invoke(self, context, _event):
         layer_stack = get_layer_stack(context)
 
         with ExitStack() as self.exit_stack:

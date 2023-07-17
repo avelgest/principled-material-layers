@@ -30,7 +30,7 @@ class PML_OT_select_udim_dir(Operator, ImportHelper):
     def poll(cls, context):
         return get_layer_stack(context) is not None
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
         layout.label(text="Select the folder to store UDIM tiles in.")
         layout.separator()
