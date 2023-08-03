@@ -300,10 +300,11 @@ class PML_MT_set_preview_channel(Menu):
 
         layout = self.layout
         for ch in layer_stack.channels:
-            op_props = layout.operator("node.pml_preview_channel",
-                                       text=ch.name)
-            op_props.layer_name = active_layer_name
-            op_props.channel_name = ch.name
+            if ch.enabled:
+                op_props = layout.operator("node.pml_preview_channel",
+                                           text=ch.name)
+                op_props.layer_name = active_layer_name
+                op_props.channel_name = ch.name
 
 
 class PML_MT_set_preview_modifier(Menu):
