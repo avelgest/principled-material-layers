@@ -92,19 +92,21 @@ class PML_UL_material_layers_list(UIList):
 
     def draw_layer_name(self, layout, layer) -> None:
         channels = layer.channels
-        show_channels = (channels and len(channels) <= 2)
 
-        # For layers with a single blend channel show the channel name
+        # For layers with only one blend channels show the channel name
         # below the layer name
-        if show_channels:
+        if len(channels) <= 2:
             blend_chs = [x for x in channels if x.usage == 'BLENDING']
-            ch_name = blend_chs[0].name if len(blend_chs) == 1 else ""
 
-            col = layout.column(align=True)
-            col.prop(layer, "name", text="", emboss=False)
-            col.label(text=f"  [{ch_name}]")
-        else:
-            layout.prop(layer, "name", text="", emboss=False)
+            if len(blend_chs) == 1:
+                ch_str = blend_chs[0].name
+
+                col = layout.column(align=True)
+                col.prop(layer, "name", text="", emboss=False)
+                col.label(text=f"  [{ch_str}]")
+                return
+
+        layout.prop(layer, "name", text="", emboss=False)
 
     def draw_filter(self, _context, layout):
         prefs = get_addon_preferences()
