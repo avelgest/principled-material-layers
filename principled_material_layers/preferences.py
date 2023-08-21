@@ -7,6 +7,7 @@ import bpy
 from bpy.types import AddonPreferences
 
 from bpy.props import (BoolProperty,
+                       EnumProperty,
                        FloatProperty)
 
 
@@ -29,6 +30,7 @@ class PMLPreferences(AddonPreferences):
                       "show_previews": True,
                       "layer_ui_scale": 2.0,
                       "layers_share_images": True,
+                      "on_asset_import": 'SHOW_POPUP',
                       "use_tiled_storage_default": False,
                       "use_large_icons": False,
                       "use_undo_workaround": bpy.app.version < (3, 2, 0),
@@ -74,6 +76,24 @@ class PMLPreferences(AddonPreferences):
                     "image to store their data. Reduces memory usage, but "
                     "changing the active layer becomes slower",
         default=default_values["layers_share_images"]
+    )
+
+    on_asset_import: EnumProperty(
+        name="On Material Import",
+        description="What should happen when 'Import as New Layer' or "
+                    "'Replace Layer Material' are used in the Asset Browser",
+        items=[
+            ('SHOW_POPUP', "Show Pop-up", "Always show a pop-up"),
+            ('DEFAULT_SETTINGS', "Use Default Settings",
+             "Never show a pop-up and use the default settings. \n"
+             "Default settings: Import all channels enabled on the layer "
+             "stack or modified by the material and automatically enable "
+             "channels on the layer stack"),
+            ('REMEMBER', "Remember Settings",
+             "Show a pop-up once and use the same settings for subsequent "
+             "imports without showing a pop-up for the rest of the session"),
+        ],
+        default=default_values["on_asset_import"]
     )
 
     show_misc_ops: BoolProperty(
@@ -149,6 +169,8 @@ class PMLPreferences(AddonPreferences):
         col.prop(self, "use_numpy")
         col.prop(self, "layers_share_images")
         col.prop(self, "show_misc_ops")
+
+        layout.prop(self, "on_asset_import")
 
         layout.separator()
         col = layout.column(align=True)

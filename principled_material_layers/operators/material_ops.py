@@ -863,6 +863,11 @@ class PML_OT_replace_layer_material(ReplaceLayerMaOpBase, Operator):
 
 class ReplaceLayerMaOpAssetBrowser(ReplaceLayerMaOpBase):
     """Replace Layer Material operator for the Asset Browser."""
+
+    # Should be set to True when a subclass executes successfully
+    # and the on_asset_import pref iis set to REMEMBER
+    _remembering_props: bool = False
+
     @classmethod
     def poll(cls, context):
         if not SpaceAssetInfo.is_asset_browser(context.space_data):
@@ -907,9 +912,22 @@ class ReplaceLayerMaOpAssetBrowser(ReplaceLayerMaOpBase):
 
             self.replace_layer_material(context, layer, material)
 
+            self.update_op_remember()
             return {'FINISHED'}
 
     def invoke(self, context, _event):
+        on_ma_import = get_addon_preferences().on_asset_import
+
+        if on_ma_import == 'DEFAULT_SETTINGS':
+            self.auto_enable_channels = True
+            self.ch_detect_mode = 'MODIFIED_OR_ENABLED'
+            self.tiled_storage_add = False
+            return self.execute(context)
+        if on_ma_import == 'REMEMBER' and self.remembering_props:
+            # When 'REMEMBER' don't show pop-up if operator has already
+            # run successfully this session
+            return self.execute(context)
+
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
 
@@ -944,6 +962,24 @@ class ReplaceLayerMaOpAssetBrowser(ReplaceLayerMaOpBase):
         self.exit_stack.callback(lambda: remove_appended_material(ma))
 
         return ma
+
+    def update_op_remember(self) -> None:
+        """Should be called when the op completes successfully. If the
+        on_asset_import pref is 'REMEMBER' then the props pop-up won't
+        be shown in the future.
+        """
+        if get_addon_preferences().on_asset_import == 'REMEMBER':
+            ReplaceLayerMaOpAssetBrowser._remembering_props = True
+        else:
+            ReplaceLayerMaOpAssetBrowser._remembering_props = False
+
+    @property
+    def remembering_props(self) -> bool:
+        """True if this op remembers the properties from a previous
+        invokation so doesn't need to show the op's pop-up when the
+        on_asset_import pref is 'REMEMBER'.
+        """
+        return ReplaceLayerMaOpAssetBrowser._remembering_props
 
 
 class PML_OT_replace_layer_material_ab(ReplaceLayerMaOpAssetBrowser, Operator):
@@ -983,6 +1019,7 @@ class PML_OT_new_layer_material_ab(ReplaceLayerMaOpAssetBrowser, Operator):
 
             layer_stack.active_layer = new_layer
 
+            self.update_op_remember()
             return {'FINISHED'}
 
 
