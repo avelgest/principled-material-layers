@@ -21,6 +21,8 @@ from ..utils.naming import suffix_num_unique_in
 from ..utils.nodes import get_nodes_by_type
 from ..utils.ops import ensure_global_undo, pml_op_poll, save_all_modified
 
+from . import channel_ops
+
 
 class PML_OT_set_active_layer_index(Operator):
     bl_idname = "material.pml_set_active_layer_index"
@@ -318,6 +320,31 @@ class PML_OT_new_node_mask(Operator):
         return node_group
 
 
+class PML_OT_unlink_node_mask(Operator):
+    bl_idname = "material.pml_unlink_node_mask"
+    bl_label = "Unlink Node Mask"
+    bl_description = "Unlink the node mask"
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        return pml_op_poll(context)
+
+    def execute(self, context):
+        layer_stack = get_layer_stack(context)
+        active_layer = layer_stack.active_layer
+        if active_layer is None or active_layer.node_mask is None:
+            return {'CANCELLED'}
+
+        # If the node mask is being previewed by the layer stack then
+        # clear previews.
+        # TODO Move to update callback of MaterialLayer.node_mask
+        if active_layer.node_mask == layer_stack.preview_group:
+            channel_ops.clear_preview_channel(layer_stack)
+        active_layer.node_mask = None
+        return {'FINISHED'}
+
+
 class PML_OT_apply_node_mask(Operator):
     bl_idname = "material.pml_apply_node_mask"
     bl_label = "Apply Node Mask"
@@ -388,6 +415,10 @@ class PML_OT_apply_node_mask(Operator):
 
         if not self.keep_node_mask:
             active_layer.node_mask = None
+
+            # If the node mask is currently being previewed
+            if layer_stack.preview_group == active_layer.node_mask:
+                channel_ops.clear_preview_channel(layer_stack)
 
         layer_stack.node_manager.rebuild_node_tree()
 
@@ -834,6 +865,7 @@ classes = (PML_OT_set_active_layer_index,
            PML_OT_move_layer_up,
            PML_OT_move_layer_down,
            PML_OT_new_node_mask,
+           PML_OT_unlink_node_mask,
            PML_OT_apply_node_mask,
            PML_OT_node_mask_to_stencil,
            PML_OT_convert_layer,

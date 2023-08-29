@@ -1224,6 +1224,18 @@ class LayerStack(bpy.types.PropertyGroup):
         self["preview_channel_name"] = ch.name
 
     @property
+    def preview_group(self) -> Optional[bpy.types.ShaderNodeGroup]:
+        """The ShaderNodeGroup currently being previewed. Only used for
+        node mask previews. May be None.
+        """
+        return self.get("preview_group", None)
+
+    @preview_group.setter
+    def preview_group(self,
+                      value: Optional[bpy.types.ShaderNodeGroup]) -> None:
+        self["preview_group"] = value
+
+    @property
     def _rna_resub_callbacks(self):
         return _UndoInvariant.get(self.identifier).rna_resub_callbacks
 

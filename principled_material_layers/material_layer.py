@@ -46,6 +46,9 @@ _VALID_LAYER_TYPES = {x[0] for x in LAYER_TYPES}
 # The name of the custom alpha channel used by MATERIAL_W_ALPHA layers
 CUSTOM_ALPHA_CH_NAME = "Layer Alpha"
 
+# Passed as channel_name to preview op to preview a layer's node mask
+NODE_MASK_PREVIEW_STR = "pml_node_mask_preview"
+
 
 class MaterialLayerRef(PropertyGroup):
     """Reference to a MaterialLayer instance. The MaterialLayer may be

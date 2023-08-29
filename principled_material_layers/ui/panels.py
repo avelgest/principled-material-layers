@@ -6,6 +6,7 @@ from .. import bake_group
 from .. import blending
 from .. import hardness
 from .. import image_mapping
+from .. import material_layer
 from .. import utils
 
 from ..preferences import get_addon_preferences
@@ -376,7 +377,8 @@ class active_layer_node_mask_PT_base:
         row = layout.row(align=True)
         row.enabled = not active_layer.is_base_layer
         row.template_ID(active_layer, "node_mask",
-                        new="material.pml_new_node_mask")
+                        new="material.pml_new_node_mask",
+                        unlink="material.pml_unlink_node_mask")
 
         if active_layer.node_mask is not None:
             op_props = row.operator("node.pml_view_shader_node_group",
@@ -385,11 +387,23 @@ class active_layer_node_mask_PT_base:
             op_props.node_group = getattr(active_layer.node_mask, "name", "")
 
             col = layout.column(align=True)
+            self._draw_node_mask_preview_op(col, layer_stack, active_layer)
             col.operator("material.pml_apply_node_mask")
             col.operator("material.pml_node_mask_to_stencil")
 
             layout.separator()
             self.draw_node_view(layout, active_layer.node_mask)
+
+    def _draw_node_mask_preview_op(self, layout, layer_stack, layer) -> None:
+        preview_group = layer_stack.preview_group
+        if preview_group == layer.node_mask:
+            layout.operator("node.pml_clear_preview_channel", text="Preview",
+                            depress=True, emboss=True)
+        else:
+            op_props = layout.operator("node.pml_preview_channel",
+                                       text="Preview")
+            op_props.layer_name = layer.name
+            op_props.channel_name = material_layer.NODE_MASK_PREVIEW_STR
 
     @classmethod
     def draw_node_view(cls, layout, node_mask) -> None:

@@ -11,6 +11,7 @@ from ..blending import blend_mode_description, blend_mode_display_name
 from ..channel import PREVIEW_MODIFIERS_ENUM, preview_modifier_from_enum
 
 from .. import utils
+from ..material_layer import NODE_MASK_PREVIEW_STR
 from ..pml_node import get_pml_nodes
 from ..utils.layer_stack_utils import get_layer_stack
 from ..utils.ops import pml_op_poll
@@ -284,6 +285,24 @@ def restore_old_links(node_tree) -> None:
                     node_tree.links.new(socket, from_soc)
 
 
+def clear_preview_channel(layer_stack) -> set[str]:
+    layer_stack.preview_channel = None
+    layer_stack.preview_group = None
+
+    node_tree = layer_stack.material.node_tree
+    if node_tree is None:
+        return {'CANCELLED'}
+
+    # Delete the layer preview and the preview modifier nodes
+    for node_name in (PREVIEW_GROUP_NODE_NAME, PREVIEW_MOD_NODE_NAME):
+        node = node_tree.nodes.get(node_name)
+        if node is not None:
+            node_tree.nodes.remove(node)
+
+    restore_old_links(node_tree)
+    return {'FINISHED'}
+
+
 class PML_OT_preview_channel(Operator):
     bl_idname = "node.pml_preview_channel"
     bl_label = "Preview Channel"
@@ -302,6 +321,8 @@ class PML_OT_preview_channel(Operator):
 
     @classmethod
     def description(cls, _context, properties):
+        if properties.channel_name == NODE_MASK_PREVIEW_STR:
+            return "Connect the node mask's output to the material output"
         if properties.layer_name:
             return (f"{cls.bl_description}. Shift-click to preview the "
                     "channel of an individual layer")
@@ -363,12 +384,16 @@ class PML_OT_preview_channel(Operator):
 
         # Clear the preview if no channel is given
         if not self.channel_name:
-            return self._clear_preview_channel()
+            return clear_preview_channel(self.layer_stack)
 
         self.ma_output = utils.nodes.get_output_node(self.node_tree)
         if self.ma_output is None:
             self.report({'WARNING'}, "Could not find a Material Output node")
             return {'CANCELLED'}
+
+        if self.channel_name == NODE_MASK_PREVIEW_STR:
+            # Preview the given layer's node mask
+            return self._preview_node_mask()
 
         if not self.layer_name:
             # Preview a channel of the layer stack
@@ -418,7 +443,7 @@ class PML_OT_preview_channel(Operator):
         if group_node is not None:
             self.node_tree.nodes.remove(group_node)
 
-    def _preview_stack_channel(self):
+    def _preview_stack_channel(self) -> set[str]:
         pml_node = get_pml_nodes(self.layer_stack)[0]
         ch = self.layer_stack.channels.get(self.channel_name)
 
@@ -438,13 +463,14 @@ class PML_OT_preview_channel(Operator):
 
         self.node_tree.links.new(self._ma_output_socket, socket)
 
+        self.layer_stack.preview_group = None
         self.layer_stack.preview_channel = ch
 
         self.insert_preview_modifier(ch, socket, self._ma_output_socket)
 
         return {'FINISHED'}
 
-    def _preview_layer_channel(self):
+    def _preview_layer_channel(self) -> set[str]:
         layer = self.layer_stack.layers.get(self.layer_name)
         if layer is None:
             self.report({'WARNING'}, f"Cannot find layer {self.layer_name}")
@@ -473,25 +499,39 @@ class PML_OT_preview_channel(Operator):
         for socket in group_node.outputs:
             socket.hide = (socket.name != self.channel_name)
 
+        self.layer_stack.preview_group = None
         self.layer_stack.preview_channel = ch
 
         self.insert_preview_modifier(ch, out_socket, self._ma_output_socket)
 
         return {'FINISHED'}
 
-    def _clear_preview_channel(self):
+    def _preview_node_mask(self) -> set[str]:
+        layer = self.layer_stack.layers.get(self.layer_name)
+        if layer is None:
+            self.report({'WARNING'}, f"Cannot find layer {self.layer_name}")
+            return {'CANCELLED'}
+
+        if layer.node_mask is None:
+            self.report({'WARNING'}, f"{self.layer_name} has no node mask")
+            return {'CANCELLED'}
+        if not layer.node_mask.outputs:
+            self.report({'WARNING'}, "Node mask has no outputs")
+            return {'CANCELLED'}
+
+        clear_preview_channel(self.layer_stack)
+
+        group_node = self._ensure_layer_group_node()
+        group_node.label = ""
+        group_node.node_tree = layer.node_mask
+
+        self._save_and_delete_ma_output_links()
+        self.node_tree.links.new(self._ma_output_socket, group_node.outputs[0])
+
+        self.layer_stack.preview_group = layer.node_mask
         self.layer_stack.preview_channel = None
 
-        node_tree = self.node_tree
-
-        # Delete the layer preview and the preview modifier nodes
-        for node_name in (PREVIEW_GROUP_NODE_NAME, PREVIEW_MOD_NODE_NAME):
-            node = node_tree.nodes.get(node_name)
-            if node is not None:
-                node_tree.nodes.remove(node)
-
-        restore_old_links(node_tree)
-
+        # Preview modifiers are not implemented for previewing masks
         return {'FINISHED'}
 
     @property
@@ -513,21 +553,7 @@ class PML_OT_clear_preview_channel(Operator):
     def execute(self, context):
         layer_stack = get_layer_stack(context)
 
-        layer_stack.preview_channel = None
-
-        node_tree = layer_stack.material.node_tree
-        if node_tree is None:
-            return {'CANCELLED'}
-
-        # Delete the layer preview and the preview modifier nodes
-        for node_name in (PREVIEW_GROUP_NODE_NAME, PREVIEW_MOD_NODE_NAME):
-            node = node_tree.nodes.get(node_name)
-            if node is not None:
-                node_tree.nodes.remove(node)
-
-        restore_old_links(node_tree)
-
-        return {'FINISHED'}
+        return clear_preview_channel(layer_stack)
 
 
 class PML_OT_set_preview_modifier(Operator):
