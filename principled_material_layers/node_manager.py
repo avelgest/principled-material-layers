@@ -56,6 +56,7 @@ class NodeManager(bpy.types.PropertyGroup):
         self._register_msgbus()
 
         self["_on_load_cb"] = layer_stack.add_on_load_callback(self._on_load)
+        self["layer_stack_id"] = layer_stack.identifier
 
     def delete(self) -> None:
         """Deletes the NodeManager. Initialize must be called before
@@ -525,6 +526,12 @@ class NodeManager(bpy.types.PropertyGroup):
 
     def rebuild_node_tree(self, immediate=False):
         """Rebuild the layer stack's internal node tree. """
+
+        # layer_stack_id should have been set in initialize, but check
+        # here for compatibility with old versions
+        if "layer_stack_id" not in self:
+            self["layer_stack_id"] = self.layer_stack.identifier
+
         if immediate or get_addon_preferences().debug_immediate_rebuild:
             self._rebuild_node_tree()
         elif not bpy.app.timers.is_registered(self._rebuild_node_tree):
@@ -532,6 +539,13 @@ class NodeManager(bpy.types.PropertyGroup):
 
     def _rebuild_node_tree(self):
         """Clears the layer stack's node tree and reconstructs it"""
+        # Get by id to avoid crashes if material has been deleted
+        layer_stack_id = self.get("layer_stack_id", "")
+        layer_stack = get_layer_stack_by_id(layer_stack_id)
+
+        if not layer_stack:
+            return
+
         try:
             pml_node_tree.rebuild_node_tree(self.layer_stack)
         except pml_node_tree.RebuildContextError as e:
