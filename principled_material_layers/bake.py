@@ -438,6 +438,8 @@ class SocketBaker:
             images = list(images)
 
         sockets = tuple(sockets)
+        if not sockets:
+            return
         if not all(x.is_output for x in sockets):
             raise ValueError("Expected only output sockets.")
 
@@ -644,7 +646,7 @@ class LayerStackBaker(SocketBaker):
 
         return baking_sockets
 
-    def post_bake(self, baked_socket: BakedSocket):
+    def post_bake(self, baked_socket: BakedSocket) -> None:
         """Method called on BakedSocket instances immediately after
         they have been returned by bake_sockets.
         """
@@ -753,9 +755,11 @@ class LayerBaker(LayerStackBaker):
         layer_stack_ch_names = {x.name for x in self.layer_stack.channels
                                 if x.enabled}
 
+        # Bake only enabled channels that are not already baked
         baking_sockets = [ChannelSocket(ch, ma_node.outputs[ch.name])
                           for ch in layer.channels
-                          if ch.name in layer_stack_ch_names]
+                          if ch.name in layer_stack_ch_names
+                          and ch.enabled and not ch.is_baked]
 
         return baking_sockets
 
@@ -790,6 +794,13 @@ class LayerBaker(LayerStackBaker):
             image.name = f".{ma.name} Baked {layer.name} {channel.name}"
         else:
             image.name = f"{image.name} {channel.name}"
+
+        # Names have a limited length so clip long names to allow for
+        # other objects (e.g nodes) to contain affixed variants of the
+        # image's name (e.g NodeNames.bake_image_rgb)
+        max_len = 48
+        if len(image.name) > max_len:
+            image.name = image.name[:max_len]
 
 
 def apply_node_mask_bake(layer,
