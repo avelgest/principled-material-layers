@@ -11,7 +11,6 @@ import bpy
 from bpy.app.handlers import persistent
 from bpy.types import PropertyGroup
 
-from .preferences import get_addon_preferences
 from .utils.naming import unique_name_in
 
 
@@ -105,8 +104,7 @@ class OnLoadManager(PropertyGroup):
                 self._call_callback(cb_data)
             except Exception as e:
                 warn(f"{type(e).__name__} calling on_load callback: {e}")
-                if get_addon_preferences().debug:
-                    traceback.print_exc()
+                traceback.print_exc()
 
     def _call_callback(self, cb_data):
         cb_str = cb_data["callback"]

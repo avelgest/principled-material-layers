@@ -37,12 +37,6 @@ class PMLPreferences(AddonPreferences):
                       "use_op_based_ma_copy": bpy.app.version > (3, 1, 0)
                       }
 
-    # TODO Remove debug property
-    debug: BoolProperty(
-        name="Debug Mode",
-        description="Enable debug mode",
-        default=default_values["debug"]
-    )
     # N.B. Not editable from the UI
     debug_immediate_rebuild: BoolProperty(
         default=False
@@ -174,8 +168,6 @@ class PMLPreferences(AddonPreferences):
 
         layout.separator()
         col = layout.column(align=True)
-        if self.debug:  # Only allow disabling debug option
-            col.prop(self, "debug")
         col.prop(self, "use_undo_workaround")
         col.prop(self, "use_op_based_ma_copy")
 
