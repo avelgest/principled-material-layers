@@ -37,15 +37,15 @@ class PMLPreferences(AddonPreferences):
                       "use_op_based_ma_copy": bpy.app.version > (3, 1, 0)
                       }
 
-    # Differences in debug mode:
-    #   - node_manager always rebuilds immediately rather than using a
-    #     timer.
-    # N.B. Disallow enabling Debug in preferences since it doesn't
-    #      do much
+    # TODO Remove debug property
     debug: BoolProperty(
         name="Debug Mode",
         description="Enable debug mode",
         default=default_values["debug"]
+    )
+    # N.B. Not editable from the UI
+    debug_immediate_rebuild: BoolProperty(
+        default=False
     )
 
     use_numpy: BoolProperty(

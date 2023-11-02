@@ -178,6 +178,14 @@ class NodeNames:
         return "pml_zero_const"
 
 
+class RebuildContextError(RuntimeError):
+    """Error raised by NodeTreeBuilder.rebuild_node_tree if ID classes
+    cannot be written to in this context.
+    """
+    def __init__(self):
+        super().__init__("Cannot write to ID classes in this context")
+
+
 class NodeTreeBuilder:
     """Class that builds the internal node tree of a ShaderNodePMLStack.
     Note that this only sets-up the node tree, updating and management
@@ -205,17 +213,20 @@ class NodeTreeBuilder:
         layer_stack = self.layer_stack
         node_tree = self.node_tree
 
-        # Name of the active node (will restore later)
-        active_node_name = getattr(node_tree.nodes.active, "name", "")
-
-        # Connections to restore later
-        pass_through_sockets = self._get_pass_through_sockets()
-
         if not layer_stack.is_initialized:
             return
 
         if node_tree is None:
             raise RuntimeError("layer_stack.node_tree cannot be None")
+
+        if not self._check_can_rebuild():
+            raise RebuildContextError()
+
+        # Name of the active node (will restore later)
+        active_node_name = getattr(node_tree.nodes.active, "name", "")
+
+        # Connections to restore later
+        pass_through_sockets = self._get_pass_through_sockets()
 
         self.nodes.clear()
 
@@ -935,6 +946,26 @@ class NodeTreeBuilder:
                 socket = node.outputs.get(socket_name)
                 self.links.new(group_soc, socket)
 
+    def _check_can_rebuild(self) -> bool:
+        """Returns False if it is not possible to rebuild the node tree
+        because ID classes cannot be written to in this oontext.
+        """
+        if self.node_tree.nodes:
+            test_node = self.node_tree.nodes[0]
+            is_temp = False
+        else:
+            test_node = self.node_tree.nodes.new('ShaderNodeMath')
+            is_temp = True
+
+        try:
+            test_node.name = test_node.name
+        except (AttributeError, RuntimeError):
+            return False
+        finally:
+            if is_temp:
+                self.node_tree.nodes.remove(test_node)
+        return True
+
     @property
     def _one_const_socket(self):
         return self.nodes[NodeNames.one_const()].outputs[0]
@@ -945,5 +976,6 @@ class NodeTreeBuilder:
 
 
 def rebuild_node_tree(layer_stack):
-    builder = NodeTreeBuilder(layer_stack)
-    builder.rebuild_node_tree()
+    if layer_stack:
+        builder = NodeTreeBuilder(layer_stack)
+        builder.rebuild_node_tree()

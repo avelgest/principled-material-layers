@@ -11,8 +11,9 @@ import bpy
 
 from bpy.types import NodeReroute, NodeSocket
 
+from . import pml_node_tree
 from .on_load_manager import pml_trusted_callback
-from .pml_node_tree import NodeNames, rebuild_node_tree
+from .pml_node_tree import NodeNames
 from .preferences import get_addon_preferences
 from .utils.layer_stack_utils import (get_layer_stack_by_id,
                                       get_layer_stack_from_prop)
@@ -32,6 +33,14 @@ class NodeManager(bpy.types.PropertyGroup):
     _cls_msgbus_owners = defaultdict(lambda: defaultdict(dict))
 
     node_names = NodeNames()
+
+    # Rebuilding can sometimes fail due to an incorrect context this is
+    # the max number of times to try rebuilding before raising an error.
+    _MAX_REBUILD_RETRIES = 32
+
+    # Instance attributes are lost on undo or reload so should only be
+    # accessed using getattr with the default keyword.
+    _rebuild_retries: int
 
     def initialize(self) -> None:
         """Initializes the layer_stack. Must be called before the
@@ -516,14 +525,28 @@ class NodeManager(bpy.types.PropertyGroup):
 
     def rebuild_node_tree(self, immediate=False):
         """Rebuild the layer stack's internal node tree. """
-        if immediate or get_addon_preferences().debug:
+        if immediate or get_addon_preferences().debug_immediate_rebuild:
             self._rebuild_node_tree()
         elif not bpy.app.timers.is_registered(self._rebuild_node_tree):
             bpy.app.timers.register(self._rebuild_node_tree)
 
     def _rebuild_node_tree(self):
         """Clears the layer stack's node tree and reconstructs it"""
-        rebuild_node_tree(self.layer_stack)
+        try:
+            pml_node_tree.rebuild_node_tree(self.layer_stack)
+        except pml_node_tree.RebuildContextError as e:
+            if get_addon_preferences().debug_immediate_rebuild:
+                raise e
+
+            # Retry later if the current state prevents rebuilding
+            self._rebuild_retries = getattr(self, "_rebuild_retries", 0) + 1
+
+            if self._rebuild_retries > self._MAX_REBUILD_RETRIES:
+                raise RuntimeError("Retry max exceeded trying to rebuild node "
+                                   f"tree: {e}") from e
+
+            bpy.app.timers.register(self._rebuild_node_tree,
+                                    first_interval=0.01)
 
     def set_active_layer(self, layer):
         layer_stack = self.layer_stack
