@@ -5,7 +5,7 @@ import typing
 import warnings
 
 from collections import defaultdict
-from typing import Optional
+from typing import Callable, Optional
 
 import bpy
 
@@ -32,15 +32,14 @@ class NodeManager(bpy.types.PropertyGroup):
     # (mapped by layer_stack.identifier).
     _cls_msgbus_owners = defaultdict(lambda: defaultdict(dict))
 
+    # Dict of layer stack ids to functions to rebuild each layer stack
+    _rebuild_functions: dict[str, Callable[[], None]] = {}
+
     node_names = NodeNames()
 
     # Rebuilding can sometimes fail due to an incorrect context this is
     # the max number of times to try rebuilding before raising an error.
-    _MAX_REBUILD_RETRIES = 32
-
-    # Instance attributes are lost on undo or reload so should only be
-    # accessed using getattr with the default keyword.
-    _rebuild_retries: int
+    MAX_REBUILD_RETRIES = 32
 
     def initialize(self) -> None:
         """Initializes the layer_stack. Must be called before the
@@ -525,7 +524,7 @@ class NodeManager(bpy.types.PropertyGroup):
                                       ignore_shader=True)
 
     def rebuild_node_tree(self, immediate=False):
-        """Rebuild the layer stack's internal node tree. """
+        """Rebuild the layer stack's internal node tree."""
 
         # layer_stack_id should have been set in initialize, but check
         # here for compatibility with old versions
@@ -533,34 +532,9 @@ class NodeManager(bpy.types.PropertyGroup):
             self["layer_stack_id"] = self.layer_stack.identifier
 
         if immediate or get_addon_preferences().debug_immediate_rebuild:
-            self._rebuild_node_tree()
-        elif not bpy.app.timers.is_registered(self._rebuild_node_tree):
-            bpy.app.timers.register(self._rebuild_node_tree)
-
-    def _rebuild_node_tree(self):
-        """Clears the layer stack's node tree and reconstructs it"""
-        # Get by id to avoid crashes if material has been deleted
-        layer_stack_id = self.get("layer_stack_id", "")
-        layer_stack = get_layer_stack_by_id(layer_stack_id)
-
-        if not layer_stack:
-            return
-
-        try:
-            pml_node_tree.rebuild_node_tree(self.layer_stack)
-        except pml_node_tree.RebuildContextError as e:
-            if get_addon_preferences().debug_immediate_rebuild:
-                raise e
-
-            # Retry later if the current state prevents rebuilding
-            self._rebuild_retries = getattr(self, "_rebuild_retries", 0) + 1
-
-            if self._rebuild_retries > self._MAX_REBUILD_RETRIES:
-                raise RuntimeError("Retry max exceeded trying to rebuild node "
-                                   f"tree: {e}") from e
-
-            bpy.app.timers.register(self._rebuild_node_tree,
-                                    first_interval=0.01)
+            self.rebuild_function()
+        elif not bpy.app.timers.is_registered(self.rebuild_function):
+            bpy.app.timers.register(self.rebuild_function)
 
     def set_active_layer(self, layer):
         layer_stack = self.layer_stack
@@ -620,6 +594,20 @@ class NodeManager(bpy.types.PropertyGroup):
         return self.layer_stack.node_tree.nodes
 
     @property
+    def rebuild_function(self) -> Callable[[], None]:
+        """A function taking no arguments that can be called to rebuild
+        the node tree. The returned function is safe to call even if the
+        layer stack has been reallocated/deleted.
+        """
+        layer_stack_id = self.layer_stack.identifier
+        fnc = self._rebuild_functions.get(layer_stack_id)
+        if fnc is None:
+            fnc = _rebuild_node_tree_factory(layer_stack_id)
+            self._rebuild_functions[layer_stack_id] = fnc
+
+        return fnc
+
+    @property
     def _zero_const_output_socket(self):
         """The output socket of the zero_const node."""
         return self.nodes[NodeNames.zero_const()].outputs[0]
@@ -628,6 +616,46 @@ class NodeManager(bpy.types.PropertyGroup):
     def _one_const_output_socket(self):
         """The output socket of the one_const node."""
         return self.nodes[NodeNames.one_const()].outputs[0]
+
+
+def _rebuild_node_tree_factory(layer_stack_id: str) -> Callable[[], None]:
+    """Creates a function for rebuilding the layer stack with identifier
+    layer_stack_id.
+    The returned function takes no arguments, returns None and is always
+    safe to call.
+    """
+    if not layer_stack_id:
+        raise ValueError("layer_stack_id is empty")
+
+    retry_count = 0
+
+    def rebuild_node_tree() -> None:
+        nonlocal retry_count
+
+        layer_stack = get_layer_stack_by_id(layer_stack_id)
+
+        if not layer_stack:
+            return
+
+        try:
+            pml_node_tree.rebuild_node_tree(layer_stack)
+        except pml_node_tree.RebuildContextError as e:
+            if get_addon_preferences().debug_immediate_rebuild:
+                raise e
+
+            # Retry later if the current state prevents rebuilding
+            retry_count += 1
+
+            if retry_count > NodeManager.MAX_REBUILD_RETRIES:
+                retry_count = 0
+                raise RuntimeError("Retry limit exceeded trying to rebuild "
+                                   f"node tree: {e}") from e
+
+            bpy.app.timers.register(rebuild_node_tree,
+                                    first_interval=0.01)
+        else:
+            retry_count = 0
+    return rebuild_node_tree
 
 
 def _rebuild_node_tree(layer_stack_id: str) -> None:
