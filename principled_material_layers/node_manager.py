@@ -178,7 +178,7 @@ class NodeManager(bpy.types.PropertyGroup):
 
     def has_channel_opacity(self, layer, channel) -> bool:
         """Returns true if a opacity node exists for channel of layer."""
-        return NodeNames.channel_opactity(layer, channel) in self.nodes
+        return NodeNames.channel_opacity(layer, channel) in self.nodes
 
     def update_blend_node(self, layer, channel) -> None:
         # Since child nodes are not yet supported ignore any layer that

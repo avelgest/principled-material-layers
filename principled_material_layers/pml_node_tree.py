@@ -58,7 +58,7 @@ class NodeNames:
         return f"{layer.identifier}.blend.{channel.name}"
 
     @staticmethod
-    def channel_opactity(layer, channel):
+    def channel_opacity(layer, channel):
         """Math node that affects the opacity of an individual channel
         for layer.
         """
@@ -315,7 +315,7 @@ class NodeTreeBuilder:
         property. layer_ch should be a channel of layer.
         """
         ch_opacity = self.nodes.new("ShaderNodeMath")
-        ch_opacity.name = NodeNames.channel_opactity(layer, layer_ch)
+        ch_opacity.name = NodeNames.channel_opacity(layer, layer_ch)
         ch_opacity.label = f"{layer_ch.name} Opacity"
         ch_opacity.operation = 'MULTIPLY'
         ch_opacity.parent = blend_node.parent
