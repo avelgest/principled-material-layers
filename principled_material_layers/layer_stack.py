@@ -671,10 +671,10 @@ class LayerStack(bpy.types.PropertyGroup):
             The MaterialLayer above 'layer' or None.
         """
         if not layer.is_top_level:
-            raise ValueError("Expected top level layer")
+            raise ValueError("Expected a top level layer")
 
         index = self.top_level_layers_ref.find(layer.identifier)
-        if index < -1:
+        if index < 0:
             raise ValueError("layer not found")
         if index == len(self.top_level_layers_ref) - 1:
             return None
@@ -690,10 +690,10 @@ class LayerStack(bpy.types.PropertyGroup):
             The MaterialLayer below 'layer' or None.
         """
         if not layer.is_top_level:
-            raise ValueError("Expected top level layer")
+            raise ValueError("Expected a top level layer")
 
         index = self.top_level_layers_ref.find(layer.identifier)
-        if index < -1:
+        if index < 0:
             raise ValueError("layer not found")
         if index == 0:
             return None
