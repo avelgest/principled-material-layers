@@ -17,7 +17,7 @@ from .. import hardness
 from .. import tiled_storage
 from .. import utils
 from ..utils.layer_stack_utils import get_layer_stack
-from ..utils.nodes import ensure_outputs_match_channels
+from ..utils.node_tree import ensure_outputs_match_channels
 from ..utils.ops import pml_op_poll
 from ..utils.temp_changes import TempNodes
 
@@ -391,10 +391,9 @@ class PML_OT_verify_layer_outputs(Operator):
             self.report({'WARNING'}, "Active layer has no node group")
             return {'CANCELLED'}
 
-        outputs = active_layer.node_tree.outputs
         channels = active_layer.channels
 
-        ensure_outputs_match_channels(outputs, channels)
+        ensure_outputs_match_channels(active_layer.node_tree, channels)
 
         return {'FINISHED'}
 

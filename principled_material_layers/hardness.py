@@ -10,6 +10,9 @@ from bpy.types import Node, ShaderNode, ShaderNodeTree
 
 from .utils.naming import cap_enum
 from .utils.nodes import NodeMakeInfo, get_node_by_type
+from .utils.node_tree import (get_node_tree_sockets,
+                              new_node_tree_socket,
+                              node_tree_socket_type)
 
 _HARDNESS_TYPES = (
     "DEFAULT",
@@ -83,11 +86,12 @@ def supports_threshold(hardness: str,
 def _create_node_group(name: str, threshold=False) -> ShaderNodeTree:
     """Create a new node group for a hardness mode"""
     node_group = bpy.data.node_groups.new(name, "ShaderNodeTree")
-    node_group.inputs.new("NodeSocketFloat", "In")
-    node_group.outputs.new("NodeSocketFloat", "Out")
+    new_node_tree_socket(node_group, "In", 'INPUT', "NodeSocketFloat")
+    new_node_tree_socket(node_group, "Out", 'OUTPUT', "NodeSocketFloat")
 
     if threshold:
-        node_group.inputs.new("NodeSocketFloat", "Threshold")
+        new_node_tree_socket(node_group, "Threshold", 'INPUT',
+                             "NodeSocketFloat")
 
     node_group.nodes.new("NodeGroupInput")
     node_group.nodes.new("NodeGroupOutput").location.x += 200
@@ -166,8 +170,8 @@ def is_group_hardness_compat(node_group: Optional[bpy.types.NodeTree],
     if node_group is None:
         return False
 
-    inputs = node_group.inputs
-    outputs = node_group.outputs
+    inputs = get_node_tree_sockets(node_group, 'INPUT')
+    outputs = get_node_tree_sockets(node_group, 'OUTPUT')
     if node_group.type != 'SHADER' or not inputs or not outputs:
         return False
     if not strict:
@@ -178,9 +182,10 @@ def is_group_hardness_compat(node_group: Optional[bpy.types.NodeTree],
     # Require exact match in strict mode
     # Support 1 or 2 input sockets (may have 'threshold' socket)
     return (len(inputs) <= 2 and len(outputs) == 1
-            and inputs[0].type == 'VALUE'
-            and outputs[0].type == 'VALUE'
-            and (len(outputs) == 1 or outputs[1].type == 'VALUE'))
+            and node_tree_socket_type(inputs[0]) == 'VALUE'
+            and node_tree_socket_type(outputs[0]) == 'VALUE'
+            and (len(outputs) == 1
+                 or node_tree_socket_type(outputs[1]) == 'VALUE'))
 
 
 def create_custom_hardness_default(name: str) -> ShaderNodeTree:

@@ -15,6 +15,9 @@ from .channel import Channel
 from .utils import node_tree_import
 from .utils.nodes import NodeMakeInfo, get_node_by_type
 from .utils.naming import cap_enum
+from .utils.node_tree import (get_node_tree_sockets,
+                              new_node_tree_socket,
+                              node_tree_socket_type)
 
 
 # Blend types which use a single MixRGB node
@@ -125,18 +128,22 @@ def is_group_blending_compat(node_group: Optional[NodeTree],
     """
     if node_group is None or node_group.type != 'SHADER':
         return False
+
+    inputs = get_node_tree_sockets(node_group, 'INPUT')
+    outputs = get_node_tree_sockets(node_group, 'OUTPUT')
+
     if not strict:
         # Require at least 3 inputs and 1 output
-        return len(node_group.inputs) >= 3 and node_group.outputs
+        return len(inputs) >= 3 and outputs
 
     # strict == True
     # Require exactly 3 inputs and 1 output
-    if len(node_group.inputs) != 3 or len(node_group.outputs) != 1:
+    if len(inputs) != 3 or len(outputs) != 1:
         return False
 
     # Check the sockets are compatible types
-    for socket in it.chain(node_group.inputs, node_group.outputs):
-        if socket.type == 'SHADER':
+    for socket in it.chain(inputs, outputs):
+        if node_tree_socket_type(socket) == 'SHADER':
             return False
 
     return True
@@ -199,11 +206,13 @@ def _create_node_group(name: str):
     """Create a node group for a blend mode."""
     node_group = bpy.data.node_groups.new(name=name, type="ShaderNodeTree")
 
-    node_group.inputs.new(name="Blend Fac", type="NodeSocketFloatFactor")
-    node_group.inputs.new(name="Input 1", type="NodeSocketColor")
-    node_group.inputs.new(name="Input 2", type="NodeSocketColor")
+    new_node_tree_socket(node_group, "Blend Fac", 'INPUT',
+                         "NodeSocketFloatFactor")
+    new_node_tree_socket(node_group, "Input 1", 'INPUT', "NodeSocketColor")
+    new_node_tree_socket(node_group, "Input 2", 'INPUT', "NodeSocketColor")
 
-    out = node_group.outputs.new(name="Output", type="NodeSocketColor")
+    out = new_node_tree_socket(node_group, "Output", 'OUTPUT',
+                               "NodeSocketColor")
     out.hide_value = True
 
     group_in = node_group.nodes.new(type="NodeGroupInput")

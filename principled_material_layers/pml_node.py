@@ -235,6 +235,10 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
         node_tree = self.id_tree
 
         out_socket = self.outputs.get(name)
+        if out_socket is None:
+            # Blender 4+ may only return enabled sockets via get
+            out_socket = next((x for x in self.outputs if x.name == name),
+                              None)
         stack_ch = layer_stack.channels.get(name)
 
         if out_socket is not None and stack_ch is not None:

@@ -40,8 +40,11 @@ from ..utils.nodes import (delete_nodes_not_in,
                            get_output_node,
                            nodes_bounding_box,
                            reference_inputs,
-                           sort_sockets_by,
                            vector_socket_link_default_generic)
+from ..utils.node_tree import (clear_node_tree_sockets,
+                               get_node_tree_socket,
+                               new_node_tree_socket,
+                               sort_outputs_by)
 from ..utils.ops import pml_op_poll
 
 
@@ -316,12 +319,15 @@ class _ReplaceMaterialHelper:
         group_out = get_node_by_type(node_tree, "NodeGroupOutput")
 
         for soc_value in socket_values:
-            if soc_value.name not in node_tree.outputs:
-                node_tree.outputs.new(type=soc_value.type, name=soc_value.name)
+            if get_node_tree_socket(node_tree,
+                                    soc_value.name, 'OUTPUT') is None:
+                new_node_tree_socket(node_tree, soc_value.name,
+                                     'OUTPUT', soc_value.type)
 
         for soc_value in socket_values:
             group_out_soc = group_out.inputs[soc_value.name]
-            tree_out = node_tree.outputs[soc_value.name]
+            tree_out = get_node_tree_socket(node_tree,
+                                            soc_value.name, 'OUTPUT')
 
             if soc_value.default_value is not None:
                 group_out_soc.default_value = soc_value.default_value
@@ -382,7 +388,7 @@ class _CombineMaterialHelper(_ReplaceMaterialHelper):
         node tree.
         """
 
-        node_tree.outputs.clear()
+        clear_node_tree_sockets(node_tree, 'OUTPUT')
 
         # Ensure that there's a group output node
         group_out = get_node_by_type(node_tree, "NodeGroupOutput")
@@ -447,8 +453,9 @@ class _CombineMaterialHelper(_ReplaceMaterialHelper):
             y_pos -= 20
 
             # Add a socket for the channel to the node group output
-            if socket.name not in node_tree.outputs:
-                node_tree.outputs.new(socket.bl_rna.identifier, socket.name)
+            if get_node_tree_socket(node_tree, socket.name, 'OUTPUT') is None:
+                new_node_tree_socket(node_tree, socket.name, 'OUTPUT',
+                                     socket.bl_rna.identifier)
 
             # Connect the reroute node to group_out
             group_out_soc = group_out.inputs[socket.name]
@@ -569,7 +576,7 @@ def replace_layer_material(context,
         helper.add_all_layer_stack_channels(layer,
                                             enabled_only=ch_select != 'ALL')
 
-    sort_sockets_by(layer.node_tree.outputs, layer.layer_stack.channels)
+    sort_outputs_by(layer.node_tree, layer.layer_stack.channels)
 
 
 def combine_layer_material(context,

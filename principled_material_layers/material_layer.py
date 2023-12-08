@@ -30,7 +30,14 @@ from .utils.naming import unique_name_in
 from .utils.nodes import (set_node_group_vector_defaults,
                           get_nodes_by_type,
                           group_output_link_default,
-                          sort_sockets_by)
+                          )
+from .utils.node_tree import (get_node_tree_socket,
+                              get_node_tree_sockets,
+                              new_node_tree_socket,
+                              node_tree_socket_type,
+                              remove_node_tree_socket,
+                              set_node_tree_socket_type,
+                              sort_outputs_by)
 
 LAYER_TYPES = (('MATERIAL_PAINT', "Material Paint",
                 "A paintable layer with an image-based alpha"),
@@ -293,38 +300,37 @@ class MaterialLayer(PropertyGroup):
             if socket is not None:
                 socket.default_value = value
 
-    def _ensure_node_tree_output(self, channel: BasicChannel) -> None:
-        """Ensure that the layer's node tree has an output for channel
-        and that it is of the correct type.
+    def _ensure_node_tree_output(self, ch: BasicChannel) -> None:
+        """Ensure that the layer's node tree has an output for the
+        channel ch and that it is of the correct type.
         """
-        # NodeSocketInterface instances
-        outputs = self.node_tree.outputs
 
-        output = outputs.get(channel.name)
+        # NodeSocketInterface
+        output = get_node_tree_socket(self.node_tree, ch.name, 'OUTPUT')
 
         if output is not None:
-            if output.type != channel.socket_type_bl_enum:
+            if node_tree_socket_type(output) != ch.socket_type_bl_enum:
                 # Convert the existing output if it has the wrong type
-                output.type = channel.socket_type_bl_enum
+                set_node_tree_socket_type(output, ch.socket_type_bl_enum)
         else:
             # Add a new output
-            output = self.node_tree.outputs.new(
-                                       name=channel.name,
-                                       type=channel.socket_type_bl_idname)
+            output = new_node_tree_socket(self.node_tree, ch.name,
+                                          'OUTPUT',
+                                          ch.socket_type_bl_idname)
 
             # Set the new output's default_value
-            default_value = self.layer_stack.get_channel_default_value(channel)
+            default_value = self.layer_stack.get_channel_default_value(ch)
             if default_value is not None:
                 output.default_value = default_value
-                self._set_output_nodes_value(channel, default_value)
+                self._set_output_nodes_value(ch, default_value)
 
             # Sort outputs to match order in layer_stack.channels
-            sort_sockets_by(self.node_tree.outputs, self.layer_stack.channels)
-            output = self.node_tree.outputs[channel.name]
+            sort_outputs_by(self.node_tree, self.layer_stack.channels)
+            output = get_node_tree_socket(self.node_tree, ch.name, 'OUTPUT')
 
-        if channel.socket_type == 'VECTOR':
+        if ch.socket_type == 'VECTOR':
             output.hide_value = True
-        elif channel.socket_type == 'FLOAT_FACTOR':
+        elif ch.socket_type == 'FLOAT_FACTOR':
             output.min_value = 0.0
             output.max_value = 1.0
 
@@ -420,9 +426,11 @@ class MaterialLayer(PropertyGroup):
         self.channels.remove(ch_idx)
 
         if not keep_sockets:
-            outputs = self.node_tree.outputs
+            outputs = {x.name: x
+                       for x in get_node_tree_sockets(self.node_tree,
+                                                      'OUTPUT')}
             if channel_name in outputs:
-                outputs.remove(outputs[channel_name])
+                remove_node_tree_socket(self.node_tree, outputs[channel_name])
 
         active_index = self.active_channel_index
 
@@ -671,7 +679,9 @@ class MaterialLayer(PropertyGroup):
         layer_stack_chs = self.layer_stack.channels
 
         if update_channels:
-            node_output_names = {x.name for x in node_tree.outputs}
+            node_output_names = {x.name
+                                 for x in get_node_tree_sockets(node_tree,
+                                                                'OUTPUT')}
 
             if self.is_base_layer:
                 # For the base layer want to have all the layer stack's

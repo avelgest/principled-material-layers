@@ -22,6 +22,7 @@ from . import bl_info
 from . import utils
 from .utils.naming import unique_name, unique_name_in
 from .utils.nodes import reference_inputs_from_type
+from .utils.node_tree import get_node_tree_socket
 from .utils.layer_stack_utils import get_layer_stack_by_id
 
 from .bake_group import BakeGroup
@@ -806,7 +807,8 @@ class LayerStack(bpy.types.PropertyGroup):
         # If this layer stack should connect to a group node then use
         # the default_value of the node group's input socket interface.
         if self.group_to_connect is not None:
-            socket = self.group_to_connect.inputs.get(channel.name)
+            socket = get_node_tree_socket(self.group_to_connect, channel.name,
+                                          'INPUT')
             return getattr(socket, "default_value", None)
 
         default_sockets = reference_inputs_from_type(

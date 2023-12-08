@@ -12,12 +12,14 @@ import bpy
 from bpy.types import NodeReroute, NodeSocket
 
 from . import pml_node_tree
+from . import utils
 from .on_load_manager import pml_trusted_callback
 from .pml_node_tree import NodeNames
 from .preferences import get_addon_preferences
 from .utils.layer_stack_utils import (get_layer_stack_by_id,
                                       get_layer_stack_from_prop)
-from .utils.nodes import EnabledSocketsNode, ensure_outputs_match_channels
+from .utils.nodes import EnabledSocketsNode
+from .utils.node_tree import ensure_outputs_match_channels
 
 
 class NodeManager(bpy.types.PropertyGroup):
@@ -496,12 +498,11 @@ class NodeManager(bpy.types.PropertyGroup):
         if node_tree is None:
             raise RuntimeError("layer_stack.node_tree cannot be None")
 
-        node_tree.inputs.clear()
-        node_tree.outputs.clear()
+        utils.node_tree.clear_node_tree_sockets(node_tree, 'BOTH')
 
         for ch in self.layer_stack.channels:
-            node_tree.outputs.new(name=ch.name,
-                                  type=ch.socket_type_bl_idname)
+            utils.node_tree.new_node_tree_socket(node_tree, ch.name, 'OUTPUT',
+                                                 ch.socket_type_bl_idname)
 
         self.rebuild_node_tree(True)
 
@@ -519,7 +520,7 @@ class NodeManager(bpy.types.PropertyGroup):
         Does not rebuild the node tree.
         """
         # Ignore shader sockets e.g Node Wrangler's tmp_viewer sockets
-        ensure_outputs_match_channels(self.node_tree.outputs,
+        ensure_outputs_match_channels(self.node_tree,
                                       self.layer_stack.channels,
                                       ignore_shader=True)
 

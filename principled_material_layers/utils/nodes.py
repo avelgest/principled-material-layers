@@ -14,12 +14,12 @@ import bpy
 
 from bpy.types import (Node,
                        NodeSocket,
-                       NodeSocketInterface,
                        NodeTree,
                        ShaderNode,
                        ShaderNodeTree)
 from mathutils import Vector
 
+from .node_tree import get_node_tree_sockets, node_tree_socket_type
 from .temp_changes import TempNodes
 
 
@@ -53,6 +53,9 @@ _SIMPLE_NODES = {
     "ShaderNodeUVMap",
     "ShaderNodeVectorMath",
 }
+
+NodeSocketInterface = Union["bpy.types.NodeSocketInterface",
+                            "bpy.types.NodeTreeInterfaceSocket"]
 
 
 def _get_node_simplicity(node: ShaderNode,
@@ -300,58 +303,6 @@ def nodes_bounding_box(nodes: Collection[Node]) -> Rect:
     return box
 
 
-def ensure_outputs_match_channels(outputs: bpy.types.NodeTreeOutputs,
-                                  channels: Sequence["BasicChannel"],
-                                  ignore_shader: bool = True) -> None:
-    """Adds, removes, sets the type of, and reorders the sockets in
-    outputs so they match channels.
-    Params:
-        outputs: NodeTreeOutputs (a collection of NodeSocketInterface)
-        channels: A sequence of BasicChannel instances, as found in
-            LayerStack.channels or MaterialLayer.channels.
-        ignore_shader: Don't remove shader sockets. These will be moved
-            to the end of the socket collection.
-    Returns:
-        None
-    """
-    for idx, ch in enumerate(channels):
-        output_idx = outputs.find(ch.name)
-        # output_idx == -1 if ch.name not found
-
-        if output_idx != -1:
-            output = outputs[output_idx]
-            if output.type != ch.socket_type_bl_enum:
-                # Convert the existing output if it has the wrong type
-                output.type = ch.socket_type_bl_enum
-        else:
-            # If no output is found then create one
-            output = outputs.new(name=ch.name,
-                                 type=ch.socket_type_bl_idname)
-            output_idx = outputs.find(output.name)
-
-        if ch.socket_type == 'VECTOR':
-            output.hide_value = True
-        elif ch.socket_type == 'FLOAT_FACTOR':
-            output.min_value = 0.0
-            output.max_value = 1.0
-
-        # Order the outputs so that they are the same as in channels
-        if output_idx != idx:
-            outputs.move(output_idx, idx)
-
-    # As the ordering of outputs is the same as in channels
-    # any outputs that are not in channels will have been pushed to
-    # the back of outputs
-    for output in reversed(outputs):
-        if ignore_shader and output.type == 'SHADER':
-            continue
-        # Delete if not in channels or is a duplicate channel
-        if output.name not in channels or outputs[output.name] != output:
-            outputs.remove(output)
-        else:
-            break
-
-
 def set_node_group_vector_defaults(node_group: ShaderNodeTree):
     """Link any unconnected normal or tangent group outputs to
     Texture Coordinate or Tangent nodes so that they have the same value
@@ -393,7 +344,7 @@ def group_output_link_default(socket: NodeSocketInterface) -> None:
     NodeSocketInterface socket to a node that provides them with a
     correct default value.
     """
-    if socket.type != 'VECTOR':
+    if node_tree_socket_type(socket) != 'VECTOR':
         return
 
     node_tree = socket.id_data
@@ -671,34 +622,10 @@ def reference_inputs(node: ShaderNode) -> Tuple[DefaultSocket, ...]:
             # For empty group nodes just return an empty tuple
             return tuple()
         # Use the node_tree's input NodeSocketInterface values
-        return [DefaultSocket.from_socket(x) for x in node.node_tree.inputs]
+        return [DefaultSocket.from_socket(x)
+                for x in get_node_tree_sockets(node.node_tree, 'INPUTS')]
 
     return reference_inputs_from_type(type(node), node_tree)
-
-
-def sort_sockets_by(sockets: bpy.types.bpy_prop_collection,
-                    reference: typing.Collection) -> None:
-    """Sorts 'sockets' so that its order matches the order of
-    'reference' using the name attribute to determine identity.
-    Params:
-        sockets: A collection of inputs or outputs from a node or
-            node tree.
-        reference: The collection to use for reference may be another
-            collection of sockets or a collection of channels etc.
-    """
-    # N.B. Assumes no two sockets have the same name
-    ref_indices = {x.name: idx for idx, x in enumerate(reference)}
-    len_refs = len(reference)
-
-    # List of sockets sorted by the index in 'reference'. Any sockets
-    # not found in ref_indices should be at the back of the list.
-    sockets_sorted = sorted(sockets,
-                            key=lambda x: ref_indices.get(x.name, len_refs))
-
-    for target_idx, socket in enumerate(sockets_sorted):
-        current_idx = sockets.find(socket.name)
-        if current_idx != target_idx:
-            sockets.move(current_idx, target_idx)
 
 
 class NodeMakeInfo(NamedTuple):

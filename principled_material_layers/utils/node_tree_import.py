@@ -10,6 +10,10 @@ from typing import Any, Iterable, Optional, Union
 import bpy
 import mathutils
 
+from .node_tree import (clear_node_tree_sockets,
+                        get_node_tree_sockets,
+                        new_node_tree_socket)
+
 
 # Sentinel object for attributes that can't be found
 _NOT_FOUND = object()
@@ -30,6 +34,10 @@ _ID_PREFIX = "#NODE_IO_ID"
 
 # Ignore node properties with these default values
 _NODE_DEFAULTS = {"parent": None, "show_options": True}
+
+
+NodeSocketInterface = Union["bpy.types.NodeSocketInterface",
+                            "bpy.types.NodeTreeInterfaceSocket"]
 
 
 def _prop_to_py(value: Any) -> Any:
@@ -184,8 +192,7 @@ def _socket_values_from_dict(sockets, sockets_dict) -> None:
                 setattr(socket, prop_name, value)
 
 
-def _socket_interface_to_dict(socket: bpy.types.NodeSocketInterface
-                              ) -> dict[str, Any]:
+def _socket_interface_to_dict(socket: NodeSocketInterface) -> dict[str, Any]:
     props = ("name", "default_value", "description", "hide_value",
              "max_value", "min_value", "bl_socket_idname")
 
@@ -203,15 +210,16 @@ def _socket_interface_to_dict(socket: bpy.types.NodeSocketInterface
 def _socket_interface_from_dict(node_tree: bpy.types.NodeTree,
                                 socket_dict: dict[str, Any],
                                 is_output: bool
-                                ) -> Optional[bpy.types.NodeSocketInterface]:
+                                ) -> Optional[NodeSocketInterface]:
     try:
         name = socket_dict.pop("name")
         bl_socket_idname = socket_dict.pop("bl_socket_idname")
     except KeyError as e:
         raise ValueError(f"Invalid socket_dict: {e}") from e
 
-    socket_col = node_tree.outputs if is_output else node_tree.inputs
-    socket = socket_col.new(type=bl_socket_idname, name=name)
+    socket = new_node_tree_socket(node_tree, name,
+                                  'OUTPUT' if is_output else 'INPUT',
+                                  bl_socket_idname)
 
     for prop_name, value in socket_dict.items():
         try:
@@ -355,9 +363,11 @@ def tree_to_dict(node_tree: bpy.types.NodeTree) -> dict[str, Any]:
 
     links = [_link_to_dict(x) for x in node_tree.links]
 
-    group_inputs = [_socket_interface_to_dict(x) for x in node_tree.inputs]
+    group_inputs = [_socket_interface_to_dict(x)
+                    for x in get_node_tree_sockets(node_tree, 'INPUT')]
 
-    group_outputs = [_socket_interface_to_dict(x) for x in node_tree.outputs]
+    group_outputs = [_socket_interface_to_dict(x)
+                     for x in get_node_tree_sockets(node_tree, 'OUTPUT')]
 
     return {"name": node_tree.name,
             "bl_idname": node_tree.bl_idname,
@@ -383,8 +393,7 @@ def tree_from_dict(tree_dict: dict[str, Any],
         # Clear the output node tree
         node_tree = out
         node_tree.nodes.clear()
-        node_tree.inputs.clear()
-        node_tree.outputs.clear()
+        clear_node_tree_sockets(node_tree, 'BOTH')
 
     # Add the inputs and outputs to node_tree
     for socket_dict in tree_dict["inputs"]:

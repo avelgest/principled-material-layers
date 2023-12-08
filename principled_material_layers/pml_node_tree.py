@@ -10,6 +10,7 @@ from bpy.types import NodeSocket, ShaderNode
 from mathutils import Vector
 
 from . import utils
+from .utils.node_tree import get_node_tree_sockets
 
 
 class NodeNames:
@@ -232,9 +233,9 @@ class NodeTreeBuilder:
 
         # If there is a channel in layer_stack that has no socket in
         # the node tree then update the node tree sockets.
-        if [ch for ch in layer_stack.channels
-                if ch.name not in node_tree.outputs]:
+        outputs = {x.name for x in get_node_tree_sockets(node_tree, 'OUTPUT')}
 
+        if any(ch for ch in layer_stack.channels if ch.name not in outputs):
             self.node_manager.update_node_tree_sockets()
 
         self._add_standard_nodes()
