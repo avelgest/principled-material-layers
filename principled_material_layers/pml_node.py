@@ -16,7 +16,9 @@ from .on_load_manager import pml_trusted_callback
 from .utils.layer_stack_utils import (get_layer_stack_from_ma,
                                       get_layer_stack_by_id)
 from .utils.naming import unique_name_in
-from .utils.nodes import get_closest_node_of_type, get_output_node
+from .utils.nodes import (get_closest_node_of_type,
+                          get_output_node,
+                          get_socket_any)
 
 
 # Cache of node names to identifiers
@@ -225,7 +227,7 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
                     or not layer_stack_chs[output.name].enabled):
                 continue
 
-            to_input = node.inputs.get(output.name)
+            to_input = get_socket_any(node.inputs, output.name)
             if to_input is not None:
                 if replace or not to_input.is_linked:
                     links.new(to_input, output)
@@ -234,11 +236,7 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
         layer_stack = self.layer_stack
         node_tree = self.id_tree
 
-        out_socket = self.outputs.get(name)
-        if out_socket is None:
-            # Blender 4+ may only return enabled sockets via get
-            out_socket = next((x for x in self.outputs if x.name == name),
-                              None)
+        out_socket = get_socket_any(self.outputs, name)
         stack_ch = layer_stack.channels.get(name)
 
         if out_socket is not None and stack_ch is not None:
@@ -254,7 +252,8 @@ class ShaderNodePMLStack(ShaderNodeCustomGroup):
 
     def _find_socket_to_link_to(self, name: str) -> Optional[ShaderNode]:
         """Finds an input socket on the closest node that the layer
-        stack can"""
+        stack can link with.
+        """
         layer_stack = self.layer_stack
 
         sh_node = get_closest_node_of_type(self,

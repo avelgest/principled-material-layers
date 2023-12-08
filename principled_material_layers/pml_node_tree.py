@@ -945,7 +945,8 @@ class NodeTreeBuilder:
 
             if node is not None and group_soc is not None:
                 socket = node.outputs.get(socket_name)
-                self.links.new(group_soc, socket)
+                if socket is not None:
+                    self.links.new(group_soc, socket)
 
     def _check_can_rebuild(self) -> bool:
         """Returns False if it is not possible to rebuild the node tree

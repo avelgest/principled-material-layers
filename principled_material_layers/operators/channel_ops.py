@@ -280,7 +280,8 @@ def restore_old_links(node_tree) -> None:
         if node_name and socket_name:
             node = node_tree.nodes.get(node_name)
             if node is not None:
-                from_soc = node.outputs.get(socket_name)
+                from_soc = utils.nodes.get_socket_any(node.outputs,
+                                                      socket_name)
                 if from_soc is not None:
                     node_tree.links.new(socket, from_soc)
 

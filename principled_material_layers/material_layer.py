@@ -30,6 +30,7 @@ from .utils.naming import unique_name_in
 from .utils.nodes import (set_node_group_vector_defaults,
                           get_nodes_by_type,
                           group_output_link_default,
+                          get_socket_any,
                           )
 from .utils.node_tree import (get_node_tree_socket,
                               get_node_tree_sockets,
@@ -784,7 +785,7 @@ class MaterialLayer(PropertyGroup):
             if stack_ch is None or not stack_ch.enabled:
                 continue
 
-            shader_input = shader_node.inputs.get(output.name)
+            shader_input = get_socket_any(shader_node.inputs, output.name)
             if shader_input is not None:
                 links.new(shader_input, output)
             elif output.name in ma_out.inputs:

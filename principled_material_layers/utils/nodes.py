@@ -58,6 +58,19 @@ NodeSocketInterface = Union["bpy.types.NodeSocketInterface",
                             "bpy.types.NodeTreeInterfaceSocket"]
 
 
+def get_socket_any(sockets: Union[bpy.types.NodeInputs,
+                                  bpy.types.NodeOutputs],
+                   name: str) -> Optional[NodeSocket]:
+    """Like NodeInputs/NodeOutputs.get , but will return sockets
+    even when disabled.
+    """
+    socket = sockets.get(name)
+    # Blender 4+ may only return enabled sockets via get
+    if socket is None:
+        return next((x for x in sockets if x.name == name), None)
+    return socket
+
+
 def _get_node_simplicity(node: ShaderNode,
                          threshold: int,
                          ignore: Optional[typing.Set[ShaderNode]] = None,
