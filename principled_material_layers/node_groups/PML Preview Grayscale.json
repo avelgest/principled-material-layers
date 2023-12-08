@@ -26,7 +26,7 @@
     "links": [
         {
             "from_node": "Group Input",
-            "from_socket": "Input_0",
+            "from_socket": 0,
             "to_node": "RGB to BW",
             "to_socket": "Color"
         },
@@ -34,7 +34,7 @@
             "from_node": "RGB to BW",
             "from_socket": "Val",
             "to_node": "Group Output",
-            "to_socket": "Output_1"
+            "to_socket": 0
         }
     ],
     "inputs": [

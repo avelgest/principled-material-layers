@@ -159,7 +159,7 @@
         "from_node": "Vector Math",
         "from_socket": "Vector",
         "to_node": "Group Output",
-        "to_socket": "Output_1"
+        "to_socket": 0
     }, {
         "from_node": "Combine XYZ",
         "from_socket": "Vector",
@@ -182,17 +182,17 @@
         "to_socket": "Vector_001"
     }, {
         "from_node": "Group Input",
-        "from_socket": "Input_0",
+        "from_socket": 0,
         "to_node": "Vector Math.002",
         "to_socket": "Vector"
     }, {
         "from_node": "Group Input",
-        "from_socket": "Input_0",
+        "from_socket": 0,
         "to_node": "Vector Math.003",
         "to_socket": "Vector"
     }, {
         "from_node": "Group Input",
-        "from_socket": "Input_0",
+        "from_socket": 0,
         "to_node": "Vector Math.004",
         "to_socket": "Vector"
     }],
