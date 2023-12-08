@@ -1,7 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-from bpy.types import NodeGroupOutput
-
 from .. import bake_group
 from .. import blending
 from .. import hardness
@@ -328,12 +326,12 @@ class active_layer_channels_PT_base:
         if node_tree is None or active_channel is None:
             return
 
-        output_node = next((x for x in node_tree.nodes
-                           if isinstance(x, NodeGroupOutput)), None)
-        socket = output_node.inputs.get(active_channel.name)
-
-        if output_node is not None and socket is not None:
-            layout.template_node_view(node_tree, output_node, socket)
+        output_node = utils.nodes.get_node_by_type(node_tree,
+                                                   "NodeGroupOutput")
+        if output_node is not None:
+            socket = output_node.inputs.get(active_channel.name)
+            if socket is not None:
+                layout.template_node_view(node_tree, output_node, socket)
 
     @classmethod
     def draw_custom_blending_props(cls, layout, ch) -> None:
