@@ -19,6 +19,7 @@ from ..utils.image import copy_image
 from ..utils.layer_stack_utils import get_layer_stack, get_layer_stack_by_id
 from ..utils.naming import suffix_num_unique_in
 from ..utils.nodes import get_nodes_by_type
+from ..utils.node_tree import new_node_tree_socket
 from ..utils.ops import ensure_global_undo, pml_op_poll, save_all_modified
 
 from . import channel_ops
@@ -310,7 +311,8 @@ class PML_OT_new_node_mask(Operator):
 
         node_group = bpy.data.node_groups.new(type="ShaderNodeTree", name=name)
 
-        output = node_group.outputs.new("NodeSocketFloatFactor", "Fac")
+        output = new_node_tree_socket(node_group, "Fac", 'OUTPUT',
+                                      "NodeSocketFloat")
         output.min_value = 0.0
         output.max_value = 1.0
         output.default_value = 1.0

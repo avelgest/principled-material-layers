@@ -15,6 +15,7 @@ from ..material_layer import NODE_MASK_PREVIEW_STR
 from ..pml_node import get_pml_nodes
 from ..utils.layer_stack_utils import get_layer_stack
 from ..utils.ops import pml_op_poll
+from ..utils.node_tree import get_node_tree_sockets
 
 # The name of the Group node used for previewing layer channels
 PREVIEW_GROUP_NODE_NAME = "pml_preview_group_node"
@@ -516,7 +517,7 @@ class PML_OT_preview_channel(Operator):
         if layer.node_mask is None:
             self.report({'WARNING'}, f"{self.layer_name} has no node mask")
             return {'CANCELLED'}
-        if not layer.node_mask.outputs:
+        if not get_node_tree_sockets(layer.node_mask, 'OUTPUT'):
             self.report({'WARNING'}, "Node mask has no outputs")
             return {'CANCELLED'}
 

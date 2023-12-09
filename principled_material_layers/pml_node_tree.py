@@ -873,7 +873,7 @@ class NodeTreeBuilder:
 
         names = NodeNames
 
-        if not layer.node_mask.outputs:
+        if not get_node_tree_sockets(layer.node_mask, 'OUTPUT'):
             warnings.warn(f"{layer.name}'s node_mask must have at least one "
                           "output.")
             return
