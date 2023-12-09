@@ -1,6 +1,6 @@
 # Principled Material Layers
-Principled Material Layers is a Blender add-on (for Blender 3.0+) that aims to 
-provide a convenient way to layer and paint any materials that 
+Principled Material Layers is a Blender add-on that aims to
+provide a convenient way to layer and paint any materials that
 use the Principled BSDF node as their surface shader.
 
 The add-on works by adding a *Material Layers* node to the Shader Editor to
@@ -10,22 +10,20 @@ materials based on each layer’s painted alpha. Each enabled channel has a
 corresponding output socket on the node, which often matches an input socket on
 a Principled BSDF node, although any channel may be added.
 
-**This add-on is currently in beta.**
-
 ![Suzanne painted with three materials](
 https://user-images.githubusercontent.com/111190478/184520872-12deb2ec-1857-4e57-a20c-892b7e21e050.jpg)
 *The Material Layers node with five enabled channels. Rust and rock materials*
 *from Poly Haven.*
 
 ## Installation
-Download the latest principled_material_layers ZIP file from the releases 
-section, then from the Add-ons section of Blender’s preferences click 
-*Install...* and select the downloaded .zip file. Enable the add-on labelled 
+Download the latest principled_material_layers ZIP file from the releases
+section, then from the Add-ons section of Blender’s preferences click
+*Install...* and select the downloaded .zip file. Enable the add-on labelled
 *“Material: Principled Material Layers”*.
 
 ## Features
 - Use existing materials in the same blend file or directly from an asset
-library (experimental) as layers.
+library as layers.
 - Freely edit or replace the materials in the layer stack at any time.
 - Only requires adding a single node to a material’s node tree.
 - Supports using any input socket from the Principled BSDF node as a channel,
@@ -34,7 +32,8 @@ and allows adding additional channels.
 - Individually set the blend mode of each of a layer’s channels or disable the
 channel entirely.
 - Use node groups to mask layers or as custom blend modes.
-- UDIM support (some features not available for UDIMs).
+- Quickly switch between viewing the material and viewing individual channels.
+- UDIM support (some features are not available for UDIMs).
 
 ## Usage
 See also the
@@ -63,20 +62,31 @@ button, select a material then press *OK*. The layer will now contain a
 copy of the material (note that the layer will not be affected by any subsequent
 changes made to the original material).
 
-A material asset can be loaded either by using the method above (for small
-asset libraries) or by selecting an asset in an Asset Browser area and pressing
-*Replace Layer Material* in the right-hand sidebar of the Asset Browser.
+A material asset can be added as a layer by right clicking an asset in an
+*Asset Browser* area and selecting *Import as New Layer* or *Replace Layer Material*
+from the context menu. These options are also available in the right-hand sidebar
+of the Asset Browser.
 
 A layer’s channels may be added/removed or enabled/disabled in the *Active Layer*
 panel. When a channel is disabled/removed from a layer then that layer
 no longer contributes to the final value of the channel.
 
+### Layer Types
+- **Material Paint** - The default. Can be used to paint a material onto the
+object in *Texture Paint* mode as above.
+- **Material Fill** - Fills the entire object with a single material. A
+[*Node Mask*](../../wiki/Node-Masks) can be used to control the alpha of the
+layer.
+- **Custom Alpha** - The alpha of the layer is controled by an output in the
+layer's node tree.
+- **Channel Paint** - Paint directly on a single channel in *Texture Paint*
+mode (e.g. directly paint color onto the *Base Color* channel).
+
 ## Limitations
 - Some features are not supported for UDIMs.
-- Loading materials from an asset library outside of the asset browser area is
- considered experimental.
+-
 - Beta version. There may be bugs.
- 
+
  https://user-images.githubusercontent.com/111190478/184711235-25bf5c51-ef9a-4372-a519-1eb4960c685a.mp4
 
 ## License
