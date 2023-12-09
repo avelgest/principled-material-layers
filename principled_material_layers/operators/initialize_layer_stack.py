@@ -16,6 +16,7 @@ from bpy.props import (BoolProperty,
 
 from .material_ops import replace_layer_material
 
+from .. import utils
 from ..channel import BasicChannel, is_socket_supported
 from ..pml_node import get_pml_nodes_from
 
@@ -266,6 +267,8 @@ class PML_OT_initialize_layer_stack(Operator):
         # not supported
         if self.tiled and not can_pack_udims():
             bpy.ops.material.pml_select_udim_dir('INVOKE_DEFAULT')
+
+        utils.ops.ensure_global_undo()
 
         return {'FINISHED'}
 

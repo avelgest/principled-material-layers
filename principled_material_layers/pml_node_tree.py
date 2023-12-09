@@ -959,6 +959,8 @@ class NodeTreeBuilder:
             test_node = self.node_tree.nodes.new('ShaderNodeMath')
             is_temp = True
 
+        assert hasattr(test_node, "name")
+
         try:
             test_node.name = test_node.name
         except (AttributeError, RuntimeError):
