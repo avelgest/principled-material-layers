@@ -233,7 +233,10 @@ def save_image_copy(image: Image, filepath: str,
                         TempChanges(image_settings.linear_colorspace_settings))
 
         if "OPEN_EXR" in image_format:
-            cs_settings.name = "Linear"
+            if bpy.app.version > (4,):
+                cs_settings.name = "Linear Rec.709"
+            else:
+                cs_settings.name = "Linear"
         else:
             cs_settings.name = image.colorspace_settings.name
 
