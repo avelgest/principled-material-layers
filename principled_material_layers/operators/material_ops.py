@@ -3,8 +3,8 @@
 import warnings
 
 from contextlib import ExitStack
-from typing import (Any, Container, Dict, List, NamedTuple, Optional, Tuple,
-                    Union)
+from typing import (Any, Callable, Container, Dict, List, NamedTuple,
+                    Optional, Tuple, Union)
 
 import bpy
 
@@ -264,6 +264,33 @@ class _ReplaceMaterialHelper:
             socket_values.append(soc_value)
         return socket_values
 
+    def _modified_filter_factory(self,
+                                 socket_values: List[_SocketInputValue]
+                                 ) -> Callable[[_SocketInputValue], bool]:
+        """Create a filter function to determine if a socket marked as
+        modified should actually be imported. The filter function takes
+        a _SocketInputValue and returns False if the socket should be
+        ignored.
+        """
+        soc_val_dict = {x.name: x for x in socket_values}
+
+        def modified_filter(soc_value) -> bool:
+            """Filter for special cases. Returns False if the socket
+            should not be included.
+            """
+            # Ignore emission color/strength if color is fully black
+            # or the strength is 0
+            if soc_value.name in ("Emission Color", "Emission Strength"):
+                emit_color = getattr(soc_val_dict.get("Emission Color"),
+                                     "default_value", (0, 0, 0, 1))
+                emit_str = getattr(soc_val_dict.get("Emission Strength"),
+                                   "default_value", 0.0)
+                if not emit_str or not any(emit_color[:3]):
+                    return False
+            return True
+
+        return modified_filter
+
     def select_socket_values(self,
                              socket_values: List[_SocketInputValue],
                              modified: bool,
@@ -272,8 +299,11 @@ class _ReplaceMaterialHelper:
         enabled_channels = {ch.name for ch in self.layer_stack.channels
                             if ch.enabled}
 
+        if modified:
+            modified_filter = self._modified_filter_factory(socket_values)
+
         return [x for x in socket_values
-                if (modified and x.is_modified)
+                if (modified and x.is_modified and modified_filter(x))
                 or (enabled and x.name in enabled_channels)]
 
     def setup_layer_node_tree(self, node_tree: ShaderNodeTree) -> None:
