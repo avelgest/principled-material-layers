@@ -214,6 +214,10 @@ def check_material_asset_compat(asset: asset_helper.AssetInfo,
             else:
                 ma = asset.link_material(delayed=False)
 
+        except OSError as e:
+            is_compat = IsMaterialCompat(f"Error: {e}")
+            _set_cached_asset_compat(asset, layer_stack, is_compat)
+
         except Exception as e:
             is_compat = IsMaterialCompat(f"Error: {e}")
             _set_cached_asset_compat(asset, layer_stack, is_compat)
