@@ -142,10 +142,10 @@ def draw_ch_preview_btn(layout, layer_stack, *, layer, channel) -> None:
 
     # Show the clear operator if given channel is currently previewed
     if layer_stack.is_channel_previewed(channel, ignore_layer=ignore_layer):
-        # Use SHADING_SOLID icon if the previewed channel is on a layer
-        # rather than on the layer stack itself
-        icon = ("SHADING_SOLID" if layer_stack.layer_channel_previewed
-                else "SHADING_TEXTURE")
+        # Use SHADING_WIRE icon if the previewed channel is on a layer
+        # and SHADING_SOLID if it is on the layer stack itself
+        icon = ("SHADING_WIRE" if layer_stack.layer_channel_previewed
+                else "SHADING_SOLID")
         layout.operator("node.pml_clear_preview_channel", text="",
                         emboss=True, depress=True, icon=icon)
     else:
