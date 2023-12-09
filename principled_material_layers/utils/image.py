@@ -217,7 +217,8 @@ def save_image_copy(image: Image, filepath: str,
         image_settings.color_mode = color_mode
         image_settings.compression = 15
         image_settings.use_preview = False
-        image_settings.use_zbuffer = False
+        if hasattr(image_settings, "use_zbuffer"):
+            image_settings.use_zbuffer = False
 
         if settings:
             for k, v in settings:
