@@ -24,11 +24,11 @@ from bpy.types import (Material,
 
 from bpy_extras.asset_utils import SpaceAssetInfo
 
+from .. import asset_helper
 from .. import tiled_storage
 
 from ..preferences import get_addon_preferences
 
-from ..asset_helper import append_material_asset
 from ..channel import BasicChannel
 
 from ..utils.duplicate_node_tree import duplicate_node_tree
@@ -880,8 +880,7 @@ class ReplaceLayerMaOpAssetBrowser(ReplaceLayerMaOpBase):
         if not SpaceAssetInfo.is_asset_browser(context.space_data):
             return False
 
-        active_file = context.active_file
-        if active_file is None or active_file.id_type != 'MATERIAL':
+        if not asset_helper.material_asset_active(context):
             return False
 
         layer_stack = get_layer_stack(context)
@@ -942,7 +941,7 @@ class ReplaceLayerMaOpAssetBrowser(ReplaceLayerMaOpBase):
         if context.active_file is None:
             return None
 
-        local_id = context.active_file.local_id
+        local_id = asset_helper.asset_local_id(context)
         if local_id is not None:
             ma = local_id
         else:
@@ -959,8 +958,7 @@ class ReplaceLayerMaOpAssetBrowser(ReplaceLayerMaOpBase):
             raise RuntimeError("self.exit_stack is None.")
 
         try:
-            ma = append_material_asset(context.active_file,
-                                       context.asset_library_ref)
+            ma = asset_helper.append_active_material_asset(context)
         except NotImplementedError:
             self.report({'ERROR'}, "Replacing the layer material with an "
                                    "asset is not supported for this version.")

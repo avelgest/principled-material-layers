@@ -7,19 +7,15 @@ import itertools as it
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Callable, DefaultDict, Dict, Optional, Union
+from typing import Callable, DefaultDict, Dict, Optional
 
 import bpy
 
-from bpy.types import (AssetHandle,
-                       AssetLibraryReference,
-                       FileSelectEntry,
-                       Material)
+from bpy.types import Material
 
 from .. import asset_helper
 
 from .layer_stack_utils import get_layer_stack_by_id
-from ..asset_helper import file_entry_from_handle
 from ..utils.nodes import get_output_node
 
 _LayerStackID = str
@@ -31,7 +27,7 @@ _asset_compat_caches: DefaultDict[_LayerStackID,
                                   _CompatCache] = defaultdict(dict)
 
 
-def _asset_cache_key(asset: FileSelectEntry) -> _AssetStrKey:
+def _asset_cache_key(asset: asset_helper.AssetInfo) -> _AssetStrKey:
     if asset.local_id is not None:
         return asset.local_id.name_full
     return asset.relative_path
@@ -166,16 +162,14 @@ def check_material_compat(ma: Material,
 MaterialAppender = Callable[[], Material]
 
 
-def check_material_asset_compat(asset: Union[AssetHandle, FileSelectEntry],
-                                library: AssetLibraryReference,
+def check_material_asset_compat(asset: asset_helper.AssetInfo,
                                 layer_stack,
                                 delayed: bool = False,
                                 ma_appender: Optional[MaterialAppender] = None
                                 ) -> IsMaterialCompat:
     """Checks whether a material asset is compatible with layer_stack.
     Params:
-        asset: A FileSelectEntry from the asset browser etc.
-        library: An AssetLibraryReference for the library containing asset.
+        asset: A asset_helper.AssetInfo instance.
         layer_stack: The LayerStack to check compatibility with.
         delayed: If True use bpy.app.timers to delay importing the asset.
             For use in situations where the BlendData cannot be changed
@@ -197,17 +191,13 @@ def check_material_asset_compat(asset: Union[AssetHandle, FileSelectEntry],
     if not layer_stack.is_initialized:
         raise ValueError("layer_stack has not been initialized")
 
-    # Support both FileSelectEntry and AssetHandle for asset param
-    if isinstance(asset, AssetHandle):
-        asset = file_entry_from_handle(asset)
-
     # Don't cache local materials
     if asset.local_id is not None:
         return check_material_compat(asset.local_id, layer_stack)
 
     # If delayed then schedule the check and return a
     if delayed:
-        return _delayed_check_ma_asset_compat(asset, library, layer_stack)
+        return _delayed_check_ma_asset_compat(asset, layer_stack)
 
     # Check the cache, if cached.in_progress is True the the material
     # should be appended and checked now.
@@ -222,7 +212,7 @@ def check_material_asset_compat(asset: Union[AssetHandle, FileSelectEntry],
                 if not isinstance(ma, Material):
                     raise RuntimeError("ma_appender did not return a Material")
             else:
-                ma = asset_helper.link_material_asset(asset, library)
+                ma = asset.link_material(delayed=False)
 
         except Exception as e:
             is_compat = IsMaterialCompat(f"Error: {e}")
@@ -238,9 +228,9 @@ def check_material_asset_compat(asset: Union[AssetHandle, FileSelectEntry],
 
 
 class _FakeAsset:
-    """Contains enough of FileSelectEntry's attributes to be used as
+    """Contains enough of AssetInfo's attributes to be used as
     an argument to check_material_asset_compat. Intended to replace
-    the FileSelectEntry instance when using delayed checking to prevent
+    the AssetInfo instance when using delayed checking to prevent
     errors/crashes due to reallocation.
     """
     def __init__(self, asset):
@@ -248,8 +238,7 @@ class _FakeAsset:
         self.local_id = None
 
 
-def _delayed_check_ma_asset_compat(asset: FileSelectEntry,
-                                   library: AssetLibraryReference,
+def _delayed_check_ma_asset_compat(asset: asset_helper.AssetInfo,
                                    layer_stack) -> IsMaterialCompat:
     """A delayed material compatibility check. If a cached value
     already exists then it is returned. Otherwise this schedules the
@@ -261,12 +250,12 @@ def _delayed_check_ma_asset_compat(asset: FileSelectEntry,
         return cached
 
     # Use only pure Python classes to prevent crashes
-    ma_appender = asset_helper.delayed_link_material_asset(asset, library)
+    ma_appender = asset.link_material(delayed=True)
     fake_asset = _FakeAsset(asset)
     layer_stack_id = layer_stack.identifier
 
     def delayed_check():
-        check_material_asset_compat(fake_asset, None, layer_stack_id,
+        check_material_asset_compat(fake_asset, layer_stack_id,
                                     delayed=False, ma_appender=ma_appender)
     bpy.app.timers.register(delayed_check)
 

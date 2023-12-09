@@ -1,12 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-from typing import Optional
-
 import bpy
 
-from bpy.types import FileSelectEntry
-
 from bpy_extras.asset_utils import SpaceAssetInfo
+
+from .. import asset_helper
 
 from ..preferences import get_addon_preferences
 
@@ -25,9 +23,7 @@ class PML_PT_asset_browser_panel(bpy.types.Panel):
         if not SpaceAssetInfo.is_asset_browser(context.space_data):
             return False
 
-        active_file = context.active_file
-
-        if active_file is None or active_file.id_type != 'MATERIAL':
+        if not asset_helper.material_asset_active(context):
             return False
 
         layer_stack = get_layer_stack(context)
@@ -61,29 +57,18 @@ class PML_PT_asset_browser_panel(bpy.types.Panel):
 
     def check_compat(self, context, layer_stack) -> IsMaterialCompat:
         """Checks the compatibility of the active asset."""
-        asset_file = self.get_active_ma_asset(context)
 
-        if asset_file is None:
-            return IsMaterialCompat("No active asset")
+        if not asset_helper.material_asset_active(context):
+            return IsMaterialCompat("No active material asset")
 
-        return check_material_asset_compat(asset_file,
-                                           context.asset_library_ref,
-                                           layer_stack,
-                                           delayed=True)
+        asset = asset_helper.AssetInfo.from_active(context)
 
-    def get_active_ma_asset(self, context) -> Optional[FileSelectEntry]:
-        active_file = context.active_file
-
-        if active_file is None or active_file.id_type != 'MATERIAL':
-            return None
-
-        return active_file
+        return check_material_asset_compat(asset, layer_stack, delayed=True)
 
 
 def asset_context_menu_func(self, context):
     if (not get_layer_stack(context)
-            or not getattr(context, "active_file", None)
-            or context.active_file.id_type != 'MATERIAL'):
+            or not asset_helper.material_asset_active(context)):
         return
 
     layout = self.layout

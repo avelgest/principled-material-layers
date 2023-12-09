@@ -1,7 +1,11 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
+from __future__ import annotations
+
+import functools
 import os
 import typing
+import warnings
 
 from dataclasses import dataclass
 from typing import Optional, Union
@@ -14,11 +18,119 @@ from bpy.types import (AssetHandle,
                        Material)
 
 
-def file_entry_from_handle(asset: AssetHandle) -> FileSelectEntry:
-    """Returns a FileSelectEntry from an asset. Defined as a function
-    in case AssetHandle.file_data is changed/removed.
+class AssetInfo(typing.NamedTuple):
+    """NamedTuple class that should be used instead of raw FileSelectEntry,
+    AssetRepresentation, etc to ensure compatibility across Blender versions.
     """
-    return asset.file_data
+    file_entry: FileSelectEntry
+    asset_rep: Optional["AssetRepresentation"]
+    library: AssetLibraryReference
+
+    @classmethod
+    def from_active(cls, context) -> Optional[AssetInfo]:
+        """Returns an AssetInfo instance from the active asset of
+        context. Returns None if no active asset can be found.
+        """
+        if context.active_file is None:
+            return None
+        if hasattr(context, "asset") and context.asset is None:
+            return None
+
+        return cls(context.active_file,
+                   getattr(context, "asset", None),
+                   asset_library_ref(context))
+
+    def import_material(self,
+                        link: bool = False,
+                        delayed: bool = False
+                        ) -> Union[Material, DelayedMaterialImport]:
+        """Imports this asset as a Material. Raises a TypeError if this
+        asset is not a material.
+        """
+        if self.id_type != 'MATERIAL':
+            raise TypeError("Not a material asset")
+        return import_material_asset(self, link=link, delayed=delayed)
+
+    append_material = functools.partialmethod(import_material, link=False)
+    link_material = functools.partialmethod(import_material, link=True)
+
+    @property
+    def local_id(self) -> Optional[bpy.types.ID]:
+        """The local id of the active asset or None."""
+        if self.asset_rep is not None:
+            # Blender 4.0+
+            return self.asset_rep.local_id
+        if hasattr(self.file_entry, "local_id"):
+            return self.file_entry.local_id
+
+        warnings.warn("Cannot find local_id prop for asset "
+                      f"{self.file_entry.name}")
+        return None
+
+    @property
+    def full_library_path(self) -> str:
+        """The absolute path to this asset's blend file."""
+        return full_library_path(self.file_entry,
+                                 self.asset_rep,
+                                 self.library)
+
+    @property
+    def id_type(self) -> str:
+        """The type of the asset data-block."""
+        if self.asset_rep is not None:
+            return self.asset_rep.id_type
+
+        return self.file_entry.id_type
+
+    @property
+    def relative_path(self) -> str:
+        return self.file_entry.relative_path
+
+
+def full_library_path(asset: Union["bpy.types.AssetHandle",
+                                   "bpy.types.FileSelectEntry"],
+                      asset_rep: Optional["AssertionError"],
+                      library: AssetLibraryReference) -> str:
+    if asset_rep is not None:
+        return asset_rep.full_library_path
+    if isinstance(asset, bpy.types.AssetHandle):
+        return full_library_path(asset.file_data, asset_rep, library)
+
+    file_entry = asset
+    return AssetHandle.get_full_library_path(file_entry,
+                                             asset_library_ref=library)
+
+
+def asset_local_id(context) -> Optional[bpy.types.ID]:
+    """Returns the local id of the active asset or None."""
+    if hasattr(context, "asset"):
+        # Blender 4.0+
+        take_from = context.asset
+    elif hasattr(context, "active_file"):
+        take_from = context.active_file
+    else:
+        return None
+    return take_from.local_id if take_from is not None else None
+
+
+def asset_library_ref(context) -> Optional[AssetLibraryReference]:
+    if hasattr(context, "asset_library_reference"):
+        # Blender 4.0+
+        return context.asset_library_reference
+    return context.asset_library_ref
+
+
+def material_asset_active(context) -> bool:
+    """Returns True if a material asset is active in the asset browser."""
+    if hasattr(context, "asset"):
+        # Blender 4.0+
+        return (context.asset is not None
+                and context.asset.id_type == 'MATERIAL')
+
+    elif hasattr(context, "active_file"):
+        return (context.active_file is not None
+                and context.active_file.id_type == 'MATERIAL')
+    return False
 
 
 @dataclass
@@ -45,55 +157,39 @@ class DelayedMaterialImport:
                                            self.link)
 
 
-def append_material_asset(asset: Union[AssetHandle, FileSelectEntry],
-                          library: AssetLibraryReference) -> Material:
-    """Append a material asset to the blend file."""
-    return import_material_asset(asset, library, False)
+def import_active_material_asset(context,
+                                 link: bool = False,
+                                 delayed: bool = False
+                                 ) -> Union[Material, DelayedMaterialImport]:
+    asset_info = AssetInfo.from_active(context)
+    if asset_info is None:
+        raise ValueError("Cannot find active asset from context")
+    return import_material_asset(asset_info, link=link, delayed=delayed)
 
 
-def link_material_asset(asset: Union[AssetHandle, FileSelectEntry],
-                        library: AssetLibraryReference) -> Material:
-    """Link a material asset to the blend file."""
-    return import_material_asset(asset, library, True)
+append_active_material_asset = functools.partial(import_active_material_asset,
+                                                 link=False)
+link_active_material_asset = functools.partial(import_active_material_asset,
+                                               link=True)
 
 
-def delayed_append_material_asset(asset: Union[AssetHandle, FileSelectEntry],
-                                  library: AssetLibraryReference
-                                  ) -> DelayedMaterialImport:
-    """Returns a DelayedMaterialImport, the import_material method can
-    be used to append the material to the blend file.
-    """
-    return import_material_asset(asset, library, link=False, delayed=True)
-
-
-def delayed_link_material_asset(asset: Union[AssetHandle, FileSelectEntry],
-                                library: AssetLibraryReference
-                                ) -> DelayedMaterialImport:
-    """Returns a DelayedMaterialImport, the import_material method can
-    be used to link the material to the blend file.
-    """
-    return import_material_asset(asset, library, link=True, delayed=True)
-
-
-def import_material_asset(asset: Union[AssetHandle, FileSelectEntry],
-                          library: AssetLibraryReference,
+def import_material_asset(asset: AssetInfo,
                           link: bool,
-                          delayed: bool = False) -> Material:
-    if isinstance(asset, FileSelectEntry):
-        file_data = asset
-    elif not hasattr(asset, "file_data"):
-        raise NotImplementedError("No 'file_data' attribute on asset")
-    else:
-        file_data = file_entry_from_handle(asset)
+                          delayed: bool = False
+                          ) -> Union[Material, DelayedMaterialImport]:
 
     # Path to the blend file containing the asset
-    library_path = AssetHandle.get_full_library_path(file_data,
-                                                     asset_library_ref=library)
+    library_path = asset.full_library_path
+    file_data = asset.file_entry
 
     if delayed:
         return DelayedMaterialImport(file_data.name, library_path, link)
 
     return _import_material_asset_path(file_data.name, library_path, link)
+
+
+link_material_asset = functools.partial(import_material_asset, link=True)
+append_material_asset = functools.partial(import_material_asset, link=False)
 
 
 def _import_material_asset_path(name: str,
