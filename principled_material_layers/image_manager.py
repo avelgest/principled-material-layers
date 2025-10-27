@@ -68,6 +68,11 @@ class SplitChannelImageProp(SplitChannelImageRGB, PropertyGroup):
         default=""
     )
 
+    def __init__(self, *args, **kwargs):
+        # Needed to prevent SplitChannelImageRGB.__init__ from being
+        # called in Blender 4.5
+        PropertyGroup.__init__(self, *args, **kwargs)
+
     def __eq__(self, other):
         if isinstance(other, SplitChannelImageRGB):
             return self.identifier == other.identifier

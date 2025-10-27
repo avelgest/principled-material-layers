@@ -45,10 +45,11 @@ class SplitChannelImageRGB:
     # Channel indices to attribute names
     _channel_names = {0: "r", 1: "g", 2: "b"}
 
-    def __init__(self, image):
-        # Use image name to get image from bpy.data.images
-        # N.B. Prevents crashes but breaks if image is renamed
-        self._image_name = image.name
+    def __init__(self, image=None):
+        if image is not None:
+            # Use image name to get image from bpy.data.images
+            # N.B. Prevents crashes but breaks if image is renamed
+            self._image_name = image.name
 
         self.r = self.unallocated_value
         self.g = self.unallocated_value
