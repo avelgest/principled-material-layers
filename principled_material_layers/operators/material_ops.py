@@ -748,7 +748,8 @@ class ReplaceLayerMaOpBase:
         default=False
     )
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         # Used during execute for deleting temporarily appended materials
         self.exit_stack: Optional[ExitStack] = None
 

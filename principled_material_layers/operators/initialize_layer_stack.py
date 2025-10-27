@@ -155,7 +155,8 @@ class PML_OT_initialize_layer_stack(Operator):
             return False
         return True
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._shader_node = None
         self._output_node = None
         self._node_tree = None
@@ -465,8 +466,8 @@ class PML_OT_apply_layer_stack(Operator):
             return False
         return True
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.layer_stack = None
 
     def execute(self, context):

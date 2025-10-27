@@ -372,7 +372,8 @@ class PML_OT_preview_channel(Operator):
         if modifier_node.outputs:
             node_tree.links.new(to_socket, modifier_node.outputs[0])
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.layer_stack = None
         self.node_tree = None
         self.ma_output = None
