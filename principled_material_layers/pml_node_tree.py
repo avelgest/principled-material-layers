@@ -425,8 +425,9 @@ class NodeTreeBuilder:
 
             links.new(image_node.inputs[0], uv_map.outputs[0])
 
-            split_rgb_node = nodes.new("ShaderNodeSeparateRGB")
+            split_rgb_node = nodes.new("ShaderNodeSeparateColor")
             split_rgb_node.name = NodeNames.paint_image_rgb(image)
+            split_rgb_node.mode = "RGB"            
             split_rgb_node.label = f"{image.name} RGB"
             split_rgb_node.location = (idx * 500 + 200, 600)
 
@@ -469,12 +470,13 @@ class NodeTreeBuilder:
 
         return f_curve
 
-    def _add_split_rgb_to(self, node) -> bpy.types.ShaderNodeSeparateRGB:
+    def _add_split_rgb_to(self, node) -> bpy.types.ShaderNodeSeparateColor:
         """Adds a Separate RGB node next to node and connects its
         input to node's first output. Returns the added node.
         """
-        split_rgb_node = self.nodes.new("ShaderNodeSeparateRGB")
+        split_rgb_node = self.nodes.new("ShaderNodeSeparateColor")
         split_rgb_node.label = f"{node.label or node.name} RGB"
+        split_rgb_node.mode = "RGB"
         split_rgb_node.location = node.location
         split_rgb_node.location.x += (node.width + 40)
 
@@ -516,8 +518,9 @@ class NodeTreeBuilder:
 
         links.new(active_layer_node.inputs[0], uv_map.outputs[0])
 
-        active_layer_rgb = nodes.new("ShaderNodeSeparateRGB")
+        active_layer_rgb = nodes.new("ShaderNodeSeparateColor")
         active_layer_rgb.name = NodeNames.active_layer_image_rgb()
+        active_layer_rgb.mode = "RGB"
         active_layer_rgb.label = "Active Layer RGB"
         active_layer_rgb.location = (-200, 50)
 

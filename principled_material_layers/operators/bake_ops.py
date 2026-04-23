@@ -12,7 +12,7 @@ from bpy.props import (BoolProperty,
 
 from bpy.types import (NodeSocket,
                        Operator,
-                       ShaderNodeSeparateRGB,
+                       ShaderNodeSeparateColor,
                        ShaderNodeTexImage,
                        ShaderNodeTree,
                        )
@@ -121,8 +121,9 @@ class BakeNodeOpBase:
         self,
         node_tree: ShaderNodeTree,
         socket: NodeSocket,
-        image: SplitChannelImageRGB) -> Tuple[ShaderNodeTexImage,
-                                              Optional[ShaderNodeSeparateRGB]]:
+        image: SplitChannelImageRGB) -> Tuple[
+            ShaderNodeTexImage,
+            Optional[ShaderNodeSeparateColor]]:
         """Creates node(s) for a socket baked to 'image'"""
 
         socket_idx = socket.node.outputs.find(socket.name)
@@ -138,7 +139,8 @@ class BakeNodeOpBase:
         rgb_node = None
 
         if image.is_shared:
-            rgb_node = node_tree.nodes.new("ShaderNodeSeparateRGB")
+            rgb_node = node_tree.nodes.new("ShaderNodeSeparateColor")
+            rgb_node.location = "RGB"
             rgb_node.location = img_node.location + Vector((200, 0))
             rgb_node.width = 100
             rgb_node.hide = True

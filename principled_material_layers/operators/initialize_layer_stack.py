@@ -542,8 +542,9 @@ class PML_OT_apply_layer_stack(Operator):
 
             # Add a Split RGB node if image is shared between channels
             if is_shared_bake:
-                split_rgb = nodes.new('ShaderNodeSeparateRGB')
+                split_rgb = nodes.new('ShaderNodeSeparateColor')
                 split_rgb.name = f"{img_node.name}.rgb"
+                split_rgb.mode = "RGB"
                 split_rgb.location = img_node.location
                 split_rgb.location.x += img_node.width + 40
                 split_rgb_nodes[ch.bake_image.name] = split_rgb

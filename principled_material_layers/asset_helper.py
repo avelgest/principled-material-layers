@@ -12,10 +12,16 @@ from typing import Optional, Union
 
 import bpy
 
-from bpy.types import (AssetHandle,
-                       AssetLibraryReference,
+from bpy.types import (AssetLibraryReference,
                        FileSelectEntry,
                        Material)
+try:
+    from bpy.types import AssetHandle
+except ImportError:
+    # Blender >= 5.0
+    from bpy.types import AssetRepresentation as AssetHandle
+asset_handle_name = str(AssetHandle).replace("<class '", "").replace("'>", "")
+
 
 
 class AssetInfo(typing.NamedTuple):
@@ -87,13 +93,13 @@ class AssetInfo(typing.NamedTuple):
         return self.file_entry.relative_path
 
 
-def full_library_path(asset: Union["bpy.types.AssetHandle",
+def full_library_path(asset: Union[asset_handle_name,
                                    "bpy.types.FileSelectEntry"],
                       asset_rep: Optional["AssertionError"],
                       library: AssetLibraryReference) -> str:
     if asset_rep is not None:
         return asset_rep.full_library_path
-    if isinstance(asset, bpy.types.AssetHandle):
+    if isinstance(asset, AssetHandle):
         return full_library_path(asset.file_data, asset_rep, library)
 
     file_entry = asset

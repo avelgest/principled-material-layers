@@ -178,12 +178,14 @@ class SocketBaker:
 
         emit_node = temp_nodes.new("ShaderNodeEmission")
 
-        emit_node_rgb = temp_nodes.new("ShaderNodeCombineRGB")
+        emit_node_rgb = temp_nodes.new("ShaderNodeCombineColor")
+        emit_node_rgb.mode = "RGB"
 
         links.new(out_node.inputs[0], emit_node.outputs[0])
 
         existing_img_node = temp_nodes.new("ShaderNodeTexImage")
-        existing_img_node_rgb = temp_nodes.new("ShaderNodeSeparateRGB")
+        existing_img_node_rgb = temp_nodes.new("ShaderNodeSeparateColor")
+        existing_img_node_rgb.mode = "RGB"
         links.new(existing_img_node_rgb.inputs[0],
                   existing_img_node.outputs[0])
 
@@ -476,7 +478,11 @@ class SocketBaker:
                             TempChanges(scene.render.bake, False))
 
             render_props.engine = 'CYCLES'
-            render_props.use_bake_multires = False
+            try:
+                render_props.use_bake_multires = False
+            except AttributeError:
+                # Removed on Blender >= 5.0
+                pass
 
             cycles_props.bake_type = 'EMIT'
             cycles_props.film_exposure = 1.0
