@@ -65,6 +65,11 @@ CHANNEL_DETECT_MODES = (
 
 
 def _temp_switch_to_node_editor(context, exit_stack, node_tree) -> None:
+    if context.area.ui_type:
+        old_ui_type = context.area.ui_type
+        exit_stack.callback(lambda: setattr(context.area, "ui_type",
+                                            old_ui_type))
+
     old_area_type = context.area.type
     exit_stack.callback(lambda: setattr(context.area, "type",
                                         old_area_type))
